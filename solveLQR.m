@@ -1,5 +1,5 @@
 % solve LQR problem and return optimal control gain
-function [Kopt, S, M] = solveLQR(N, A, B, Q, R, P)
+function [Kopt, S, M, Qbar, Rbar] = solveLQR(N, A, B, Q, R, P)
   % Compute the matrices S, M, Qbar, Rbar, and K0N
   % for the unconstrained LQ-MPC problem
   %

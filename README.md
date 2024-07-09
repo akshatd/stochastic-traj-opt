@@ -170,16 +170,16 @@ $$
 J &= x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k) \\
 &= X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0 \text{ (extra $x_0$ term because it is not in $X$)} \\
 &= (S U + M x_0)^T \bar{Q} (S U + M x_0) + U^T \bar{R} U + x_0^T Q x_0 \\
-& \text{note } (A + B)^T = A^T + B^T \text{ and } (AB)^T = B^T A^T \\
+% & \text{note } (A + B)^T = A^T + B^T \text{ and } (AB)^T = B^T A^T \\
 &= (U^T S^T + x_0^T M^T) \bar{Q} (S U + M x_0) + U^T \bar{R} U + x_0^T Q x_0 \\
-& \text{note } A(B + C) = AB + AC \\
+% & \text{note } A(B + C) = AB + AC \\
 &= (U^T S^T + x_0^T M^T) (\bar{Q} S U + \bar{Q} M x_0) + U^T \bar{R} U + x_0^T Q x_0 \\
 &= U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0 + U^T \bar{R} U + x_0^T Q x_0 \\
-& \text{note } \bar{Q} \text{ is symmetric so it doesnt need to be transposed} \\
+% & \text{note } \bar{Q} \text{ is symmetric so it doesnt need to be transposed} \\
 &= U^T S^T \bar{Q} S U + (x_0^T M^T \bar{Q} S U)^T + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0 + U^T \bar{R} U + x_0^T Q x_0 \\
-& \text{note } x_0^T M^T \bar{Q} S U \text{ is a scalar(check its dimensions), so its transpose is itself} \\
+% & \text{note } x_0^T M^T \bar{Q} S U \text{ is a scalar(check its dimensions), so its transpose is itself} \\
 &= U^T S^T \bar{Q} S U + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0 + U^T \bar{R} U + x_0^T Q x_0 \\
-& \text{combining all quadratic and repeated terms} \\
+% & \text{combining all quadratic and repeated terms} \\
 &= U^T (S^T \bar{Q} S + \bar{R}) U + 2 x_0^T M^T \bar{Q} S U + x_0^T(M^T \bar{Q} M + Q) x_0\\
 \end{aligned}
 $$
@@ -190,7 +190,7 @@ $$
 \begin{aligned}
 H &= S^T \bar{Q} S + \bar{R} = H^T \\
 &\text{(quadratic multiplication by diagnonal($\bar{Q}$) results in a symmetric, R is symmetric)} \\
-q &= (x_0^T M^T \bar{Q} S)^T = S^T \bar{Q} M x_0 \text{ ($\bar{Q}$ is symmetric)} \\
+q &= (x_0^T M^T \bar{Q} S)^T = S^T \bar{Q} M x_0 \\
 c &= x_0^T (M^T \bar{Q} M + Q) x_0
 \end{aligned}
 $$
@@ -220,7 +220,7 @@ $$
 
 ## Stochastic LQR
 
-We will consider the case where the initial state $x_0$ is stochastic, with mean $\mu$ and variance $\sigma^2$.
+We will consider the case where the initial state $x_0$ is stochastic, with mean $\mu$ and covariance $\Sigma$.
 The control input vector $U$ is still deterministic.
 
 In this case, the state vector $X$ is stochastic, owing to the the initial condition $x_0$ being a vector of random variables. The state propagation equations are now expectations
@@ -247,15 +247,59 @@ The cost matrices $\bar{Q}$ and $\bar{R}$ are also the same. The cost function i
 
 $$
 \begin{aligned}
-J &= E[x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)] \\
+E[J] &= E[x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)] \\
 &= E[X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0] \\
 &= E[X^T \bar{Q} X] + E[U^T \bar{R} U] + E[x_0^T Q x_0] \\
 &= E[X^T \bar{Q} X] + U^T \bar{R} U + E[x_0^T Q x_0] \text{ (since $U$ is deterministic)} \\
 &= E[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + E[x_0^T Q x_0] \\
-&= (S U + M E[x_0])^T \bar{Q} (S U + M E[x_0]) + U^T \bar{R} U + (\mu^T Q \mu + \text{trace}(Q \sigma^2)) \\
+% & \text{quadratic form: https://en.wikipedia.org/wiki/Quadratic_form_(statistics)} \\
+&= E[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
+&= U^T S^T \bar{Q} S U + E[U^T S^T \bar{Q} M x_0] + E[x_0^T M^T \bar{Q} S U] + E[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M E[x_0] + E[x_0^T] M^T \bar{Q} S U + E[x_0^T M^T \bar{Q} M x_0] + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + E[x_0^T] M^T \bar{Q} S U + E[x_0^T] M^T \bar{Q} S U + E[x_0^T M^T \bar{Q} M x_0] + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 E[x_0^T] M^T \bar{Q} S U + E[x_0^T M^T \bar{Q} M x_0] + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 E[x_0^T] M^T \bar{Q} S U + \mu^T M^T \bar{Q} M \mu + \text{tr}(M^T \bar{Q} M \Sigma) + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 E[x_0^T] M^T \bar{Q} S U + \mu^T (M^T \bar{Q} M + Q) \mu + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma) \\
 \end{aligned}
 $$
+
+Now assuming $E[x_0] = \mu$, let
+
+$$
+\begin{aligned}
+H &= S^T \bar{Q} S + \bar{R} = H^T \\
+q &= (\mu^T M^T \bar{Q} S)^T = S^T \bar{Q} M \mu \\
+c &= \mu^T (M^T \bar{Q} M + Q) \mu + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma)
+\end{aligned}
+$$
+
+The cost function can now be written as a quadratic function of the control inputs $U$
+
+$$
+J = U^T H U + 2 q^T U + c
+$$
+
+Which has a gradient with respect to $U$ as
+
+$$
+\Delta J = 2 H U + 2 q
+$$
+
+Assuming minimum exists, we can set the gradient to zero to get the optimal control input $U^*$
+
+$$
+\begin{aligned}
+\Delta J &= 2 H U + 2 q = 0 \\
+\implies U^* &= -H^{-1} q
+\end{aligned}
+$$
+
+Which proves that the optimal control input when the initial state is stochastic is the same as when the initial state is deterministic if that the mean of the stochastic initial state is the same as the deterministic initial state given enough samples.
 
 To visualize this, we can optmize individual trajectories with randomly sampled initial conditions and plot the average trajectory. The average trajectory is the solution to the stochastic LQR problem.
 
 ![Closed Loop with Stochastic LQR Control](figs/cl_stoch_init.svg)
+
+Here we use a simple Monte Carlo estimator to estimate the expected value of the cost function over some realizations of the initial conditions. The variance of this cost function is varies with the number of samples used in the Monte Carlo estimator.
+
+![Variance of the Cost Function with Number of Samples](figs/mc_variance.svg)
