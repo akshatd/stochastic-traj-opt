@@ -1,0 +1,14 @@
+{
+	"runOnSave.commands": [
+		{
+		"match": ".*\\.md$",
+		"command": "pandoc ${fileDirname}/*.md --resource-path=${fileDirname} -o ${workspaceFolder}/artefacts/${fileBasenameNoExtension}.pdf",
+		"runningStatusMessage": "Exporting ${fileBasename} to PDF...",
+		"finishStatusMessage": "${fileBasename} exported to PDF",
+		// "runIn": "backend",
+		"runIn": "terminal",
+		// "runIn": "vscode",
+		}
+],
+
+}
