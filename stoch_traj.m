@@ -5,7 +5,7 @@ m = 5; % mass
 k = 2; % spring coefficient
 b = 0.5; % damping coefficient
 
-Ts = 0.1; % sampling time
+Ts = 0.05; % sampling time
 
 %% state space model
 A_msd = [0 1;
@@ -79,7 +79,7 @@ saveas(fig, 'figs/cl_det.svg');
 %% stochastic with random initial state
 
 %% set up problem with stochastic initial state
-nSamples = 10;
+nSamples = 100;
 x0_mean = 1;
 x0_sd = 0.1;
 x0_rv = normrnd(x0_mean, x0_sd, [nx, nSamples]);
@@ -126,9 +126,11 @@ saveas(fig, 'figs/ol_stoch_init.svg');
 %% set up and solve stochastic LQR problem using robust optimization
 data.x_cl_stoch = zeros(nx, length(times), nSamples);
 data.x_cl_stoch(:, 1, :) = x0_rv;
+x0_rv_mean = mean(x0_rv, 2);
 % Kopt does not depend on x0, so we can use the same Kopt
 for i = 1:nSamples
-  Uopt = Kopt * data.x_ol_stoch(:, 1, i);
+  % Uopt = Kopt * data.x_ol_stoch(:, 1, i);
+  Uopt = Kopt * x0_rv_mean;
   % reshape because the result will be a column vector of length N * nx or N * nu
   data.x_cl_stoch(:, 2:end, i) = reshape(S * Uopt + M * data.x_cl_stoch(:, 1, i), nx, N); % SU + Mx0
 end
@@ -154,7 +156,6 @@ subplot(1, 2, 2);
 hold on;
 plot(times, mean(data.x_cl_stoch(1, :, :), 3), 'b', 'LineWidth', 2, 'DisplayName', 'Sample Average');
 plot(times, data.x_cl(1, :), 'r', 'LineWidth', 2, 'DisplayName', 'Deterministic');
-title("Closed loop dynamics with stochastic initial state (" + nSamples + " samples)");
 xlabel('Time [s]');
 ylabel('Position [m]');
 legend show; legend boxoff;
@@ -181,14 +182,15 @@ for samples = mc_data.samples
   for i = 1:mc_est_samples
     mc_x0 = normrnd(x0_mean, x0_sd, [nx, samples]);
     mc_cost = zeros(samples, 1);
+    mc_x0_mean = mean(mc_x0, 2);
 
     for j = 1:samples
-      Uopt = Kopt * mc_x0(:, j);
+      Uopt = Kopt * mc_x0_mean;
       mc_cost(j) = Uopt' * H * Uopt + 2 * (q_partial * mc_x0(:, j))' * Uopt + mc_x0(:, j)' * c_partial * mc_x0(:, j);
     end
 
     waitbar(i / mc_est_samples, wait_bar);
-    mc_est(i) = mean(mc_cost);
+    mc_est(i) = mean(mc_cost) / N;
   end
 
   close(wait_bar);
@@ -199,7 +201,7 @@ end
 fig = figure();
 loglog(mc_data.samples, mc_data.var, 'b', 'LineWidth', 2, 'DisplayName', 'MC Variance');
 hold on;
-title('Monte Carlo variance of the cost function estimator');
+title('Monte Carlo estimator variance of normalized cost function');
 xlabel('Number of samples');
 ylabel('Variance');
 legend show; legend boxoff;

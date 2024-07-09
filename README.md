@@ -263,7 +263,7 @@ E[J] &= E[x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)] \\
 \end{aligned}
 $$
 
-Now assuming $E[x_0] = \mu$, let
+Now assuming $E[x_0] = \mu$, which is calculated using a Monte Carlo estimator, we can write the cost function as
 
 $$
 \begin{aligned}
@@ -301,5 +301,11 @@ To visualize this, we can optmize individual trajectories with randomly sampled 
 ![Closed Loop with Stochastic LQR Control](figs/cl_stoch_init.svg)
 
 Here we use a simple Monte Carlo estimator to estimate the expected value of the cost function over some realizations of the initial conditions. The variance of this cost function is varies with the number of samples used in the Monte Carlo estimator.
+
+$$
+\begin{aligned}
+Var[J] &= E[J^2] - E[J]^2 \\
+\end{aligned}
+$$
 
 ![Variance of the Cost Function with Number of Samples](figs/mc_variance.svg)
