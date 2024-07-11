@@ -9,9 +9,9 @@ Ts = 0.05; % sampling time
 
 %% state space model
 A_msd = [0 1;
-         -k / m -b / m];
+  -k / m -b / m];
 B_msd = [0;
-         1 / m];
+  1 / m];
 C_msd = [1 0];
 D_msd = 0;
 
@@ -30,11 +30,12 @@ Tfid = Ts / 10;
 %% simulate open loop dynamics
 data.x_ol = zeros(nx, length(times));
 data.x_ol(:, 1) = x0;
-k = 2; % first index is already filled by x0  (k = 1)
+k = 1;
 
-for t = times(2:end)
+for t = times(1: end - 1)
   uk = 0;
-  data.x_ol(:, k) = Ad_msd * data.x_ol(:, k - 1) + Bd_msd * uk;
+  [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t + Tfid:Tfid:t + Ts, data.x_ol(:, k));
+  data.x_ol(:, k + 1) = x_ode(end, :)';
   k = k + 1;
 end
 
@@ -61,8 +62,14 @@ Uopt = Kopt * x0;
 %% simulate closed loop dynamics
 data.x_cl = zeros(nx, length(times));
 data.x_cl(:, 1) = x0;
-% reshape because the result will be a column vector of length N * nx or N * nu
-data.x_cl(:, 2:end) = reshape(S * Uopt + M * data.x_cl(:, 1), nx, N); % SU + Mx0
+k = 1;
+
+for t = times(1: end - 1)
+  uk = Uopt(k);
+  [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t + Tfid:Tfid:t + Ts, data.x_cl(:, k));
+  data.x_cl(:, k + 1) = x_ode(end, :)';
+  k = k + 1;
+end
 
 %% plot closed loop dynamics
 fig = figure;
@@ -88,10 +95,14 @@ data.x_ol_stoch(:, 1, :) = x0_rv;
 Uzero = zeros(N * nu, nSamples);
 
 %% simulate open loop dynamics
-
 for i = 1:nSamples
-  % reshape because the result will be a column vector of length N * nx or N * nu
-  data.x_ol_stoch(:, 2:end, i) = reshape(S * Uzero(:, i) + M * data.x_ol_stoch(:, 1, i), nx, N); % SU + Mx0
+  k = 1;
+  for t = times(1:end - 1)
+    uk = 0;
+    [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t + Tfid:Tfid:t + Ts, data.x_ol_stoch(:, k, i));
+    data.x_ol_stoch(:, k + 1, i) = x_ode(end, :)';
+    k = k + 1;
+  end
 end
 
 %% plot open loop dynamics
@@ -127,12 +138,17 @@ saveas(fig, 'figs/ol_stoch_init.svg');
 data.x_cl_stoch = zeros(nx, length(times), nSamples);
 data.x_cl_stoch(:, 1, :) = x0_rv;
 x0_rv_mean = mean(x0_rv, 2);
-% Kopt does not depend on x0, so we can use the same Kopt
+% Uopt does not depend on x0, so we can use the same Uopt
+Uopt = Kopt * x0_rv_mean;
+
 for i = 1:nSamples
-  % Uopt = Kopt * data.x_ol_stoch(:, 1, i);
-  Uopt = Kopt * x0_rv_mean;
-  % reshape because the result will be a column vector of length N * nx or N * nu
-  data.x_cl_stoch(:, 2:end, i) = reshape(S * Uopt + M * data.x_cl_stoch(:, 1, i), nx, N); % SU + Mx0
+  k = 1;
+  for t = times(1:end - 1)
+    uk = Uopt(k);
+    [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t + Tfid:Tfid:t + Ts, data.x_cl_stoch(:, k, i));
+    data.x_cl_stoch(:, k + 1, i) = x_ode(end, :)';
+    k = k + 1;
+  end
 end
 
 %% plot closed loop dynamics
@@ -178,21 +194,17 @@ c_partial = M' * Qbar * M + Q;
 for samples = mc_data.samples
   mc_est = zeros(mc_est_samples, 1);
   wait_bar = waitbar(0, "Running MC estimator with " + samples + " samples");
-
   for i = 1:mc_est_samples
     mc_x0 = normrnd(x0_mean, x0_sd, [nx, samples]);
     mc_cost = zeros(samples, 1);
     mc_x0_mean = mean(mc_x0, 2);
-
+    Uopt = Kopt * mc_x0_mean;
     for j = 1:samples
-      Uopt = Kopt * mc_x0_mean;
       mc_cost(j) = Uopt' * H * Uopt + 2 * (q_partial * mc_x0(:, j))' * Uopt + mc_x0(:, j)' * c_partial * mc_x0(:, j);
     end
-
     waitbar(i / mc_est_samples, wait_bar);
     mc_est(i) = mean(mc_cost) / N;
   end
-
   close(wait_bar);
   mc_data.var(mc_data.samples == samples) = var(mc_est);
 end
@@ -208,3 +220,7 @@ legend show; legend boxoff;
 grid on; grid minor;
 saveas(fig, 'figs/mc_variance.svg');
 hold off;
+
+function xdot = msd(t, x, u, A, B)
+xdot = A * x + B * u;
+end

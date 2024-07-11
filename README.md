@@ -250,26 +250,23 @@ $$
 E[J] &= E[x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)] \\
 &= E[X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0] \\
 &= E[X^T \bar{Q} X] + E[U^T \bar{R} U] + E[x_0^T Q x_0] \\
-&= E[X^T \bar{Q} X] + U^T \bar{R} U + E[x_0^T Q x_0] \text{ (since $U$ is deterministic)} \\
 &= E[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + E[x_0^T Q x_0] \\
 % & \text{quadratic form: https://en.wikipedia.org/wiki/Quadratic_form_(statistics)} \\
-&= E[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
-&= U^T S^T \bar{Q} S U + E[U^T S^T \bar{Q} M x_0] + E[x_0^T M^T \bar{Q} S U] + E[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M E[x_0] + E[x_0^T] M^T \bar{Q} S U + E[x_0^T M^T \bar{Q} M x_0] + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + E[x_0^T] M^T \bar{Q} S U + E[x_0^T] M^T \bar{Q} S U + E[x_0^T M^T \bar{Q} M x_0] + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 E[x_0^T] M^T \bar{Q} S U + E[x_0^T M^T \bar{Q} M x_0] + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 E[x_0^T] M^T \bar{Q} S U + \mu^T M^T \bar{Q} M \mu + \text{tr}(M^T \bar{Q} M \Sigma) + \mu^T Q \mu + \text{tr}(Q \Sigma) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 E[x_0^T] M^T \bar{Q} S U + \mu^T (M^T \bar{Q} M + Q) \mu + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma) \\
+&= E[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + E[x_0]^T Q E[x_0] + \text{tr}(Q \Sigma) \\
+&= U^T S^T \bar{Q} S U + E[U^T S^T \bar{Q} M x_0] + E[x_0^T M^T \bar{Q} S U] + E[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + E[x_0]^T Q E[x_0] + \text{tr}(Q \Sigma) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M E[x_0] + E[x_0^T] M^T \bar{Q} S U + E[x_0^T M^T \bar{Q} M x_0] + E[x_0]^T Q E[x_0] + \text{tr}(Q \Sigma) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + E[x_0^T] M^T \bar{Q} S U + E[x_0^T] M^T \bar{Q} S U + E[x_0]^T M^T \bar{Q} M E[x_0] + \text{tr}(M^T \bar{Q} M \Sigma) + E[x_0]^T Q E[x_0] + \text{tr}(Q \Sigma) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 E[x_0^T] M^T \bar{Q} S U + E[x_0]^T (M^T \bar{Q} M + Q) E[x_0] + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma) \\
 \end{aligned}
 $$
 
-Now assuming $E[x_0] = \mu$, which is calculated using a Monte Carlo estimator, we can write the cost function as
+Now assuming $E[x_0]$ is calculated using a Monte Carlo estimator, we can write the cost function as
 
 $$
 \begin{aligned}
 H &= S^T \bar{Q} S + \bar{R} = H^T \\
-q &= (\mu^T M^T \bar{Q} S)^T = S^T \bar{Q} M \mu \\
-c &= \mu^T (M^T \bar{Q} M + Q) \mu + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma)
+q &= (E[x_0]^T M^T \bar{Q} S)^T = S^T \bar{Q} M E[x_0] \\
+c &= E[x_0]^T (M^T \bar{Q} M + Q) E[x_0] + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma)
 \end{aligned}
 $$
 
@@ -303,8 +300,15 @@ To visualize this, we can optmize individual trajectories with randomly sampled 
 Here we use a simple Monte Carlo estimator to estimate the expected value of the cost function over some realizations of the initial conditions. The variance of this cost function is varies with the number of samples used in the Monte Carlo estimator.
 
 $$
+Var[J] = E[J^2] - E[J]^2
+$$
+
+We already know $E[J]$, so we can focus on $E[J^2]$
+
+$$
 \begin{aligned}
-Var[J] &= E[J^2] - E[J]^2 \\
+E[J^2] &= E[(U^T H U + 2 q^T U + c)^2] \\
+&= E[U^T H U U^T H U + 4 q^T U q^T U + c^2 + 2 U^T H U q^T U + U^T H U c + 2 q^T U U^T H U + 2 q^T U c + c U^T H U + 2 c q^T U] \\
 \end{aligned}
 $$
 
