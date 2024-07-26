@@ -1,5 +1,9 @@
 clc; clear; close all;
 
+
+% plot settings
+plot_ylim_l = [-2.5 2.5];
+plot_ylim_r = [-4.5 0];
 %% state space model
 
 % system params
@@ -37,7 +41,7 @@ plot(data.times, data.x_ol(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity'
 title('Open loop dynamics');
 xlabel('Time [s]');
 ylabel('Position [m]/Velocity [m/s]');
-ylim([-3 3]);
+ylim(plot_ylim_l);
 legend show; legend boxoff;
 grid on; grid minor;
 saveas(fig, 'figs/ol_det.svg');
@@ -84,11 +88,14 @@ fig = figure;
 hold on;
 plot(data.times, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position');
 plot(data.times, data.x_cl(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity');
-stairs(times(1:end-1), u0 + cumsum(Uopt), 'r', 'LineWidth', 2, 'DisplayName', 'Control Effort');
 title('Closed loop dynamics');
 xlabel('Time [s]');
 ylabel('Position [m]/Velocity [m/s]');
-ylim([-3 3]);
+ylim(plot_ylim_l);
+yyaxis right;
+stairs(times(1:end-1), u0 + cumsum(Uopt), 'r', 'LineWidth', 2, 'DisplayName', 'Control Effort');
+ylabel('Control Effort [N]');
+ylim(plot_ylim_r);
 legend show; legend boxoff;
 grid on; grid minor;
 saveas(fig, 'figs/cl_det.svg');
@@ -118,10 +125,10 @@ for i = 1:nSamples
   plot(data.times, data.x_ol_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.5]);
 end
 
-plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Position: Sample Average');
+plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
 xlabel('Time [s]');
 ylabel('Position [m]');
-ylim([-3 3]);
+ylim(plot_ylim_l);
 legend show; legend boxoff;
 grid on; grid minor;
 hold off;
@@ -129,10 +136,10 @@ hold off;
 subplot(1, 2, 2);
 hold on;
 plot(data.times, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic');
-plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Position: Sample Average');
+plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
 xlabel('Time [s]');
 ylabel('Position [m]');
-ylim([-3 3]);
+ylim(plot_ylim_l);
 legend show; legend boxoff;
 grid on; grid minor;
 hold off;
@@ -142,18 +149,20 @@ saveas(fig, 'figs/ol_stoch_init.svg');
 %% set up and solve stochastic LQR problem using robust optimization
 data.x_cl_stoch = zeros(nx, Tsim/Tfid + 1, nSamples);
 x0_rv_mean = mean(x0_rv, 2);
-% Uopt does not depend on x0, so we can use the same Uopt
-Uopt = Kopt * x0_rv_mean;
-
+x0_rv_mean_ext = [x0_rv_mean; u0; ref];
+% Uopt only depends on x0, so we can use the same Uopt
+Uopt = Kopt * x0_rv_mean_ext;
 for i = 1:nSamples
   k = 0;
   xk = x0_rv(:, i);
+  ukm1 = u0;
   for t = times(1:end - 1)
-    uk = Uopt(k+1);
+    uk = ukm1 + Uopt(k+1);
     [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t:Tfid:t + Ts, xk);
     % skip the last x since it will be repeated in the next sim
     data.x_cl_stoch(:, k*Tmult + 1:(k + 1)*Tmult, i) = x_ode(1:end-1, :)';
     xk = x_ode(end, :)';
+    ukm1 = uk;
     k = k + 1;
   end
   % add back the last xk
@@ -171,10 +180,13 @@ for i = 1:nSamples
 end
 
 plot(data.times, mean(data.x_cl_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
-stairs(times(1:end-1), Uopt, 'r', 'LineWidth', 2, 'DisplayName', 'Control Effort');
 xlabel('Time [s]');
 ylabel('Position [m]');
-ylim([-3 3]);
+ylim(plot_ylim_l);
+yyaxis right;
+stairs(times(1:end-1), u0 + cumsum(Uopt), 'r', 'LineWidth', 2, 'DisplayName', 'Control Effort');
+ylabel('Control Effort [N]');
+ylim(plot_ylim_r);
 legend show; legend boxoff;
 grid on; grid minor;
 hold off;
@@ -185,11 +197,11 @@ plot(data.times, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position:
 plot(data.times, mean(data.x_cl_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
 xlabel('Time [s]');
 ylabel('Position [m]');
-ylim([-3 3]);
+ylim(plot_ylim_l);
 legend show; legend boxoff;
 grid on; grid minor;
 hold off;
-fig.Position = [100 100 1000 500];
+fig.Position = [100 100 1200 500];
 saveas(fig, 'figs/cl_stoch_init.svg');
 
 %% Monte carlo estimator with variance calculation
