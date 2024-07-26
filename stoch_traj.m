@@ -11,7 +11,9 @@ A_msd = [0 1;
   -k / m -b / m];
 B_msd = [0;
   1 / m];
-C_msd = [1 0];
+% C_msd = [1 0]; % only observe position
+C_msd = [1 0;
+  0 1]; % observe both position and velocity
 D_msd = 0;
 
 msd_sys = ss(A_msd, B_msd, C_msd, D_msd);
@@ -19,7 +21,7 @@ msd_sys = ss(A_msd, B_msd, C_msd, D_msd);
 % setup simulation
 nx = size(A_msd, 1);
 nu = size(B_msd, 2);
-x0 = ones(nx, 1);
+x0 = [1;0];
 Tsim = 10;
 Tfid = 0.01; % simulation fidelity
 
@@ -31,7 +33,7 @@ data.x_ol = x_ode';
 fig = figure;
 hold on;
 plot(data.times, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position');
-% plot(data.times, data.x_ol(2, :), 'r', 'LineWidth', 2, 'DisplayName', 'Velocity');
+plot(data.times, data.x_ol(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity');
 title('Open loop dynamics');
 xlabel('Time [s]');
 ylabel('Position [m]');
@@ -46,24 +48,32 @@ assert(mod(Ts, Tfid) == 0, "Ts=" + Ts + " is not a multiple of Tfid=" + Tfid);
 Tmult = Ts / Tfid;
 %% set up and solve deterministic LQR problem
 Q = eye(nx) * 2; % state cost
-R = eye(nu) * 1; % input cost
-P = eye(nx) * 10; % terminal state cost
+R = eye(nu) * 100; % input cost
+% terminal state cost, needs to be 0 for the extended state since
+% we dont want to penalize the state being away from the origin
+P = eye(nx) * 0;
 N = Tsim/Ts; % prediction horizon, excluding initial state
-Kopt = solveLQR(N, c2d(msd_sys, Ts), Q, R, P);
-Uopt = Kopt * x0;
+ref = [-2; 0]; % reference state [pos, vel]
+u0 = 0; % initial control effort
+% create the extended state system [x_k, u_k-1, r_k]
+x0_ext = [x0; u0; ref]; %
+[A_ext, B_ext, Q_ext, R_ext, P_ext] = extendState(c2d(msd_sys, Ts), Q, R, P);
+Kopt = solveLQR(N, A_ext, B_ext, Q_ext, R_ext, P_ext);
+Uopt = Kopt * x0_ext;
 
 %% simulate closed loop dynamics
 data.x_cl = zeros(nx, Tsim/Tfid + 1);
-data.x_cl(:, 1) = x0;
 k = 0;
 xk = x0;
+ukm1 = u0;
 times = 0:Ts:Tsim;
 for t = times(1: end - 1)
-  uk = Uopt(k+1);
+  uk = ukm1 + Uopt(k+1);
   [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t:Tfid:t + Ts, xk);
   % skip the last x since it will be repeated in the next sim
   data.x_cl(:, k*Tmult + 1:(k + 1)*Tmult) = x_ode(1:end-1,:)';
   xk = x_ode(end, :)';
+  ukm1 = uk;
   k = k + 1;
 end
 % add back the last xk
@@ -73,7 +83,8 @@ data.x_cl(:,end) = xk;
 fig = figure;
 hold on;
 plot(data.times, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position');
-stairs(times(1:end-1), Uopt, 'r', 'LineWidth', 2, 'DisplayName', 'Control Effort');
+plot(data.times, data.x_cl(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity');
+stairs(times(1:end-1), u0 + cumsum(Uopt), 'r', 'LineWidth', 2, 'DisplayName', 'Control Effort');
 title('Closed loop dynamics');
 xlabel('Time [s]');
 ylabel('Position [m]');
@@ -130,7 +141,6 @@ saveas(fig, 'figs/ol_stoch_init.svg');
 
 %% set up and solve stochastic LQR problem using robust optimization
 data.x_cl_stoch = zeros(nx, Tsim/Tfid + 1, nSamples);
-data.x_cl_stoch(:, 1, :) = x0_rv;
 x0_rv_mean = mean(x0_rv, 2);
 % Uopt does not depend on x0, so we can use the same Uopt
 Uopt = Kopt * x0_rv_mean;
@@ -187,23 +197,38 @@ mc_est_samples = 1000; % number of samples of each estimator for calculating the
 mc_data.samples = [10, 100, 1000, 10000]; % number of samples for a single MC estimator
 mc_data.var = zeros(1, length(mc_data.samples));
 
-%% pre calculate all matrices that dont require x0
-H = S' * Qbar * S + Rbar;
-q_partial = S' * Qbar * M;
-c_partial = M' * Qbar * M + Q;
-
-%% run samples of monte carlo
+% go through MC estimators with different sample sizes
 for samples = mc_data.samples
   mc_est = zeros(mc_est_samples, 1);
   wait_bar = waitbar(0, "Running MC estimator with " + samples + " samples");
+  % run each MC estimator multiple times to get a vaiance estimate
   for i = 1:mc_est_samples
-    mc_x0 = normrnd(x0_mean, x0_sd, [nx, samples]);
+    x0_mc = normrnd(x0_mean, x0_sd, [nx, samples]);
     mc_cost = zeros(samples, 1);
-    mc_x0_mean = mean(mc_x0, 2);
-    Uopt = Kopt * mc_x0_mean;
+    x0_mc_mean = mean(x0_mc, 2);
+    Uopt = Kopt * x0_mc_mean;
+    mc_x = zeros(nx, Tsim/Tfid + 1, samples);
+    % for j = 1:samples
+    %   mc_cost(j) = Uopt' * H * Uopt + 2 * (q_partial * x0_mc(:, j))' * Uopt + x0_mc(:, j)' * c_partial * x0_mc(:, j);
+    % end
+    % calculate the cost for each sample
     for j = 1:samples
-      mc_cost(j) = Uopt' * H * Uopt + 2 * (q_partial * mc_x0(:, j))' * Uopt + mc_x0(:, j)' * c_partial * mc_x0(:, j);
+      k = 0;
+      xk = x0_mc(:, j);
+      for t = times(1:end - 1)
+        uk = Uopt(k+1);
+        [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t:Tfid:t + Ts, xk);
+        % skip the last x since it will be repeated in the next sim
+        mc_x(:, k*Tmult + 1:(k + 1)*Tmult, j) = x_ode(1:end-1, :)';
+        xk = x_ode(end, :)';
+        k = k + 1;
+      end
+      % add back the last xk
+      mc_x(:, end, j) = xk;
+      % alculate the total cost
+      % for t=1:Tsim/Tfid
     end
+    
     waitbar(i / mc_est_samples, wait_bar);
     mc_est(i) = mean(mc_cost) / N;
   end

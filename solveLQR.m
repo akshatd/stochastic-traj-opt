@@ -1,17 +1,15 @@
 % solve LQR problem and return optimal control gain
-function Kopt = solveLQR(N, system, Q, R, P)
+function Kopt = solveLQR(N, A, B, Q, R, P)
 % Compute the matrices S, M, Qbar, Rbar, and K0N
 % for the unconstrained LQ-MPC problem
 %
 % Inputs:
 %   N: Prediction horizon
-%   system: state space system
+%   A: State transition matrix
+%   B: Input matrix
 %   Q: State cost matrix
 %   R: Input cost matrix
 %   P: Terminal state cost matrix
-
-A = system.A;
-B = system.B;
 
 nx = size(A, 1);
 nu = size(B, 2);
