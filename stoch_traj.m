@@ -36,7 +36,7 @@ plot(data.times, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position'
 plot(data.times, data.x_ol(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity');
 title('Open loop dynamics');
 xlabel('Time [s]');
-ylabel('Position [m]');
+ylabel('Position [m]/Velocity [m/s]');
 ylim([-3 3]);
 legend show; legend boxoff;
 grid on; grid minor;
@@ -87,7 +87,7 @@ plot(data.times, data.x_cl(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity'
 stairs(times(1:end-1), u0 + cumsum(Uopt), 'r', 'LineWidth', 2, 'DisplayName', 'Control Effort');
 title('Closed loop dynamics');
 xlabel('Time [s]');
-ylabel('Position [m]');
+ylabel('Position [m]/Velocity [m/s]');
 ylim([-3 3]);
 legend show; legend boxoff;
 grid on; grid minor;
@@ -97,9 +97,9 @@ saveas(fig, 'figs/cl_det.svg');
 
 %% set up problem with stochastic initial state
 nSamples = 100;
-x0_mean = 1;
-x0_sd = 0.1;
-x0_rv = normrnd(x0_mean, x0_sd, [nx, nSamples]);
+x0_mean = x0;
+x0_sd = eye(nx)* 0.1;
+x0_rv = mvnrnd(x0_mean, x0_sd, nSamples)';
 data.x_ol_stoch = zeros(nx, Tsim/Tfid + 1, nSamples);
 
 %% simulate open loop dynamics
@@ -118,7 +118,7 @@ for i = 1:nSamples
   plot(data.times, data.x_ol_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.5]);
 end
 
-plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--g', 'LineWidth', 2, 'DisplayName', 'Sample Average');
+plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Position: Sample Average');
 xlabel('Time [s]');
 ylabel('Position [m]');
 ylim([-3 3]);
@@ -128,8 +128,8 @@ hold off;
 
 subplot(1, 2, 2);
 hold on;
-plot(data.times, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Deterministic');
-plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--g', 'LineWidth', 2, 'DisplayName', 'Sample Average');
+plot(data.times, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic');
+plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Position: Sample Average');
 xlabel('Time [s]');
 ylabel('Position [m]');
 ylim([-3 3]);
@@ -170,7 +170,7 @@ for i = 1:nSamples
   plot(data.times, data.x_cl_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.5]);
 end
 
-plot(data.times, mean(data.x_cl_stoch(1, :, :), 3), '--g', 'LineWidth', 2, 'DisplayName', 'Sample Average');
+plot(data.times, mean(data.x_cl_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
 stairs(times(1:end-1), Uopt, 'r', 'LineWidth', 2, 'DisplayName', 'Control Effort');
 xlabel('Time [s]');
 ylabel('Position [m]');
@@ -181,8 +181,8 @@ hold off;
 
 subplot(1, 2, 2);
 hold on;
-plot(data.times, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Deterministic');
-plot(data.times, mean(data.x_cl_stoch(1, :, :), 3), '--g', 'LineWidth', 2, 'DisplayName', 'Sample Average');
+plot(data.times, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic');
+plot(data.times, mean(data.x_cl_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
 xlabel('Time [s]');
 ylabel('Position [m]');
 ylim([-3 3]);
