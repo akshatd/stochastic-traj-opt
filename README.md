@@ -2,7 +2,32 @@
 geometry: "margin=2cm"
 ---
 
-# Stochastic Trajectory Optimization
+# Multi-fidelity Stochastic Trajectory Optimization
+
+## Overview
+
+- Given the state space equations of a system, we can predict how it evolves over time with a given control input.
+- Since we can predict the future states of the system, we can optimize the control inputs over time to make sure the system gets to a desired state (position and vecocity = 0 in this case).
+- We also do not want to use too much control effort to get to the desired state.
+- Putting both of these ideas into maths, we can construct a cost function that is dependent on how far away the state is to the desired state and how much control effort is being used.
+- This function can then be minimized over the control inputs to see which control inputs can get the system to the desired state with minimal effort.
+- Now some things in the system might not be known exactly, like the initial state of the system or the spring constant of a mass spring damper system.
+- These unknowns can be modeled as random variables, and the cost function then becomes a random variable itself, since it is now a function of other random variables.
+- This cost function can be estimated using Monte Carlo with random samples from the distribution of the parameters, which would give us an expected value of the cost function.
+- If we use fewer samples in the Monte Carlo, the estimate will be less accurate and will be away from the true expected value of the cost function more often and vice-versa.
+- This means that if we were to repeat the Monte Carlo simulation multiple times with a fixed number of samples, it will have some variance in the estimate of the cost function.
+- Our goal then becomes to minimize this variance in the Monte Carlo estimate of the cost function given a finite total computational cost, so that every time we run Monte Carlo, we are sure that it wont be too far off from the true value.
+- Now normally we would just increase the number of samples in the Monte Carlo to reduce the variance till we hit our computational budget.
+- But what if we had access to a lower fidelity model of the system that could give us a rough estimate (maybe it has some bias in either the cost or the solution of control inputs) of the cost function with lower computational cost? This means we can run more samples in the lower fidelity model for the same computational cost!
+- With this in mind, our goal of minimizing the variance in the Monte Carlo estimate of the cost function is now not just about maxxing out the number of samples, but finding a good balance between the the number of samples we run in the high and low fidelity models given a fixed total computational budget that minimizes the variance.
+- If we have multiple fidelity models, we will have to determine how to distribute the samples among the models.
+- So to summarize
+  - We have a system, whose trajectory we want to optimize using a cost function
+  - Some parameters in the system are random, so the cost function is also random
+  - To get an expectation of the cost function, we use Monte Carlo using random samples of the random parameters
+  - If we have a low fidelity model as well, we can run a lot of samples in that model or run a few samples in the high fidelity model.
+  - We want the Monte Carlo estimate to be close to the true value of the cost function, so we want to minimize its run-to-run variance.
+  - Hence we try to distribute the samples among the models for a single run of the Monte Carlo so its variance is minimized.
 
 ## Dynamics
 
@@ -216,7 +241,8 @@ $$
 \end{aligned}
 $$
 
-![Closed Loop with LQR Control](figs/cl_det.svg)
+![Closed Loop with LQR Control](figs/0.05_cl_det.svg)
+![Closed Loop with LQR Control](figs/0.5_cl_det.svg)
 
 ## Stochastic LQR
 
@@ -295,21 +321,17 @@ Which proves that the optimal control input when the initial state is stochastic
 
 To visualize this, we can optmize individual trajectories with randomly sampled initial conditions and plot the average trajectory. The average trajectory is the solution to the stochastic LQR problem.
 
-![Closed Loop with Stochastic LQR Control](figs/cl_stoch_init.svg)
+![Closed Loop with Stochastic LQR Control](figs/0.05_cl_stoch_init.svg)
+![Closed Loop with Stochastic LQR Control](figs/0.5_cl_stoch_init.svg)
 
 Here we use a simple Monte Carlo estimator to estimate the expected value of the cost function over some realizations of the initial conditions. The variance of this cost function is varies with the number of samples used in the Monte Carlo estimator.
 
 $$
-Var[J] = E[J^2] - E[J]^2
-$$
-
-We already know $E[J]$, so we can focus on $E[J^2]$
-
-$$
 \begin{aligned}
-E[J^2] &= E[(U^T H U + 2 q^T U + c)^2] \\
-&= E[U^T H U U^T H U + 4 q^T U q^T U + c^2 + 2 U^T H U q^T U + U^T H U c + 2 q^T U U^T H U + 2 q^T U c + c U^T H U + 2 c q^T U] \\
+Var[\hat{J}] &= E[(\hat{J} - E[\hat{J}])^2] \\
+&= E[(U^T H U + 2 q^T U + c - E[U^T H U + 2 q^T U + c])^2] \\
 \end{aligned}
 $$
 
-![Variance of the Cost Function with Number of Samples](figs/mc_variance.svg)
+![Variance of the Cost Function with Number of Samples](figs/0.05_mc_variance.svg)
+![Variance of the Cost Function with Number of Samples](figs/0.5_mc_variance.svg)
