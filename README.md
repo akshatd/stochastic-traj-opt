@@ -102,10 +102,10 @@ This linear system will be converted to discrete time using MATLAB to give us th
 
 ## Deterministic LQR
 
-To solve the LQR problem, we need to define the cost function to be minimzed. This is defined as
+To solve the LQR problem with reference tracking, we need to define the cost function to be minimzed. This is defined as
 
 $$
-\min_{u_0, u_1 ... u_{N-1}}J = x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)
+\min_{u_0, u_1 ... u_{N-1}}J = \sum_{k=0}^{N-1} (e_k^T Q_e e_k + \Delta u_k^T R \Delta u_k)
 $$
 
 Where:
@@ -115,30 +115,104 @@ Where:
 - $N$ is the time horizon
 - $x_k$ is the state vector at time step $k$
 - $u_k$ is the control input vector at time step $k$
-- $Q$ is the state cost matrix
+- $\Delta u_k = u_k - u_{k-1}$ is the change in control input at time step $k$
+- $r_k$ is the reference output at time step $k$
+- $e_k = y_k - r_k = Cx - r_k$ is the error in the output at time step $k$
+- $Q_e$ is the error cost matrix
 - $R$ is the control cost matrix
-- $P$ is the terminal cost matrix
+<!-- - $P$ is the terminal cost matrix -->
+
+Here we extend the usual state with other variables to make it easier to track the error in the output and the change in control input. The state vector is now
+
+$$
+x_k^{ext} = \begin{bmatrix}
+x_k \\
+u_{k-1} \\
+r_k
+\end{bmatrix}
+$$
+
+And the state space equations are
+
+$$
+\begin{aligned}
+x_{k+1}^{ext} &= \begin{bmatrix}
+A & B & 0 \\
+0 & \mathbb{I}_{n_u \times n_u} & 0 \\
+0 & 0 & \mathbb{I}_{n_r \times n_r}
+\end{bmatrix} \begin{bmatrix}
+x_k \\
+u_{k-1} \\
+r_k
+\end{bmatrix} + \begin{bmatrix}
+B \\
+\mathbb{I}_{n_u \times n_u} \\
+0
+\end{bmatrix} \Delta u_k \\
+\end{aligned}
+$$
+
+with
+
+$$
+\begin{aligned}
+A^{ext} &= \begin{bmatrix}
+A & B & 0 \\
+0 & \mathbb{I}_{n_u \times n_u} & 0 \\
+0 & 0 & \mathbb{I}_{n_r \times n_r}
+\end{bmatrix} \\
+B^{ext} &= \begin{bmatrix}
+B \\
+\mathbb{I}_{n_u \times n_u} \\
+0
+\end{bmatrix}
+\end{aligned}
+$$
 
 Stacking the state and control input vectors, we have
 
 $$
 \begin{aligned}
 X &= \begin{bmatrix}
-x_1 \\
-x_2 \\
+x_1^{ext} \\
+x_2^{ext} \\
 \vdots \\
-x_N
+x_N^{ext}
 \end{bmatrix} \text{with size } N n_x \times 1 \\
 U &= \begin{bmatrix}
-u_0 \\
-u_1 \\
+\Delta u_0 \\
+\Delta u_1 \\
 \vdots \\
-u_{N-1}
+\Delta u_{N-1}
 \end{bmatrix} \text{with size } N n_u \times 1
 \end{aligned}
 $$
 
-State transition formula for a linear system is $x_{k+1} = A x_k + B u_k$. Hence, starting from $x_0$, we can write the state vector at any time step as
+Additionally, The matrix $Q$ for the extended state should only penalize the error, so for the extended state, the Q matrix can be derived as follows
+
+$$
+\begin{aligned}
+e_k^T Q_e e_k &= (y_k - r_k)^T Q_e (y_k - r_k) \\
+&= \left(\begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix}
+\begin{bmatrix}
+x_k \\
+u_{k-1} \\
+r_k
+\end{bmatrix}\right)^T Q_e
+\left(\begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix}
+\begin{bmatrix}
+x_k \\
+u_{k-1} \\
+r_k
+\end{bmatrix}\right) \\
+&= x_k^{ext^T} \begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix}^T Q_e
+\begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix} x_k^{ext} \\
+\implies Q &= \begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix}^T Q_e
+\begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix}
+\end{aligned}
+$$
+
+I will represent the new extended state $x_k^{ext}$ and state transition matrices $A^{ext}$, $B^{ext}$ as just $x_k$, $A$, $B$ to make things less cluttered. State transition formula for a linear system is $x_{k+1} = A x_k + B u_k$. Hence, starting from $x_0$, we can write the state vector at any time step as
 
 $$
 \begin{aligned}
@@ -177,7 +251,7 @@ $$
 Q & 0 & \ldots & 0 \\
 0 & Q & \ldots & 0 \\
 \vdots & \vdots & \ddots & \vdots \\
-0 & 0 & \ldots & P
+0 & 0 & \ldots & 0
 \end{bmatrix} \text{with size } Nn_x \times Nn_x \\
 \bar{R} &= \begin{bmatrix}
 R & 0 & \ldots & 0 \\
@@ -187,6 +261,8 @@ R & 0 & \ldots & 0 \\
 \end{bmatrix} \text{with size } Nn_u \times Nn_u
 \end{aligned}
 $$
+
+Note that the final state is not being penalized with the terminal cost matrix $P$ as we do not want to penalize the state for being far away from the origin.
 
 The cost function in terms of the new matrices $X$, $U$, $S$, $M$, $\bar{Q}$ and $\bar{R}$ is
 
@@ -241,8 +317,8 @@ $$
 \end{aligned}
 $$
 
-![Closed Loop with LQR Control](figs/0.05_cl_det.svg)
-![Closed Loop with LQR Control](figs/0.5_cl_det.svg)
+![Closed Loop with LQR Control](figs/0.05_cl_det.svg){width=50%}
+![Closed Loop with LQR Control](figs/0.5_cl_det.svg){width=50%}
 
 ## Stochastic LQR
 
@@ -253,11 +329,11 @@ In this case, the state vector $X$ is stochastic, owing to the the initial condi
 
 $$
 \begin{aligned}
-E[x_1] &= E[A x_0 + B u_0] = A E[x_0] + B u_0 \\
-E[x_2] &= E[A x_1 + B u_1] = A E[x_1] + B u_1 = A^2 E[x_0] + A B u_0 + B u_1 \\
+\mathbb{E}[x_1] &= \mathbb{E}[A x_0 + B u_0] = A \mathbb{E}[x_0] + B u_0 \\
+\mathbb{E}[x_2] &= \mathbb{E}[A x_1 + B u_1] = A \mathbb{E}[x_1] + B u_1 = A^2 \mathbb{E}[x_0] + A B u_0 + B u_1 \\
 \vdots \\
-E[x_N] &= E[A x_{N-1} + B u_{N-1}] = A E[x_{N-1}] + B u_{N-1} \\
- &= A^N E[x_0] + A^{N-1} B u_0 + A^{N-2} B u_1 + \ldots + B u_{N-1} \\
+\mathbb{E}[x_N] &= \mathbb{E}[A x_{N-1} + B u_{N-1}] = A \mathbb{E}[x_{N-1}] + B u_{N-1} \\
+ &= A^N \mathbb{E}[x_0] + A^{N-1} B u_0 + A^{N-2} B u_1 + \ldots + B u_{N-1} \\
 \end{aligned}
 $$
 
@@ -266,33 +342,39 @@ $$
 The matrices $S$ and $M$ remain the same, and we have the following expression for the expectation of the state vector $X$
 
 $$
-E[X] = S U + M E[x_0]
+\mathbb{E}[X] = S U + M \mathbb{E}[x_0]
 $$
 
-The cost matrices $\bar{Q}$ and $\bar{R}$ are also the same. The cost function is now the expected value of the cost function over all possible realizations of the initial conditions. The cost function is
+The cost matrices $\bar{Q}$ and $\bar{R}$ are also the same. The cost function is now a random variable $\hat{J}$, with an expectation and variance.
+
+$$
+\hat{J} \sim \mathcal{N}(\mathbb{E}[\hat{J}], Var[\hat{J}])
+$$
+
+The expected value of the cost function over all possible realizations of the initial conditions is
 
 $$
 \begin{aligned}
-E[J] &= E[x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)] \\
-&= E[X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0] \\
-&= E[X^T \bar{Q} X] + E[U^T \bar{R} U] + E[x_0^T Q x_0] \\
-&= E[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + E[x_0^T Q x_0] \\
+\mathbb{E}[\hat{J}] &= \mathbb{E}[x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)] \\
+&= \mathbb{E}[X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0] \\
+&= \mathbb{E}[X^T \bar{Q} X] + \mathbb{E}[U^T \bar{R} U] + \mathbb{E}[x_0^T Q x_0] \\
+&= \mathbb{E}[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + \mathbb{E}[x_0^T Q x_0] \\
 % & \text{quadratic form: https://en.wikipedia.org/wiki/Quadratic_form_(statistics)} \\
-&= E[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + E[x_0]^T Q E[x_0] + \text{tr}(Q \Sigma) \\
-&= U^T S^T \bar{Q} S U + E[U^T S^T \bar{Q} M x_0] + E[x_0^T M^T \bar{Q} S U] + E[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + E[x_0]^T Q E[x_0] + \text{tr}(Q \Sigma) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M E[x_0] + E[x_0^T] M^T \bar{Q} S U + E[x_0^T M^T \bar{Q} M x_0] + E[x_0]^T Q E[x_0] + \text{tr}(Q \Sigma) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + E[x_0^T] M^T \bar{Q} S U + E[x_0^T] M^T \bar{Q} S U + E[x_0]^T M^T \bar{Q} M E[x_0] + \text{tr}(M^T \bar{Q} M \Sigma) + E[x_0]^T Q E[x_0] + \text{tr}(Q \Sigma) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 E[x_0^T] M^T \bar{Q} S U + E[x_0]^T (M^T \bar{Q} M + Q) E[x_0] + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma) \\
+&= \mathbb{E}[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \Sigma) \\
+&= U^T S^T \bar{Q} S U + \mathbb{E}[U^T S^T \bar{Q} M x_0] + \mathbb{E}[x_0^T M^T \bar{Q} S U] + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \Sigma) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M \mathbb{E}[x_0] + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \Sigma) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T M^T \bar{Q} M \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \Sigma) + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \Sigma) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma) \\
 \end{aligned}
 $$
 
-Now assuming $E[x_0]$ is calculated using a Monte Carlo estimator, we can write the cost function as
+Now assuming $\mathbb{E}[x_0]$ is calculated using a Monte Carlo estimator, we can write the cost function as
 
 $$
 \begin{aligned}
 H &= S^T \bar{Q} S + \bar{R} = H^T \\
-q &= (E[x_0]^T M^T \bar{Q} S)^T = S^T \bar{Q} M E[x_0] \\
-c &= E[x_0]^T (M^T \bar{Q} M + Q) E[x_0] + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma)
+q &= (\mathbb{E}[x_0]^T M^T \bar{Q} S)^T = S^T \bar{Q} M \mathbb{E}[x_0] \\
+c &= \mathbb{E}[x_0]^T (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma)
 \end{aligned}
 $$
 
@@ -324,14 +406,45 @@ To visualize this, we can optmize individual trajectories with randomly sampled 
 ![Closed Loop with Stochastic LQR Control](figs/0.05_cl_stoch_init.svg)
 ![Closed Loop with Stochastic LQR Control](figs/0.5_cl_stoch_init.svg)
 
-Here we use a simple Monte Carlo estimator to estimate the expected value of the cost function over some realizations of the initial conditions. The variance of this cost function is varies with the number of samples used in the Monte Carlo estimator.
+To calculate the variance, we can rewrite the expression of the cost function
 
 $$
 \begin{aligned}
-Var[\hat{J}] &= E[(\hat{J} - E[\hat{J}])^2] \\
-&= E[(U^T H U + 2 q^T U + c - E[U^T H U + 2 q^T U + c])^2] \\
+J &= U^T(S^T \bar{Q} S + \bar{R}) U + 2 x_0^T M^T \bar{Q} S U + x_0^T(M^T \bar{Q} M + Q) x_0 \\
+\text{Let}& \\
+K &= U^T(S^T \bar{Q} S + \bar{R}) U \\
+L &= 2 M^T \bar{Q} S U \\
+N &= M^T \bar{Q} M + Q \\
+\text{Then}& \\
+J &= K + x_0^T L + x_0^T N x_0 \\
 \end{aligned}
 $$
 
-![Variance of the Cost Function with Number of Samples](figs/0.05_mc_variance.svg)
-![Variance of the Cost Function with Number of Samples](figs/0.5_mc_variance.svg)
+Similarly, expectation of the random cost function can be rewritten as
+
+$$
+\begin{aligned}
+\mathbb{E}[\hat{J}] &= U^T(S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T(M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \Sigma) + \text{tr}(Q \Sigma) \\
+\text{Let}& \\
+O &= \text{tr}(M^T \bar{Q} M \Sigma) + \text{tr}(Q \Sigma) \\
+\text{Then}& \\
+\mathbb{E}[\hat{J}] &= K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0]^T N \mathbb{E}[x_0] + O \\
+\end{aligned}
+$$
+
+Then, the variance can be written as
+
+$$
+\begin{aligned}
+Var[\hat{J}] &= \mathbb{E}[(\hat{J} - \mathbb{E}[\hat{J}])^2] \\
+&= \mathbb{E}[(K + x_0^T L + x_0^T N x_0 - (K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0]^T N \mathbb{E}[x_0] + O))^2] \\
+&= \mathbb{E}[(x_0^T L + x_0^T N x_0 - \mathbb{E}[x_0^T] L - \mathbb{E}[x_0]^T N \mathbb{E}[x_0] - O)^2] \\
+&= \mathbb{E}[(x_0^T L - \mathbb{E}[x_0^T] L + x_0^T N x_0 - \mathbb{E}[x_0]^T N \mathbb{E}[x_0] - O)^2] \\
+&= \mathbb{E}[((x_0^T - \mathbb{E}[x_0]^T) L + (x_0 + \mathbb{E}[x_0])^T N (x_0 - \mathbb{E}[x_0]) + O)^2] \\
+\end{aligned}
+$$
+
+Here we use a simple Monte Carlo estimator to estimate the expected value of the cost function over some realizations of the initial conditions. The variance of this cost function is varies with the number of samples used in the Monte Carlo estimator.
+
+![Variance of the Cost Function with Number of Samples](figs/0.05_mc_variance.svg){width=50%}
+![Variance of the Cost Function with Number of Samples](figs/0.5_mc_variance.svg){width=50%}

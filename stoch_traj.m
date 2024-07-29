@@ -33,8 +33,8 @@ u0 = 0; % initial control effort
 
 Tsim = 6;
 Tfid = 0.01; % simulation fidelity
-% Ts = 0.05; % sampling time, MUST BE MULTIPLE OF Tfid
-Ts = 0.5; % sampling time, MUST BE MULTIPLE OF Tfid
+Ts = 0.05; % sampling time, MUST BE MULTIPLE OF Tfid
+%Ts = 0.5; % sampling time, MUST BE MULTIPLE OF Tfid
 assert(mod(Ts, Tfid) == 0, "Ts=" + Ts + " is not a multiple of Tfid=" + Tfid);
 
 Q = eye(nx) * 2; % state cost
@@ -43,7 +43,7 @@ R = eye(nu) * 10; % input cost
 % we dont want to penalize the state being away from the origin
 P = eye(nx) * 0;
 
-nSamples = 100;
+rv_samples = 100;
 
 % simulate open loop dynamics
 [data.times, x_ode] = ode45(@(t, x) msd(t, x, 0, A_msd, B_msd), 0:Tfid:Tsim, x0);
@@ -109,22 +109,22 @@ saveas(fig, "figs/"+Ts+"_cl_det.svg");
 %% stochastic with random initial state
 
 % set up problem with stochastic initial state
-x0_rv = mvnrnd(x0_mean, x0_sd, nSamples)';
-data.x_ol_stoch = zeros(nx, Tsim/Tfid + 1, nSamples);
+x0_rv = mvnrnd(x0_mean, x0_sd, rv_samples)';
+data.x_ol_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
 
 % simulate open loop dynamics
-for i = 1:nSamples
+for i = 1:rv_samples
   [~, x_ode] = ode45(@(t, x) msd(t, x, 0, A_msd, B_msd), 0:Tfid:Tsim, x0_rv(:, i));
   data.x_ol_stoch(:, :, i) = x_ode';
 end
 
 % plot open loop dynamics
 fig = figure;
-sgtitle("Open loop dynamics with stochastic initial state (" + nSamples + " samples)");
+sgtitle("Open loop dynamics with stochastic initial state (" + rv_samples + " samples)");
 subplot(1, 2, 1);
 hold on;
 
-for i = 1:nSamples
+for i = 1:rv_samples
   plot(data.times, data.x_ol_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.5]);
 end
 
@@ -150,12 +150,12 @@ fig.Position = [100 100 1000 500];
 saveas(fig, 'figs/ol_stoch_init.svg');
 
 %% set up and solve stochastic LQR problem using robust optimization
-data.x_cl_stoch = zeros(nx, Tsim/Tfid + 1, nSamples);
+data.x_cl_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
 x0_rv_mean = mean(x0_rv, 2);
 x0_rv_mean_ext = [x0_rv_mean; u0; ref];
 % Uopt only depends on x0, so we can use the same Uopt
 Uopt = Kopt * x0_rv_mean_ext;
-for i = 1:nSamples
+for i = 1:rv_samples
   k = 0;
   xk = x0_rv(:, i);
   ukm1 = u0;
@@ -174,11 +174,11 @@ end
 
 %% plot closed loop dynamics
 fig = figure;
-sgtitle("(Ts:"+Ts+") Closed loop dynamics with stochastic initial state (" + nSamples + " samples)");
+sgtitle("(Ts:"+Ts+") Closed loop dynamics with stochastic initial state (" + rv_samples + " samples)");
 subplot(1, 2, 1);
 hold on;
 
-for i = 1:nSamples
+for i = 1:rv_samples
   plot(data.times, data.x_cl_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.5]);
 end
 
@@ -213,10 +213,10 @@ mc_data.var = zeros(1, length(mc_data.samples));
 
 % go through MC estimators with different sample sizes
 for samples = mc_data.samples
-  mc_est = zeros(nSamples, 1);
+  mc_est = zeros(rv_samples, 1);
   wait_bar = waitbar(0, "Running MC estimator with " + samples + " samples");
   % run each MC estimator multiple times to get a vaiance estimate
-  for i = 1:nSamples
+  for i = 1:rv_samples
     x0_mc = mvnrnd(x0_mean, x0_sd, samples)'; % take samples for a single estimator
     x0_mc_mean = mean(x0_mc, 2);
     x0_mc_mean_ext = [x0_mc_mean; u0; ref];
@@ -242,7 +242,7 @@ for samples = mc_data.samples
     % calculate the MSE of the trajectory
     mc_cost = squeeze(sum((mc_x - ref).^2, [1,2]));
     
-    waitbar(i / nSamples, wait_bar);
+    waitbar(i / rv_samples, wait_bar);
     mc_est(i) = mean(mc_cost) / N;
   end
   close(wait_bar);
