@@ -27,14 +27,14 @@ plot_ylim_r = [0.5, 5];
 
 x0 = [1;0];
 x0_mean = x0;
-x0_sd = eye(nx)* 0.1;
+x0_cov = eye(nx)* 0.1;
 ref = [2; 0]; % reference state [pos, vel]
 u0 = 0; % initial control effort
 
 Tsim = 6;
 Tfid = 0.01; % simulation fidelity
 Ts = 0.05; % sampling time, MUST BE MULTIPLE OF Tfid
-%Ts = 0.5; % sampling time, MUST BE MULTIPLE OF Tfid
+% Ts = 0.5; % sampling time, MUST BE MULTIPLE OF Tfid
 assert(mod(Ts, Tfid) == 0, "Ts=" + Ts + " is not a multiple of Tfid=" + Tfid);
 
 Q = eye(nx) * 2; % state cost
@@ -68,8 +68,10 @@ N = Tsim/Ts; % prediction horizon, excluding initial state
 % create the extended state system [x_k, u_k-1, r_k]
 x0_ext = [x0; u0; ref]; %
 [A_ext, B_ext, Q_ext, R_ext, P_ext] = extendState(c2d(msd_sys, Ts), Q, R, P);
-Kopt = solveLQR(N, A_ext, B_ext, Q_ext, R_ext, P_ext);
+[Kopt, S, M, Qbar, Rbar] = solveLQR(N, A_ext, B_ext, Q_ext, R_ext, P_ext);
 Uopt = Kopt * x0_ext;
+cost_det = LQRCost(x0_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
+display("Deterministic LQR cost: " + cost_det);
 
 %% simulate closed loop dynamics
 data.x_cl = zeros(nx, Tsim/Tfid + 1);
@@ -109,7 +111,7 @@ saveas(fig, "figs/"+Ts+"_cl_det.svg");
 %% stochastic with random initial state
 
 % set up problem with stochastic initial state
-x0_rv = mvnrnd(x0_mean, x0_sd, rv_samples)';
+x0_rv = mvnrnd(x0_mean, x0_cov, rv_samples)';
 data.x_ol_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
 
 % simulate open loop dynamics
@@ -152,13 +154,20 @@ saveas(fig, 'figs/ol_stoch_init.svg');
 %% set up and solve stochastic LQR problem using robust optimization
 data.x_cl_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
 x0_rv_mean = mean(x0_rv, 2);
+x0_rv_cov = cov(x0_rv');
 x0_rv_mean_ext = [x0_rv_mean; u0; ref];
+x0_rv_cov_ext = blkdiag(x0_rv_cov, zeros(3,3));
+cost_lqr_est = LQRcost_exp(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
+display("Expecttaion of Stochastic LQR cost(analytical): " + cost_lqr_est);
+display("Variance of Stochastic LQR cost(analytical): " + LQRcost_var(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar));
+data.cost_lqr = zeros(rv_samples, 1);
 % Uopt only depends on x0, so we can use the same Uopt
 Uopt = Kopt * x0_rv_mean_ext;
 for i = 1:rv_samples
   k = 0;
   xk = x0_rv(:, i);
   ukm1 = u0;
+  data.cost_lqr(i) = LQRCost([x0_rv(:, i); u0; ref], Uopt, Q_ext, S, M, Qbar, Rbar);
   for t = times(1:end - 1)
     uk = ukm1 + Uopt(k+1);
     [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t:Tfid:t + Ts, xk);
@@ -207,6 +216,24 @@ hold off;
 fig.Position = [100 100 1200 500];
 saveas(fig, "figs/"+Ts+"_cl_stoch_init.svg");
 
+% plot cost distribution
+fig = figure;
+histogram(data.cost_lqr, 10, 'Normalization', 'pdf', 'FaceColor', 'b', 'EdgeColor', 'k', 'DisplayName', 'Cost Distribution');
+hold on;
+x = linspace(min(data.cost_lqr), max(data.cost_lqr), 100);
+y = normpdf(x, mean(data.cost_lqr), std(data.cost_lqr));
+display("Expectation of Stochastic LQR cost(MC): " + mean(data.cost_lqr));
+display("Variance of Stochastic LQR cost(MC): " + var(data.cost_lqr));
+plot(x, y, 'r', 'LineWidth', 2, 'DisplayName', 'Normal Fit');
+xline(cost_det, 'k', 'LineWidth', 2, 'DisplayName', 'Deterministic Cost');
+xline(cost_lqr_est, 'g', 'LineWidth', 2, 'DisplayName', 'Stochastic Analytical Cost');
+title("(Ts:"+Ts+") Cost distribution of stochastic LQR ("+rv_samples+" samples)");
+xlabel('Cost');
+ylabel('Probability Density');
+legend show; legend boxoff;
+grid on; grid minor;
+saveas(fig, "figs/"+Ts+"_cost_dist.svg");
+
 %% Monte carlo estimator with variance calculation
 mc_data.samples = [10, 100, 1000, 10000]; % number of samples for a single MC estimator
 mc_data.var = zeros(1, length(mc_data.samples));
@@ -217,7 +244,7 @@ for samples = mc_data.samples
   wait_bar = waitbar(0, "Running MC estimator with " + samples + " samples");
   % run each MC estimator multiple times to get a vaiance estimate
   for i = 1:rv_samples
-    x0_mc = mvnrnd(x0_mean, x0_sd, samples)'; % take samples for a single estimator
+    x0_mc = mvnrnd(x0_mean, x0_cov, samples)'; % take samples for a single estimator
     x0_mc_mean = mean(x0_mc, 2);
     x0_mc_mean_ext = [x0_mc_mean; u0; ref];
     Uopt = Kopt * x0_mc_mean_ext; % control effort for the mean initial state
@@ -243,7 +270,7 @@ for samples = mc_data.samples
     mc_cost = squeeze(sum((mc_x - ref).^2, [1,2]));
     
     waitbar(i / rv_samples, wait_bar);
-    mc_est(i) = mean(mc_cost) / N;
+    mc_est(i) = mean(mc_cost);
   end
   close(wait_bar);
   mc_data.var(mc_data.samples == samples) = var(mc_est);
@@ -253,7 +280,7 @@ end
 fig = figure();
 loglog(mc_data.samples, mc_data.var, 'b', 'LineWidth', 2, 'DisplayName', 'MC Variance');
 hold on;
-title("(Ts:"+Ts+") MC estimator variance of normalized cost function");
+title("(Ts:"+Ts+") MC estimator variance of mean sq error");
 xlabel('Number of samples');
 ylabel('Variance');
 legend show; legend boxoff;
@@ -263,4 +290,16 @@ hold off;
 
 function xdot = msd(t, x, u, A, B)
 xdot = A * x + B * u;
+end
+
+function cost = LQRCost(x0, u, Q, S, M, Qbar, Rbar)
+cost = u'*(S'*Qbar*S + Rbar)*u + 2*x0'*M'*Qbar*S*u + x0'*(M'*Qbar*M + Q)*x0;
+end
+
+function cost_exp = LQRcost_exp(x0_mean, x0_cov, u, Q, S, M, Qbar, Rbar)
+cost_exp = u'*(S'*Qbar*S + Rbar)*u + 2*x0_mean'*M'*Qbar*S*u + x0_mean'*(M'*Qbar*M + Q)*x0_mean + trace((M'*Qbar*M + Q)*x0_cov);
+end
+
+function cost_var = LQRcost_var(x0_mean, x0_cov, u, Q, S, M, Qbar, Rbar)
+cost_var = trace((M'*Qbar*M + Q)*x0_cov);
 end

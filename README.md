@@ -360,21 +360,21 @@ $$
 &= \mathbb{E}[X^T \bar{Q} X] + \mathbb{E}[U^T \bar{R} U] + \mathbb{E}[x_0^T Q x_0] \\
 &= \mathbb{E}[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + \mathbb{E}[x_0^T Q x_0] \\
 % & \text{quadratic form: https://en.wikipedia.org/wiki/Quadratic_form_(statistics)} \\
-&= \mathbb{E}[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \Sigma) \\
-&= U^T S^T \bar{Q} S U + \mathbb{E}[U^T S^T \bar{Q} M x_0] + \mathbb{E}[x_0^T M^T \bar{Q} S U] + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \Sigma) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M \mathbb{E}[x_0] + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \Sigma) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T M^T \bar{Q} M \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \Sigma) + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \Sigma) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma) \\
+&= \mathbb{E}[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{Cov}[x_0]) \\
+&= U^T S^T \bar{Q} S U + \mathbb{E}[U^T S^T \bar{Q} M x_0] + \mathbb{E}[x_0^T M^T \bar{Q} S U] + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{Cov}[x_0]) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M \mathbb{E}[x_0] + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{Cov}[x_0]) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T M^T \bar{Q} M \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \mathbb{Cov}[x_0]) + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{Cov}[x_0]) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \mathbb{Cov}[x_0]) \\
 \end{aligned}
 $$
 
-Now assuming $\mathbb{E}[x_0]$ is calculated using a Monte Carlo estimator, we can write the cost function as
+Now assuming $\mathbb{E}[x_0]$ and $\mathbb{Cov}[x_0]$ is calculated using a Monte Carlo estimator, we can write the cost function as
 
 $$
 \begin{aligned}
 H &= S^T \bar{Q} S + \bar{R} = H^T \\
 q &= (\mathbb{E}[x_0]^T M^T \bar{Q} S)^T = S^T \bar{Q} M \mathbb{E}[x_0] \\
-c &= \mathbb{E}[x_0]^T (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \Sigma)  + \text{tr}(Q \Sigma)
+c &= \mathbb{E}[x_0]^T (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \mathbb{Cov}[x_0])
 \end{aligned}
 $$
 
@@ -406,7 +406,12 @@ To visualize this, we can optmize individual trajectories with randomly sampled 
 ![Closed Loop with Stochastic LQR Control](figs/0.05_cl_stoch_init.svg)
 ![Closed Loop with Stochastic LQR Control](figs/0.5_cl_stoch_init.svg)
 
-To calculate the variance, we can rewrite the expression of the cost function
+We can verify that the expected value of the random cost function when calculated by averaging over all trajectories is the same as the one determined by the aalytical formula derived above.
+
+![Distribution of the Cost Function](figs/0.05_cost_dist.svg){width=50%}
+![Distribution of the Cost Function](figs/0.5_cost_dist.svg){width=50%}
+
+We can rewrite the the cost function as
 
 $$
 \begin{aligned}
@@ -420,19 +425,19 @@ J &= K + x_0^T L + x_0^T N x_0 \\
 \end{aligned}
 $$
 
-Similarly, expectation of the random cost function can be rewritten as
+Similarly, rewrite the expectation of the random cost function as
 
 $$
 \begin{aligned}
-\mathbb{E}[\hat{J}] &= U^T(S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T(M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \Sigma) + \text{tr}(Q \Sigma) \\
+\mathbb{E}[\hat{J}] &= U^T(S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T(M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \mathbb{Cov}[x_0]) \\
 \text{Let}& \\
-O &= \text{tr}(M^T \bar{Q} M \Sigma) + \text{tr}(Q \Sigma) \\
+O &= \text{tr}((M^T \bar{Q} M + Q) \mathbb{Cov}[x_0]) \\
 \text{Then}& \\
 \mathbb{E}[\hat{J}] &= K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0]^T N \mathbb{E}[x_0] + O \\
 \end{aligned}
 $$
 
-Then, the variance can be written as
+Then, the variance of the random cost function can be written as
 
 $$
 \begin{aligned}
