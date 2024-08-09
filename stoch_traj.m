@@ -33,8 +33,8 @@ u0 = 0; % initial control effort
 
 Tsim = 6;
 Tfid = 0.01; % simulation fidelity
-Ts = 0.05; % sampling time, MUST BE MULTIPLE OF Tfid
-% Ts = 0.5; % sampling time, MUST BE MULTIPLE OF Tfid
+% Ts = 0.05; % sampling time, MUST BE MULTIPLE OF Tfid
+Ts = 0.5; % sampling time, MUST BE MULTIPLE OF Tfid
 assert(mod(Ts, Tfid) == 0, "Ts=" + Ts + " is not a multiple of Tfid=" + Tfid);
 
 Q = eye(nx) * 2; % state cost
@@ -158,8 +158,8 @@ x0_rv_cov = cov(x0_rv');
 x0_rv_mean_ext = [x0_rv_mean; u0; ref];
 x0_rv_cov_ext = blkdiag(x0_rv_cov, zeros(3,3));
 cost_lqr_est = LQRcost_exp(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
-display("Expecttaion of Stochastic LQR cost(analytical): " + cost_lqr_est);
-display("Variance of Stochastic LQR cost(analytical): " + LQRcost_var(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar));
+display("Expectaion of Stochastic LQR cost(analytical): " + cost_lqr_est);
+% display("Variance of Stochastic LQR cost(analytical): " + LQRcost_var(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar));
 data.cost_lqr = zeros(rv_samples, 1);
 % Uopt only depends on x0, so we can use the same Uopt
 Uopt = Kopt * x0_rv_mean_ext;

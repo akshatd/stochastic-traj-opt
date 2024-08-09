@@ -360,21 +360,21 @@ $$
 &= \mathbb{E}[X^T \bar{Q} X] + \mathbb{E}[U^T \bar{R} U] + \mathbb{E}[x_0^T Q x_0] \\
 &= \mathbb{E}[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + \mathbb{E}[x_0^T Q x_0] \\
 % & \text{quadratic form: https://en.wikipedia.org/wiki/Quadratic_form_(statistics)} \\
-&= \mathbb{E}[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{Cov}[x_0]) \\
-&= U^T S^T \bar{Q} S U + \mathbb{E}[U^T S^T \bar{Q} M x_0] + \mathbb{E}[x_0^T M^T \bar{Q} S U] + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{Cov}[x_0]) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M \mathbb{E}[x_0] + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{Cov}[x_0]) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T M^T \bar{Q} M \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \mathbb{Cov}[x_0]) + \mathbb{E}[x_0]^T Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{Cov}[x_0]) \\
-&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \mathbb{Cov}[x_0]) \\
+&= \mathbb{E}[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{C}ov[x_0]) \\
+&= U^T S^T \bar{Q} S U + \mathbb{E}[U^T S^T \bar{Q} M x_0] + \mathbb{E}[x_0^T M^T \bar{Q} S U] + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{C}ov[x_0]) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M \mathbb{E}[x_0] + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{C}ov[x_0]) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} M \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \mathbb{C}ov[x_0]) + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{C}ov[x_0]) \\
+&= U^T (S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \mathbb{C}ov[x_0]) \\
 \end{aligned}
 $$
 
-Now assuming $\mathbb{E}[x_0]$ and $\mathbb{Cov}[x_0]$ is calculated using a Monte Carlo estimator, we can write the cost function as
+Now assuming $\mathbb{E}[x_0]$ and $\mathbb{C}ov[x_0]$ is calculated using a Monte Carlo estimator, we can write the cost function as
 
 $$
 \begin{aligned}
 H &= S^T \bar{Q} S + \bar{R} = H^T \\
-q &= (\mathbb{E}[x_0]^T M^T \bar{Q} S)^T = S^T \bar{Q} M \mathbb{E}[x_0] \\
-c &= \mathbb{E}[x_0]^T (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \mathbb{Cov}[x_0])
+q &= (\mathbb{E}[x_0^T] M^T \bar{Q} S)^T = S^T \bar{Q} M \mathbb{E}[x_0] \\
+c &= \mathbb{E}[x_0^T] (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \mathbb{C}ov[x_0])
 \end{aligned}
 $$
 
@@ -411,6 +411,8 @@ We can verify that the expected value of the random cost function when calculate
 ![Distribution of the Cost Function](figs/0.05_cost_dist.svg){width=50%}
 ![Distribution of the Cost Function](figs/0.5_cost_dist.svg){width=50%}
 
+$\pagebreak$
+
 We can rewrite the the cost function as
 
 $$
@@ -419,7 +421,8 @@ J &= U^T(S^T \bar{Q} S + \bar{R}) U + 2 x_0^T M^T \bar{Q} S U + x_0^T(M^T \bar{Q
 \text{Let}& \\
 K &= U^T(S^T \bar{Q} S + \bar{R}) U \\
 L &= 2 M^T \bar{Q} S U \\
-N &= M^T \bar{Q} M + Q \\
+N &= M^T \bar{Q} M + Q = N^T \\
+&\text{(quadratic multiplication by diagnonal($\bar{Q}$) results in a symmetric, $Q$ is symmetric)} \\
 \text{Then}& \\
 J &= K + x_0^T L + x_0^T N x_0 \\
 \end{aligned}
@@ -429,23 +432,57 @@ Similarly, rewrite the expectation of the random cost function as
 
 $$
 \begin{aligned}
-\mathbb{E}[\hat{J}] &= U^T(S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0]^T(M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \mathbb{Cov}[x_0]) \\
+\mathbb{E}[\hat{J}] &= U^T(S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T](M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \mathbb{C}ov[x_0]) \\
 \text{Let}& \\
-O &= \text{tr}((M^T \bar{Q} M + Q) \mathbb{Cov}[x_0]) \\
+O &= \text{tr}((M^T \bar{Q} M + Q) \mathbb{C}ov[x_0]) \\
 \text{Then}& \\
-\mathbb{E}[\hat{J}] &= K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0]^T N \mathbb{E}[x_0] + O \\
+\mathbb{E}[\hat{J}] &= K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] + O \\
 \end{aligned}
 $$
 
-Then, the variance of the random cost function can be written as
+Then, the variance of the random cost function can be written as. Take note that the random variable here is $x_0$ and $\mathbb{E}[x_0]$ is a scalar.
+
+<!-- ref: https://www.math.uwaterloo.ca/~hwolkowi/matrixcookbook.pdf
+https://math.stackexchange.com/questions/2163694/expectation-of-quartic-form-for-multivariate-gaussian/4247240#4247240 -->
 
 $$
 \begin{aligned}
 Var[\hat{J}] &= \mathbb{E}[(\hat{J} - \mathbb{E}[\hat{J}])^2] \\
-&= \mathbb{E}[(K + x_0^T L + x_0^T N x_0 - (K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0]^T N \mathbb{E}[x_0] + O))^2] \\
-&= \mathbb{E}[(x_0^T L + x_0^T N x_0 - \mathbb{E}[x_0^T] L - \mathbb{E}[x_0]^T N \mathbb{E}[x_0] - O)^2] \\
-&= \mathbb{E}[(x_0^T L - \mathbb{E}[x_0^T] L + x_0^T N x_0 - \mathbb{E}[x_0]^T N \mathbb{E}[x_0] - O)^2] \\
-&= \mathbb{E}[((x_0^T - \mathbb{E}[x_0]^T) L + (x_0 + \mathbb{E}[x_0])^T N (x_0 - \mathbb{E}[x_0]) + O)^2] \\
+&= \mathbb{E}[(K + x_0^T L + x_0^T N x_0 - (K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] + O))^2] \\
+&= \mathbb{E}[(x_0^T L + x_0^T N x_0 - \mathbb{E}[x_0^T] L - \mathbb{E}[x_0^T] N \mathbb{E}[x_0] - O)^2] \\
+& \text{let } \mathbb{E}[x_0^T] L + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] + O = W \\
+& \text{note: $x_0^T L$ is a scalar, $x_0^T L = L^T x_0$} \\
+& \text{note: $\mathbb{E}[x_0^T] N \mathbb{E}[x_0]$, $O$ are deterministic scalars, so $W$ is a deterministic scalar} \\
+&= \mathbb{E}[(x_0^T L + x_0^T N x_0 - W)^2] \\
+&= \mathbb{E}[x_0^T L x_0^T L + x_0^T L x_0^T N x_0 - x_0^T L W \\
+&+ x_0^T N x_0 x_0^T L + x_0^T N x_0 x_0^T N x_0 - x_0^T N x_0 W \\
+&- W x_0^T L - W x_0^T N x_0 + W^2] \\
+&= \mathbb{E}[x_0^T L L^T x_0 + x_0^T N x_0 x_0^T L - x_0^T L W \\
+&+ x_0^T N x_0 x_0^T L + x_0^T N x_0 x_0^T N x_0 - W x_0^T N x_0 \\
+&- x_0^T L W - W x_0^T N x_0 + W^2] \\
+&= \mathbb{E}[x_0^T L L^T x_0 + 2 x_0^T N x_0 x_0^T L - 2 x_0^T L W + x_0^T N x_0 x_0^T N x_0 - 2 W x_0^T N x_0 + W^2] \\
+&= \mathbb{E}[x_0^T] L L^T \mathbb{E}[x_0] + \text{tr}(LL^T \mathbb{C}ov[x_0]) \\
+&+ 2\mathbb{E}[x_0^T N x_0 x_0^T] L \\
+&- 2 \mathbb{E}[x_0^T] L W \\
+&+ 2 \text{tr}(N \mathbb{C}ov[x] N \mathbb{C}ov[x]) + 4 \mathbb{E}[x^T]N\mathbb{C}ov[x]N\mathbb{E}[x] \\
+&+ \text{tr}(N\mathbb{C}ov[x])^2 + (\mathbb{E}[x^T]N\mathbb{E}[x])^2 + 2 \text{tr}(N\mathbb{C}ov[x])\mathbb{E}[x^T]N\mathbb{E}[x] \\
+&- 2W (\mathbb{E}[x_0^T] N \mathbb{E}[x_0] + \text{tr}(N \mathbb{C}ov[x_0])) \\
+& + W^2 \\
+\end{aligned}
+$$
+
+$\pagebreak$
+
+Derivation of $\mathbb{E}[(x^T A x)(x^T A x)]$ where $A$ is a symmetric matrix, ref: [Matrix Cookbook](https://www.math.uwaterloo.ca/~hwolkowi/matrixcookbook.pdf), pg 43
+
+$$
+\begin{aligned}
+\mathbb{E}[(x^T A x)(x^T A x)] &= \text{tr}(A \mathbb{C}ov[x] (A + A^T) \mathbb{C}ov[x]) \\
+&+ \mathbb{E}[x^T](A + A^T)\mathbb{C}ov[x](A + A^T)\mathbb{E}[x] \\
+&+ (\text{tr}(A\mathbb{C}ov[x]) + \mathbb{E}[x^T]A\mathbb{E}[x])(\text{tr}(A\mathbb{C}ov[x]) + \mathbb{E}[x^T]A\mathbb{E}[x]) \\
+&= 2 \text{tr}(A \mathbb{C}ov[x] A \mathbb{C}ov[x]) \\
+&+ 4 \mathbb{E}[x^T]A\mathbb{C}ov[x]A\mathbb{E}[x] \\
+&+ \text{tr}(A\mathbb{C}ov[x])^2 + (\mathbb{E}[x^T]A\mathbb{E}[x])^2 + 2 \text{tr}(A\mathbb{C}ov[x])\mathbb{E}[x^T]A\mathbb{E}[x] \text{ (trace is a scalar so can be swapped)} \\
 \end{aligned}
 $$
 
