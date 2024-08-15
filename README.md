@@ -353,13 +353,14 @@ $$
 
 The expected value of the cost function over all possible realizations of the initial conditions is
 
+<!-- ref for quadratic form: https://en.wikipedia.org/wiki/Quadratic_form_(statistics) -->
+
 $$
 \begin{aligned}
 \mathbb{E}[\hat{J}] &= \mathbb{E}[x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)] \\
 &= \mathbb{E}[X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0] \\
 &= \mathbb{E}[X^T \bar{Q} X] + \mathbb{E}[U^T \bar{R} U] + \mathbb{E}[x_0^T Q x_0] \\
 &= \mathbb{E}[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + \mathbb{E}[x_0^T Q x_0] \\
-% & \text{quadratic form: https://en.wikipedia.org/wiki/Quadratic_form_(statistics)} \\
 &= \mathbb{E}[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{C}ov[x_0]) \\
 &= U^T S^T \bar{Q} S U + \mathbb{E}[U^T S^T \bar{Q} M x_0] + \mathbb{E}[x_0^T M^T \bar{Q} S U] + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{C}ov[x_0]) \\
 &= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M \mathbb{E}[x_0] + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \mathbb{C}ov[x_0]) \\
@@ -440,7 +441,7 @@ O &= \text{tr}((M^T \bar{Q} M + Q) \mathbb{C}ov[x_0]) \\
 \end{aligned}
 $$
 
-Then, the variance of the random cost function can be written as. Take note that the random variable here is $x_0$ and $\mathbb{E}[x_0]$ is a scalar.
+Then, the variance of the random cost function can be written as follows. Take note that the random variable here is $x_0$ and $\mathbb{E}[x_0]$ is a scalar.
 
 <!-- ref: https://www.math.uwaterloo.ca/~hwolkowi/matrixcookbook.pdf
 https://math.stackexchange.com/questions/2163694/expectation-of-quartic-form-for-multivariate-gaussian/4247240#4247240 -->
@@ -464,25 +465,9 @@ Var[\hat{J}] &= \mathbb{E}[(\hat{J} - \mathbb{E}[\hat{J}])^2] \\
 &= \mathbb{E}[x_0^T] L L^T \mathbb{E}[x_0] + \text{tr}(LL^T \mathbb{C}ov[x_0]) \\
 &+ 2\mathbb{E}[x_0^T N x_0 x_0^T] L \\
 &- 2 \mathbb{E}[x_0^T] L W \\
-&+ 2 \text{tr}(N \mathbb{C}ov[x] N \mathbb{C}ov[x]) + 4 \mathbb{E}[x^T]N\mathbb{C}ov[x]N\mathbb{E}[x] \\
-&+ \text{tr}(N\mathbb{C}ov[x])^2 + (\mathbb{E}[x^T]N\mathbb{E}[x])^2 + 2 \text{tr}(N\mathbb{C}ov[x])\mathbb{E}[x^T]N\mathbb{E}[x] \\
+&+ 2 \text{tr}(N \mathbb{C}ov[x] N \mathbb{C}ov[x]) + 4 \mathbb{E}[x^T]N\mathbb{C}ov[x]N\mathbb{E}[x] + (tr(N \mathbb{C}ov[x]) + \mathbb{E}[x^T] N \mathbb{E}[x])^2 \\
 &- 2W (\mathbb{E}[x_0^T] N \mathbb{E}[x_0] + \text{tr}(N \mathbb{C}ov[x_0])) \\
 & + W^2 \\
-\end{aligned}
-$$
-
-$\pagebreak$
-
-Derivation of $\mathbb{E}[(x^T A x)(x^T A x)]$ where $A$ is a symmetric matrix, ref: [Matrix Cookbook](https://www.math.uwaterloo.ca/~hwolkowi/matrixcookbook.pdf), pg 43
-
-$$
-\begin{aligned}
-\mathbb{E}[(x^T A x)(x^T A x)] &= \text{tr}(A \mathbb{C}ov[x] (A + A^T) \mathbb{C}ov[x]) \\
-&+ \mathbb{E}[x^T](A + A^T)\mathbb{C}ov[x](A + A^T)\mathbb{E}[x] \\
-&+ (\text{tr}(A\mathbb{C}ov[x]) + \mathbb{E}[x^T]A\mathbb{E}[x])(\text{tr}(A\mathbb{C}ov[x]) + \mathbb{E}[x^T]A\mathbb{E}[x]) \\
-&= 2 \text{tr}(A \mathbb{C}ov[x] A \mathbb{C}ov[x]) \\
-&+ 4 \mathbb{E}[x^T]A\mathbb{C}ov[x]A\mathbb{E}[x] \\
-&+ \text{tr}(A\mathbb{C}ov[x])^2 + (\mathbb{E}[x^T]A\mathbb{E}[x])^2 + 2 \text{tr}(A\mathbb{C}ov[x])\mathbb{E}[x^T]A\mathbb{E}[x] \text{ (trace is a scalar so can be swapped)} \\
 \end{aligned}
 $$
 
@@ -490,3 +475,76 @@ Here we use a simple Monte Carlo estimator to estimate the expected value of the
 
 ![Variance of the Cost Function with Number of Samples](figs/0.05_mc_variance.svg){width=50%}
 ![Variance of the Cost Function with Number of Samples](figs/0.5_mc_variance.svg){width=50%}
+
+## Reference Expectations
+
+Let
+
+$$
+\begin{aligned}
+x &= \begin{bmatrix} x_1 \\ x_2 \\ \vdots \\ x_n \end{bmatrix}
+A &= \begin{bmatrix} a_1 \\ a_2 \\ \vdots \\ a_n \end{bmatrix}
+B &= \begin{bmatrix} b_{11} & b_{12} & \ldots & b_{1n} \\
+b_{21} & b_{22} & \ldots & b_{2n} \\
+\vdots & \vdots & \ddots & \vdots \\
+b_{n1} & b_{n2} & \ldots & b_{nn} \end{bmatrix}
+\end{aligned}
+$$
+
+And $B$ is symmetric.
+Also, reference the [Matrix Cookbook](https://www.math.uwaterloo.ca/~hwolkowi/matrixcookbook.pdf) for the following derivations.
+
+### Linear $x^T A$
+
+$$
+\begin{aligned}
+\mathbb{E}[x^TA] &= \mathbb{E}\left[
+\begin{bmatrix} x_1 & x_2 & \ldots & x_n \end{bmatrix}
+\begin{bmatrix} a_1 \\ a_2 \\ \vdots \\ a_n \end{bmatrix}
+\right] \\
+&= \mathbb{E}[x_1 a_1 + x_2 a_2 + \ldots + x_n a_n] \\
+&= \mathbb{E}[x_1] a_1 + \mathbb{E}[x_2] a_2 + \ldots + \mathbb{E}[x_n] a_n \\
+&= \begin{bmatrix} \mathbb{E}[x_1] & \mathbb{E}[x_2] & \ldots & \mathbb{E}[x_n] \end{bmatrix}
+\begin{bmatrix} a_1 \\ a_2 \\ \vdots \\ a_n \end{bmatrix} \\
+&= \mathbb{E}[x^T] A \\
+\end{aligned}
+$$
+
+### Quadratic $x^TBx$
+
+$$
+\mathbb{E}[x^TBx] = tr(B \mathbb{C}ov[x]) + \mathbb{E}[x^T]B\mathbb{E}[x]
+$$
+
+### Cubic $x^T B x x^T A$
+
+$$
+\begin{aligned}
+\mathbb{E}[x^T B x x^T A] &= 2 \mathbb{E}[x^T] B \mathbb{C}ov[x] A + tr(B \mathbb{C}ov[x]) \mathbb{E}[x^T] A + (\mathbb{E}[x^T] B \mathbb{E}[x]) (\mathbb{E}[x^T] A) \\
+\text{Chat GPT: }& (\mathbb{E}[x^T] B \mathbb{E}[x]) \cdot \mathbb{E}[x^T] A + tr(B \mathbb{C}ov[x]) \cdot \mathbb{E}[x^T] A \\
+\text{UMich GPT: }& 2 \mu^\top B \Sigma A + \text{Tr}(B \Sigma) \mu^\top A + (\mu^\top B \mu)(\mu^\top A)
+\end{aligned}
+$$
+
+### Quartic $x^T B x x^T B x$
+
+From the reference, we have
+
+$$
+\begin{aligned}
+\mathbb{E}[x^T C x x^T D x] &= tr(C \mathbb{C}ov[x] (D + D^T) \mathbb{C}ov[x]) + \mathbb{E}[x^T] (C + C^T) \mathbb{C}ov[x] (D + D^T) \mathbb{E}[x] \\
+&+ (tr(C \mathbb{C}ov[x]) + \mathbb{E}[x^T] C \mathbb{E}[x]) (tr(D \mathbb{C}ov[x]) + \mathbb{E}[x^T] D \mathbb{E}[x]) \\
+\end{aligned}
+$$
+
+In our case, $C = D = B$ and since $B$ is symmetric, $C + C^T = D + D^T = 2B$.
+
+$$
+\begin{aligned}
+\mathbb{E}[x^T B x x^T B x] &= tr(B \mathbb{C}ov[x] 2B \mathbb{C}ov[x]) + \mathbb{E}[x^T] 2B \mathbb{C}ov[x] 2B \mathbb{E}[x] \\
+&+ (tr(B \mathbb{C}ov[x]) + \mathbb{E}[x^T] B \mathbb{E}[x]) (tr(B \mathbb{C}ov[x]) + \mathbb{E}[x^T] B \mathbb{E}[x]) \\
+&= 2 tr(B \mathbb{C}ov[x] B \mathbb{C}ov[x]) + 4 \mathbb{E}[x^T] B \mathbb{C}ov[x] B \mathbb{E}[x] + (tr(B \mathbb{C}ov[x]) + \mathbb{E}[x^T] B \mathbb{E}[x])^2 \\
+\text{Chat GPT: }& (\mathbb{E}[x^T] B \mathbb{E}[x])^2 + 4 (\mathbb{E}[x^T] B \mathbb{E}[x]) \cdot tr(B \mathbb{C}ov[x]) + 2 tr(B \mathbb{C}ov[x] B \mathbb{C}ov[x]) + tr(B \mathbb{C}ov[x])^2 \\
+\text{UMich GPT: }& (\mu^\top B \mu)^2 + 2 (\mu^\top B \mu) \text{Tr}(B \Sigma) + \text{Tr}(B \Sigma)^2 + 2 \text{Tr}(B \Sigma B \Sigma)
+\end{aligned}
+$$
