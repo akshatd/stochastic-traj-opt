@@ -193,22 +193,22 @@ Additionally, The matrix $Q$ for the extended state should only penalize the err
 $$
 \begin{aligned}
 e_k^T Q_e e_k &= (y_k - r_k)^T Q_e (y_k - r_k) \\
-&= \left(\begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix}
+&= \left(\begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r} \end{bmatrix}
 \begin{bmatrix}
 x_k \\
 u_{k-1} \\
 r_k
 \end{bmatrix}\right)^T Q_e
-\left(\begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix}
+\left(\begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r} \end{bmatrix}
 \begin{bmatrix}
 x_k \\
 u_{k-1} \\
 r_k
 \end{bmatrix}\right) \\
-&= x_k^{ext^T} \begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix}^T Q_e
-\begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix} x_k^{ext} \\
-\implies Q &= \begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix}^T Q_e
-\begin{bmatrix} C & 0 & -\mathbb{I_{n_r \times n_r}} \end{bmatrix}
+&= x_k^{ext^T} \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r} \end{bmatrix}^T Q_e
+\begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r} \end{bmatrix} x_k^{ext} \\
+\implies Q &= \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r} \end{bmatrix}^T Q_e
+\begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r} \end{bmatrix}
 \end{aligned}
 $$
 
@@ -525,6 +525,99 @@ $$
 \text{UMich GPT: }& 2 \mu^\top B \Sigma A + \text{Tr}(B \Sigma) \mu^\top A + (\mu^\top B \mu)(\mu^\top A)
 \end{aligned}
 $$
+
+To find the expectation $\mathbb{E}[X^\top B X \cdot X^\top A]$ where $X$ is a random vector with non-zero mean, $B$ is a symmetric matrix, and $A$ is an $n \times 1$ vector, we need to consider the second and fourth moments of $X$.
+
+#### Assumptions:
+
+- $X \in \mathbb{R}^n$ is a random vector with mean $\mu = \mathbb{E}[X]$.
+- The covariance matrix of $X$ is $\Sigma = \text{Cov}(X) = \mathbb{E}[(X - \mu)(X - \mu)^\top]$.
+- $B \in \mathbb{R}^{n \times n}$ is a symmetric matrix.
+- $A \in \mathbb{R}^{n \times 1}$ is a column vector.
+
+#### Derivation:
+
+1. **Expression Expansion:**
+
+   $$
+   (X^\top B X) \cdot (X^\top A) = \left( \sum_{i,j} X_i B_{ij} X_j \right) \cdot \left( \sum_{k} X_k A_k \right)
+   $$
+
+2. **Combine the Terms:**
+
+   $$
+   (X^\top B X) \cdot (X^\top A) = \sum_{i,j,k} X_i B_{ij} X_j X_k A_k
+   $$
+
+3. **Expectation:**
+
+   $$
+   \mathbb{E}[X^\top B X \cdot X^\top A] = \sum_{i,j,k} B_{ij} A_k \mathbb{E}[X_i X_j X_k]
+   $$
+
+4. **Third-Order Moments:**
+
+   The expectation of the product of three normally distributed random variables (assuming $X$ is multivariate normal) can be computed using the fact that for multivariate normal vectors, the third central moments are zero:
+
+   $$
+   \mathbb{E}[X_i X_j X_k] = \mathbb{E}[(X_i - \mu_i + \mu_i)(X_j - \mu_j + \mu_j)(X_k - \mu_k + \mu_k)]
+   $$
+
+   Expanding this, we get:
+
+   $$
+   \begin{aligned}
+   \mathbb{E}[X_i X_j X_k] &= \mathbb{E}[(X_i - \mu_i)(X_j - \mu_j)(X_k - \mu_k)] \\
+   & \quad + \mu_i \mathbb{E}[(X_j - \mu_j)(X_k - \mu_k)] + \mu_j \mathbb{E}[(X_i - \mu_i)(X_k - \mu_k)] + \mu_k \mathbb{E}[(X_i - \mu_i)(X_j - \mu_j)] \\
+   & \quad + \mu_i \mu_j \mu_k
+   \end{aligned}
+   $$
+
+5. **Evaluate the Expressions:**
+
+   Since the expectation of the product of zero-mean Gaussian random variables is zero, the first term drops out:
+
+   $$
+   \mathbb{E}[(X_i - \mu_i)(X_j - \mu_j)(X_k - \mu_k)] = 0
+   $$
+
+   This simplifies to:
+
+   $$
+   \begin{aligned}
+   \mathbb{E}[X_i X_j X_k] &= \mu_i \Sigma_{jk} + \mu_j \Sigma_{ik} + \mu_k \Sigma_{ij} + \mu_i \mu_j \mu_k
+   \end{aligned}
+   $$
+
+6. **Substitute Back:**
+
+   Substituting $\mathbb{E}[X_i X_j X_k] = \mu_i \Sigma_{jk} + \mu_j \Sigma_{ik} + \mu_k \Sigma_{ij} + \mu_i \mu_j \mu_k$ into the original sum:
+
+   $$
+   \begin{aligned}
+   \mathbb{E}[X^\top B X \cdot X^\top A] &= \sum_{i,j,k} B_{ij} A_k \left( \mu_i \Sigma_{jk} + \mu_j \Sigma_{ik} + \mu_k \Sigma_{ij} + \mu_i \mu_j \mu_k \right)
+   \end{aligned}
+   $$
+
+7. **Simplify:**
+
+   Breaking this into separate sums:
+
+   $$
+   \mathbb{E}[X^\top B X \cdot X^\top A] = \sum_{i,j,k} B_{ij} A_k \mu_i \Sigma_{jk} + \sum_{i,j,k} B_{ij} A_k \mu_j \Sigma_{ik} + \sum_{i,j,k} B_{ij} A_k \mu_k \Sigma_{ij} + \sum_{i,j,k} B_{ij} A_k \mu_i \mu_j \mu_k
+   $$
+
+   Rewriting in matrix form:
+
+   $$
+   \mathbb{E}[X^\top B X \cdot X^\top A] = \mu^\top B \Sigma A + \mu^\top B \Sigma A + \text{Tr}(B \Sigma) \mu^\top A + (\mu^\top B \mu)(\mu^\top A)
+   $$
+
+   Combining these:
+
+   $$
+   \mathbb{E}[X^\top B X \cdot X^\top A] = 2 \mu^\top B \Sigma A + \text{Tr}(B \Sigma) \mu^\top A + (\mu^\top B \mu)(\mu^\top A)
+   $$
 
 ### Quartic $x^T B x x^T B x$
 

@@ -19,21 +19,21 @@ x_cov = cov(x');
 disp("Constant");
 st_mean = mean(x, 2);
 an_mean = x_mean;
-print_mean_cov(an_mean, st_mean);
+fprintf("Analytic: %f, Statistic: %f\n", an_mean, st_mean);
 
 % test linear
 disp("Linear");
 term = x' * A;
 st_mean = mean(term);
 an_mean = x_mean' * A;
-print_mean_cov(an_mean, st_mean);
+fprintf("Analytic: %f, Statistic: %f\n", an_mean, st_mean);
 
 % test quadratic
 disp("Quadratic");
 term = diag(x' * B * x); % diag cos it contains the square term of x with itself
 st_mean = mean(term);
 an_mean = trace(B * x_cov) + x_mean' * B * x_mean;
-print_mean_cov(an_mean, st_mean);
+fprintf("Analytic: %f, Statistic: %f\n", an_mean, st_mean);
 
 % test cubic
 disp("Cubic");
@@ -46,7 +46,7 @@ st_mean = term/samples;
 % an_mean = (x_mean' * B * x_mean) * (x_mean' * A) + trace(B * x_cov) * x_mean' * A
 % UMGPT, works
 an_mean = 2 * x_mean' * B * x_cov * A + trace(B * x_cov) * x_mean' * A + (x_mean' * B * x_mean) * (x_mean' * A);
-print_mean_cov(an_mean, st_mean);
+fprintf("Analytic: %f, Statistic: %f\n", an_mean, st_mean);
 
 % test quartic
 disp("Quartic");
@@ -63,11 +63,4 @@ an_mean = 2 * trace(B * x_cov * B * x_cov) + 4 * x_mean' * B * x_cov * B * x_mea
 % an_mean = (x_mean' * B * x_mean)^2 + 4 * (x_mean' * B * x_mean) * trace(B * x_cov) + 2 * trace(B * x_cov * B * x_cov) + trace(B * x_cov)^2
 % UMGPT, doesnt work
 % an_mean = (x_mean' * B * x_mean)^2 + 2 * (x_mean' * B * x_mean) * trace(B * x_cov) + trace(B * x_cov)^2 + 2 * trace(B * x_cov * B * x_cov)
-print_mean_cov(an_mean, st_mean);
-
-function print_mean_cov(an_mean, st_mean)
-disp("Analytical:");
-disp(an_mean);
-disp("Statistical:");
-disp(st_mean);
-end
+fprintf("Analytic: %f, Statistic: %f\n", an_mean, st_mean);
