@@ -463,9 +463,9 @@ Var[\hat{J}] &= \mathbb{E}[(\hat{J} - \mathbb{E}[\hat{J}])^2] \\
 &- x_0^T L W - W x_0^T N x_0 + W^2] \\
 &= \mathbb{E}[x_0^T L L^T x_0 + 2 x_0^T N x_0 x_0^T L - 2 x_0^T L W + x_0^T N x_0 x_0^T N x_0 - 2 W x_0^T N x_0 + W^2] \\
 &= \mathbb{E}[x_0^T] L L^T \mathbb{E}[x_0] + \text{tr}(LL^T \mathbb{C}ov[x_0]) \\
-&+ 2\mathbb{E}[x_0^T N x_0 x_0^T] L \\
+&+ 2(2 \mathbb{E}x_0^T N \mathbb{C}ov[x_0] + tr(N \mathbb{C}ov[x_0]) \mathbb{E}[x_0^T] + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] \mathbb{E}[x_0^T]) L \\
 &- 2 \mathbb{E}[x_0^T] L W \\
-&+ 2 \text{tr}(N \mathbb{C}ov[x] N \mathbb{C}ov[x]) + 4 \mathbb{E}[x^T]N\mathbb{C}ov[x]N\mathbb{E}[x] + (tr(N \mathbb{C}ov[x]) + \mathbb{E}[x^T] N \mathbb{E}[x])^2 \\
+&+ 2 \text{tr}(N \mathbb{C}ov[x_0] N \mathbb{C}ov[x_0]) + 4 \mathbb{E}[x_0^T]N\mathbb{C}ov[x_0]N\mathbb{E}[x_0] + (tr(N \mathbb{C}ov[x_0]) + \mathbb{E}[x_0^T] N \mathbb{E}[x_0])^2 \\
 &- 2W (\mathbb{E}[x_0^T] N \mathbb{E}[x_0] + \text{tr}(N \mathbb{C}ov[x_0])) \\
 & + W^2 \\
 \end{aligned}

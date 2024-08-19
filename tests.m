@@ -45,7 +45,8 @@ st_mean = term/samples;
 % chatgpt, doesnt work
 % an_mean = (x_mean' * B * x_mean) * (x_mean' * A) + trace(B * x_cov) * x_mean' * A
 % UMGPT, works
-an_mean = 2 * x_mean' * B * x_cov * A + trace(B * x_cov) * x_mean' * A + (x_mean' * B * x_mean) * (x_mean' * A);
+% an_mean = 2 * x_mean' * B * x_cov * A + trace(B * x_cov) * x_mean' * A + (x_mean' * B * x_mean) * (x_mean' * A);
+an_mean = (2 * x_mean' * B * x_cov + trace(B * x_cov) * x_mean' + x_mean' * B * x_mean * x_mean') * A;
 fprintf("Analytic: %f, Statistic: %f\n", an_mean, st_mean);
 
 % test quartic

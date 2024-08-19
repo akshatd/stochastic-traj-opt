@@ -159,7 +159,7 @@ x0_rv_mean_ext = [x0_rv_mean; u0; ref];
 x0_rv_cov_ext = blkdiag(x0_rv_cov, zeros(3,3));
 cost_lqr_est = LQRcost_exp(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
 display("Expectaion of Stochastic LQR cost(analytical): " + cost_lqr_est);
-% display("Variance of Stochastic LQR cost(analytical): " + LQRcost_var(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar));
+display("Variance of Stochastic LQR cost(analytical): " + LQRcost_var(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar));
 data.cost_lqr = zeros(rv_samples, 1);
 % Uopt only depends on x0, so we can use the same Uopt
 Uopt = Kopt * x0_rv_mean_ext;
@@ -300,6 +300,15 @@ function cost_exp = LQRcost_exp(x0_mean, x0_cov, u, Q, S, M, Qbar, Rbar)
 cost_exp = u'*(S'*Qbar*S + Rbar)*u + 2*x0_mean'*M'*Qbar*S*u + x0_mean'*(M'*Qbar*M + Q)*x0_mean + trace((M'*Qbar*M + Q)*x0_cov);
 end
 
-function cost_var = LQRcost_var(x0_mean, x0_cov, u, Q, S, M, Qbar, Rbar)
-cost_var = trace((M'*Qbar*M + Q)*x0_cov);
+function cost_var = LQRcost_var(x0_mean, x0_cov, u, Q, S, M, Qbar)
+L = 2 * M' * Qbar * S * u;
+N = M' * Qbar * M + Q;
+O = trace((M' * Qbar * M + Q) * x0_cov);
+W = x0_mean' * L + x0_mean' * N * x0_mean + O;
+cost_var = x0_mean' * L * L' * x0_mean +  trace(L * L' * x0_cov) ...
+  + 2*(x0_mean' * N * x0_cov + trace(N * x0_cov) * x0_mean' + x0_mean' * N * x0_mean * x0_mean') * L ...
+  - 2 * x0_mean' * L * W ...
+  + 2 * trace(N * x0_cov * N * x0_cov) + 4 * x0_mean' * N * x0_cov * N * x0_mean + (trace(N * x0_cov) + x0_mean' * N * x0_mean)^2 ...
+  - 2 * W * (x0_mean' * N * x0_mean + trace(N * x0_cov)) ...
+  + W^2;
 end
