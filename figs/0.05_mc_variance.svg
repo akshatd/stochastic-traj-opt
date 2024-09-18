@@ -29,7 +29,6 @@
         /><glyph unicode="m" horiz-adv-x="93.49144" d="M67.2969 54.5938 Q76.4062 54.5938 80.9062 49.9453 Q85.4062 45.2969 85.4062 34.9062 L85.4062 0 L76.7031 0 L76.7031 34.5 Q76.7031 47.2031 65.7969 47.2031 Q58 47.2031 54.6484 42.7031 Q51.2969 38.2031 51.2969 29.5938 L51.2969 0 L42.5938 0 L42.5938 34.5 Q42.5938 47.2031 31.5938 47.2031 Q23.5 47.2031 20.3984 42.2031 Q17.2969 37.2031 17.2969 27.7969 L17.2969 0 L8.5 0 L8.5 53.5938 L15.5938 53.5938 L16.9062 46.2969 L17.4062 46.2969 Q19.9062 50.5 24.1562 52.5469 Q28.4062 54.5938 33.2031 54.5938 Q45.7969 54.5938 49.5938 45.5938 L50.0938 45.5938 Q52.7969 50.2031 57.4453 52.3984 Q62.0938 54.5938 67.2969 54.5938 Z"
         /><glyph unicode="u" horiz-adv-x="61.794342" d="M53.2969 53.5938 L53.2969 0 L46.0938 0 L44.7969 7.0938 L44.4062 7.0938 Q41.7969 2.9062 37.1953 0.9531 Q32.5938 -1 27.4062 -1 Q17.7031 -1 12.8047 3.6484 Q7.9062 8.2969 7.9062 18.5 L7.9062 53.5938 L16.7969 53.5938 L16.7969 19.0938 Q16.7969 6.2969 28.7031 6.2969 Q37.5938 6.2969 41.0469 11.2969 Q44.5 16.2969 44.5 25.7031 L44.5 53.5938 L53.2969 53.5938 Z"
         /><glyph unicode="N" horiz-adv-x="75.99304" d="M66.2969 0 L55.7969 0 L17.5938 59.2969 L17.2031 59.2969 Q17.4062 55.7969 17.7031 50.6016 Q18 45.4062 18 39.9062 L18 0 L9.7031 0 L9.7031 71.4062 L20.0938 71.4062 L58.2031 12.2969 L58.5938 12.2969 Q58.5 13.9062 58.3516 17.1016 Q58.2031 20.2969 58.0547 24.1016 Q57.9062 27.9062 57.9062 31.0938 L57.9062 71.4062 L66.2969 71.4062 L66.2969 0 Z"
-        /><glyph unicode="-" horiz-adv-x="32.197052" d="M4 22.9062 L4 30.7031 L28.2031 30.7031 L28.2031 22.9062 L4 22.9062 Z"
         /><glyph unicode="c" horiz-adv-x="47.995605" d="M30 -1 Q22.9062 -1 17.3516 1.8984 Q11.7969 4.7969 8.6484 10.8984 Q5.5 17 5.5 26.5 Q5.5 36.4062 8.7969 42.6016 Q12.0938 48.7969 17.75 51.6953 Q23.4062 54.5938 30.5938 54.5938 Q34.7031 54.5938 38.5 53.75 Q42.2969 52.9062 44.7031 51.7031 L42 44.4062 Q39.5938 45.2969 36.3984 46.1016 Q33.2031 46.9062 30.4062 46.9062 Q14.5938 46.9062 14.5938 26.5938 Q14.5938 16.9062 18.4453 11.75 Q22.2969 6.5938 29.9062 6.5938 Q34.2969 6.5938 37.6484 7.5 Q41 8.4062 43.7969 9.7031 L43.7969 1.9062 Q41.0938 0.5 37.8438 -0.25 Q34.5938 -1 30 -1 Z"
         /><glyph unicode="n" horiz-adv-x="61.794342" d="M34.2969 54.5938 Q43.9062 54.5938 48.8047 49.9453 Q53.7031 45.2969 53.7031 34.9062 L53.7031 0 L45 0 L45 34.2969 Q45 47.2031 33 47.2031 Q24.0938 47.2031 20.6953 42.2031 Q17.2969 37.2031 17.2969 27.7969 L17.2969 0 L8.5 0 L8.5 53.5938 L15.5938 53.5938 L16.9062 46.2969 L17.4062 46.2969 Q20 50.5 24.6016 52.5469 Q29.2031 54.5938 34.2969 54.5938 Z"
         /><glyph unicode="i" horiz-adv-x="25.797638" d="M13 73.7031 Q15 73.7031 16.5469 72.3516 Q18.0938 71 18.0938 68.0938 Q18.0938 65.2969 16.5469 63.8984 Q15 62.5 13 62.5 Q10.7969 62.5 9.2969 63.8984 Q7.7969 65.2969 7.7969 68.0938 Q7.7969 71 9.2969 72.3516 Q10.7969 73.7031 13 73.7031 ZM17.2969 53.5938 L17.2969 0 L8.5 0 L8.5 53.5938 L17.2969 53.5938 Z"
@@ -40,10 +39,7 @@
       ><font horiz-adv-x="59.994507" id="font2"
       ><font-face ascent="106.89021" descent="29.297318" units-per-em="100" style="font-style:normal; font-family:SansSerif; font-weight:bold;"
         /><missing-glyph horiz-adv-x="59.994507" d="M9.4062 0 L9.4062 71.4062 L50.5 71.4062 L50.5 0 L9.4062 0 ZM14.5 5.0938 L45.4062 5.0938 L45.4062 66.2969 L14.5 66.2969 L14.5 5.0938 Z"
-        /><glyph unicode="u" horiz-adv-x="65.693985" d="M57.9062 54.5938 L57.9062 0 L46.5 0 L44.5 7 L43.7031 7 Q41.0938 2.7969 36.5469 0.8984 Q32 -1 26.9062 -1 Q18.0938 -1 12.7969 3.75 Q7.5 8.5 7.5 19 L7.5 54.5938 L22.4062 54.5938 L22.4062 22.7031 Q22.4062 16.9062 24.5 13.9062 Q26.5938 10.9062 31.2031 10.9062 Q38 10.9062 40.5 15.5547 Q43 20.2031 43 28.9062 L43 54.5938 L57.9062 54.5938 Z"
-        /><glyph unicode="d" horiz-adv-x="63.294205" d="M25.0938 -1 Q16 -1 10.25 6.1484 Q4.5 13.2969 4.5 27.2031 Q4.5 41.2031 10.2969 48.3984 Q16.0938 55.5938 25.5 55.5938 Q31.4062 55.5938 35.2031 53.2969 Q39 51 41.2031 47.5938 L41.7031 47.5938 Q41.4062 49.2031 41 52.25 Q40.5938 55.2969 40.5938 58.5 L40.5938 76 L55.5 76 L55.5 0 L44.0938 0 L41.2031 7.0938 L40.5938 7.0938 Q38.4062 3.7031 34.7031 1.3516 Q31 -1 25.0938 -1 ZM30.2969 10.9062 Q36.5 10.9062 39 14.5547 Q41.5 18.2031 41.5938 25.5 L41.5938 27.0938 Q41.5938 35.0938 39.1484 39.2969 Q36.7031 43.5 30.0938 43.5 Q25.2031 43.5 22.3984 39.25 Q19.5938 35 19.5938 27 Q19.5938 19 22.3984 14.9531 Q25.2031 10.9062 30.2969 10.9062 Z"
-        /><glyph unicode="z" horiz-adv-x="48.795532" d="M45.7969 0 L2.7031 0 L2.7031 8.7969 L28 43.2031 L4.2031 43.2031 L4.2031 54.5938 L44.9062 54.5938 L44.9062 44.9062 L20.2969 11.4062 L45.7969 11.4062 L45.7969 0 Z"
-        /><glyph unicode="l" horiz-adv-x="30.497208" d="M22.7031 0 L7.7969 0 L7.7969 76 L22.7031 76 L22.7031 0 Z"
+        /><glyph unicode="q" horiz-adv-x="63.294205" d="M40.5938 -1.0938 Q40.5938 3.0938 41.2031 7.0938 L40.5938 7.0938 Q38.5 3.7031 34.7969 1.3516 Q31.0938 -1 25.0938 -1 Q15.9062 -1 10.2031 6.1484 Q4.5 13.2969 4.5 27.2031 Q4.5 41.2031 10.2969 48.3984 Q16.0938 55.5938 25.4062 55.5938 Q31.4062 55.5938 35.1562 53.2969 Q38.9062 51 41.2031 47.5938 L41.5938 47.5938 L42.9062 54.5938 L55.5 54.5938 L55.5 -24 L40.5938 -24 L40.5938 -1.0938 ZM30.4062 10.7031 Q36.5938 10.7031 39.0469 14.3516 Q41.5 18 41.5938 25.2969 L41.5938 27.0938 Q41.5938 35.0938 39.1484 39.2969 Q36.7031 43.5 30.2031 43.5 Q24.9062 43.5 22.3047 39.25 Q19.7031 35 19.7031 27 Q19.7031 10.7031 30.4062 10.7031 Z"
         /><glyph unicode="f" horiz-adv-x="38.696457" d="M38 43.4062 L25.0938 43.4062 L25.0938 0 L10.2031 0 L10.2031 43.4062 L2 43.4062 L2 50.5938 L10.2031 54.5938 L10.2031 58.5938 Q10.2031 65.5938 12.5547 69.4453 Q14.9062 73.2969 19.25 74.8984 Q23.5938 76.5 29.5 76.5 Q33.9062 76.5 37.4531 75.7969 Q41 75.0938 43.2031 74.2031 L39.4062 63.2969 Q37.7031 63.7969 35.7031 64.25 Q33.7031 64.7031 31.0938 64.7031 Q28 64.7031 26.5469 62.8047 Q25.0938 60.9062 25.0938 58 L25.0938 54.5938 L38 54.5938 L38 43.4062 Z"
         /><glyph unicode="c" horiz-adv-x="51.395294" d="M30 -1 Q17.7969 -1 11.1484 5.75 Q4.5 12.5 4.5 27 Q4.5 37 7.8984 43.2969 Q11.2969 49.5938 17.3516 52.5938 Q23.4062 55.5938 31.2969 55.5938 Q36.9062 55.5938 41.0547 54.5 Q45.2031 53.4062 48.2969 51.9062 L43.9062 40.4062 Q40.4062 41.7969 37.3516 42.6953 Q34.2969 43.5938 31.2969 43.5938 Q19.7031 43.5938 19.7031 27.0938 Q19.7031 18.9062 22.75 15 Q25.7969 11.0938 31.2969 11.0938 Q36 11.0938 39.6016 12.3438 Q43.2031 13.5938 46.5938 15.7969 L46.5938 3.0938 Q43.2031 0.9062 39.4531 -0.0469 Q35.7031 -1 30 -1 Z"
         /><glyph unicode="n" horiz-adv-x="65.693985" d="M38.7969 55.5938 Q47.5938 55.5938 52.8984 50.8438 Q58.2031 46.0938 58.2031 35.5938 L58.2031 0 L43.2969 0 L43.2969 31.9062 Q43.2969 37.7969 41.1953 40.75 Q39.0938 43.7031 34.5 43.7031 Q27.7031 43.7031 25.2031 39.0547 Q22.7031 34.4062 22.7031 25.7031 L22.7031 0 L7.7969 0 L7.7969 54.5938 L19.2031 54.5938 L21.2031 47.5938 L22 47.5938 Q24.5938 51.7969 29.1484 53.6953 Q33.7031 55.5938 38.7969 55.5938 Z"
@@ -338,37 +334,37 @@
       /><line y2="34.878" style="fill:none;" x1="507" x2="504.83" y1="34.878"
       /><line y2="31" style="fill:none;" x1="507" x2="504.83" y1="31"
     /></g
-    ><g transform="translate(42,377)" style="font-size:13.3333px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
+    ><g transform="translate(45,377)" style="font-size:13.3333px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="0" style="stroke:none;"
       >10</text
     ></g
-    ><g transform="translate(58,371)" style="font-size:10.6667px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
+    ><g transform="translate(61,371)" style="font-size:10.6667px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="0" style="stroke:none;"
-      >-4</text
+      >0</text
     ></g
-    ><g transform="translate(42,292)" style="font-size:13.3333px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
+    ><g transform="translate(45,292)" style="font-size:13.3333px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="0" style="stroke:none;"
       >10</text
     ></g
-    ><g transform="translate(58,286)" style="font-size:10.6667px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
+    ><g transform="translate(61,286)" style="font-size:10.6667px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="0" style="stroke:none;"
-      >-3</text
+      >1</text
     ></g
-    ><g transform="translate(42,208)" style="font-size:13.3333px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
+    ><g transform="translate(45,208)" style="font-size:13.3333px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="0" style="stroke:none;"
       >10</text
     ></g
-    ><g transform="translate(58,202)" style="font-size:10.6667px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
+    ><g transform="translate(61,202)" style="font-size:10.6667px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="0" style="stroke:none;"
-      >-2</text
+      >2</text
     ></g
-    ><g transform="translate(42,123)" style="font-size:13.3333px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
+    ><g transform="translate(45,123)" style="font-size:13.3333px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="0" style="stroke:none;"
       >10</text
     ></g
-    ><g transform="translate(58,117)" style="font-size:10.6667px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
+    ><g transform="translate(61,117)" style="font-size:10.6667px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="0" style="stroke:none;"
-      >-1</text
+      >3</text
     ></g
     ><g transform="translate(45,38)" style="font-size:13.3333px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="0" style="stroke:none;"
@@ -376,18 +372,18 @@
     ></g
     ><g transform="translate(61,32)" style="font-size:10.6667px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="0" style="stroke:none;"
-      >0</text
+      >4</text
     ></g
-    ><g transform="translate(37.6667,200.4998) rotate(-90)" style="font-size:14.6667px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
+    ><g transform="translate(40.6667,200.4998) rotate(-90)" style="font-size:14.6667px; fill:rgb(38,38,38); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(38,38,38); color-interpolation:linearRGB;"
     ><text x="-30" xml:space="preserve" y="-5" style="stroke:none;"
       >Variance</text
     ></g
     ><g transform="translate(290.0003,28.25)" style="font-size:14.6667px; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; color-interpolation:linearRGB; font-weight:bold;"
-    ><text x="-217" xml:space="preserve" y="-5" style="stroke:none;"
-      >(Ts:0.05) MC estimator variance of normalized cost function</text
+    ><text x="-177.5" xml:space="preserve" y="-5" style="stroke:none;"
+      >(Ts:0.05) MC estimator variance of mean sq error</text
     ></g
     ><g style="stroke-linecap:butt; fill:blue; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; stroke-linejoin:round; stroke:blue; color-interpolation:linearRGB; stroke-width:2.6667;"
-    ><path d="M73 91.8874 L217.6667 167.4957 L362.3333 259.3302 L507 349.685" style="fill:none; fill-rule:evenodd;"
+    ><path d="M73 82.3745 L217.6667 156.8125 L362.3333 239.3929 L507 326.8716" style="fill:none; fill-rule:evenodd;"
     /></g
     ><g transform="translate(421,52.5)" style="text-rendering:geometricPrecision; font-family:'SansSerif'; color-interpolation:linearRGB; color-rendering:optimizeQuality; image-rendering:optimizeQuality;"
     ><text x="0" xml:space="preserve" y="4.5" style="stroke:none;"

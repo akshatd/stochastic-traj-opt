@@ -15,6 +15,9 @@ x = mvnrnd(x_mean, x_cov, samples)'; % transpose to make it nx by samples
 x_mean = mean(x, 2);
 x_cov = cov(x');
 
+% expected values
+disp("Expected values");
+
 % test constant
 disp("Constant");
 st_mean = mean(x, 2);
@@ -39,7 +42,7 @@ fprintf("Analytic: %f, Statistic: %f\n", an_mean, st_mean);
 disp("Cubic");
 term = 0;
 for i = 1:samples
-	term = term + (x(:, i)' * B * x(:, i)) * (x(:, i)' * A);
+	term = term + (x(:, i)' * A) * (x(:, i)' * B * x(:, i));
 end
 st_mean = term/samples;
 % chatgpt, doesnt work
@@ -65,3 +68,27 @@ an_mean = 2 * trace(B * x_cov * B * x_cov) + 4 * x_mean' * B * x_cov * B * x_mea
 % UMGPT, doesnt work
 % an_mean = (x_mean' * B * x_mean)^2 + 2 * (x_mean' * B * x_mean) * trace(B * x_cov) + trace(B * x_cov)^2 + 2 * trace(B * x_cov * B * x_cov)
 fprintf("Analytic: %f, Statistic: %f\n", an_mean, st_mean);
+
+% variances
+disp(newline + "Variances");
+
+% test linear
+disp("Linear");
+term = x' * A;
+st_var = var(term);
+an_var = A' * x_cov * A;
+fprintf("Analytic: %f, Statistic: %f\n", an_var, st_var);
+
+% test quadratic
+disp("Quadratic");
+term = diag(x' * B * x);
+st_var = var(term);
+an_var = trace(B * x_cov * (B + B') * x_cov) + x_mean' * (B + B') * x_cov * (B + B') * x_mean;
+fprintf("Analytic: %f, Statistic: %f\n", an_var, st_var);
+
+% test combined variance
+disp("Combined");
+term = x' * A + diag(x' * B * x);
+st_var = var(term);
+an_var = 2 * trace(B * x_cov * B * x_cov) + A' * x_cov * A + 4 * (x_mean' * B + A') * x_cov * B * x_mean;
+fprintf("Analytic: %f, Statistic: %f\n", an_var, st_var);

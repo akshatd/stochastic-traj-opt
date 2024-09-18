@@ -157,12 +157,12 @@ x0_rv_mean = mean(x0_rv, 2);
 x0_rv_cov = cov(x0_rv');
 x0_rv_mean_ext = [x0_rv_mean; u0; ref];
 x0_rv_cov_ext = blkdiag(x0_rv_cov, zeros(3,3));
-cost_lqr_est = LQRcost_exp(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
-display("Expectaion of Stochastic LQR cost(analytical): " + cost_lqr_est);
-display("Variance of Stochastic LQR cost(analytical): " + LQRcost_var(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar));
-data.cost_lqr = zeros(rv_samples, 1);
-% Uopt only depends on x0, so we can use the same Uopt
+% Uopt only depends on x0, so we can use the same Kopt
 Uopt = Kopt * x0_rv_mean_ext;
+[cost_lqr_exp, cost_lqr_var] = LQRcost_stats(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
+display("Expectaion of Stochastic LQR cost(analytical): " + cost_lqr_exp);
+display("Variance of Stochastic LQR cost(analytical): " + cost_lqr_var);
+data.cost_lqr = zeros(rv_samples, 1);
 for i = 1:rv_samples
   k = 0;
   xk = x0_rv(:, i);
@@ -226,7 +226,7 @@ display("Expectation of Stochastic LQR cost(MC): " + mean(data.cost_lqr));
 display("Variance of Stochastic LQR cost(MC): " + var(data.cost_lqr));
 plot(x, y, 'r', 'LineWidth', 2, 'DisplayName', 'Normal Fit');
 xline(cost_det, 'k', 'LineWidth', 2, 'DisplayName', 'Deterministic Cost');
-xline(cost_lqr_est, 'g', 'LineWidth', 2, 'DisplayName', 'Stochastic Analytical Cost');
+xline(cost_lqr_exp, 'g', 'LineWidth', 2, 'DisplayName', 'Stochastic Analytical Cost');
 title("(Ts:"+Ts+") Cost distribution of stochastic LQR ("+rv_samples+" samples)");
 xlabel('Cost');
 ylabel('Probability Density');
@@ -296,19 +296,10 @@ function cost = LQRCost(x0, u, Q, S, M, Qbar, Rbar)
 cost = u'*(S'*Qbar*S + Rbar)*u + 2*x0'*M'*Qbar*S*u + x0'*(M'*Qbar*M + Q)*x0;
 end
 
-function cost_exp = LQRcost_exp(x0_mean, x0_cov, u, Q, S, M, Qbar, Rbar)
-cost_exp = u'*(S'*Qbar*S + Rbar)*u + 2*x0_mean'*M'*Qbar*S*u + x0_mean'*(M'*Qbar*M + Q)*x0_mean + trace((M'*Qbar*M + Q)*x0_cov);
-end
-
-function cost_var = LQRcost_var(x0_mean, x0_cov, u, Q, S, M, Qbar)
+function [exp, var] = LQRcost_stats(x0_mean, x0_cov, u, Q, S, M, Qbar, Rbar)
+K = u'*(S'*Qbar*S + Rbar)*u;
 L = 2 * M' * Qbar * S * u;
 N = M' * Qbar * M + Q;
-O = trace((M' * Qbar * M + Q) * x0_cov);
-W = x0_mean' * L + x0_mean' * N * x0_mean + O;
-cost_var = x0_mean' * L * L' * x0_mean +  trace(L * L' * x0_cov) ...
-  + 2*(x0_mean' * N * x0_cov + trace(N * x0_cov) * x0_mean' + x0_mean' * N * x0_mean * x0_mean') * L ...
-  - 2 * x0_mean' * L * W ...
-  + 2 * trace(N * x0_cov * N * x0_cov) + 4 * x0_mean' * N * x0_cov * N * x0_mean + (trace(N * x0_cov) + x0_mean' * N * x0_mean)^2 ...
-  - 2 * W * (x0_mean' * N * x0_mean + trace(N * x0_cov)) ...
-  + W^2;
+exp = K + x0_mean' * L + x0_mean' * N * x0_mean + trace(N * x0_cov);
+var = L' * x0_cov * L + 2 * trace(N * x0_cov * N * x0_cov) + 4 * (x0_mean' * N + L') * x0_cov * N * x0_mean;
 end

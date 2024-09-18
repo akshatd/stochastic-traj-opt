@@ -345,11 +345,7 @@ $$
 \mathbb{E}[X] = S U + M \mathbb{E}[x_0]
 $$
 
-The cost matrices $\bar{Q}$ and $\bar{R}$ are also the same. The cost function is now a random variable $\hat{J}$, with an expectation and variance.
-
-$$
-\hat{J} \sim \mathcal{N}(\mathbb{E}[\hat{J}], Var[\hat{J}])
-$$
+The cost matrices $\bar{Q}$ and $\bar{R}$ are also the same. The cost function $J$ is now a random variable, with an expectation $\mathbb{E}[J]$ and variance $Var[J]$.
 
 The expected value of the cost function over all possible realizations of the initial conditions is
 
@@ -357,7 +353,7 @@ The expected value of the cost function over all possible realizations of the in
 
 $$
 \begin{aligned}
-\mathbb{E}[\hat{J}] &= \mathbb{E}[x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)] \\
+\mathbb{E}[J] &= \mathbb{E}[x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)] \\
 &= \mathbb{E}[X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0] \\
 &= \mathbb{E}[X^T \bar{Q} X] + \mathbb{E}[U^T \bar{R} U] + \mathbb{E}[x_0^T Q x_0] \\
 &= \mathbb{E}[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + \mathbb{E}[x_0^T Q x_0] \\
@@ -400,19 +396,14 @@ $$
 \end{aligned}
 $$
 
-Which proves that the optimal control input when the initial state is stochastic is the same as when the initial state is deterministic if that the mean of the stochastic initial state is the same as the deterministic initial state given enough samples.
+Which proves that the optimal control input when the initial state is stochastic is the same as when the initial state is deterministic if the mean of the stochastic initial state is the same as the deterministic initial state given enough samples.
 
 To visualize this, we can optmize individual trajectories with randomly sampled initial conditions and plot the average trajectory. The average trajectory is the solution to the stochastic LQR problem.
 
 ![Closed Loop with Stochastic LQR Control](figs/0.05_cl_stoch_init.svg)
 ![Closed Loop with Stochastic LQR Control](figs/0.5_cl_stoch_init.svg)
 
-We can verify that the expected value of the random cost function when calculated by averaging over all trajectories is the same as the one determined by the aalytical formula derived above.
-
-![Distribution of the Cost Function](figs/0.05_cost_dist.svg){width=50%}
-![Distribution of the Cost Function](figs/0.5_cost_dist.svg){width=50%}
-
-$\pagebreak$
+### Expected value and Variance of the cost function
 
 We can rewrite the the cost function as
 
@@ -429,52 +420,84 @@ J &= K + x_0^T L + x_0^T N x_0 \\
 \end{aligned}
 $$
 
-Similarly, rewrite the expectation of the random cost function as
-
-$$
-\begin{aligned}
-\mathbb{E}[\hat{J}] &= U^T(S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T](M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \mathbb{C}ov[x_0]) \\
-\text{Let}& \\
-O &= \text{tr}((M^T \bar{Q} M + Q) \mathbb{C}ov[x_0]) \\
-\text{Then}& \\
-\mathbb{E}[\hat{J}] &= K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] + O \\
-\end{aligned}
-$$
-
-Then, the variance of the random cost function can be written as follows. Take note that the random variable here is $x_0$ and $\mathbb{E}[x_0]$ is a scalar.
+Then, the expectation and variance of the cost function is as follows. Take note that the random variable here is $x_0$ and $\mathbb{E}[x_0]$ is a scalar.
 
 <!-- ref: https://www.math.uwaterloo.ca/~hwolkowi/matrixcookbook.pdf
 https://math.stackexchange.com/questions/2163694/expectation-of-quartic-form-for-multivariate-gaussian/4247240#4247240 -->
+<!-- ref: https://math.stackexchange.com/questions/1302882/variance-of-a-quadratic-form -->
 
 $$
 \begin{aligned}
-Var[\hat{J}] &= \mathbb{E}[(\hat{J} - \mathbb{E}[\hat{J}])^2] \\
-&= \mathbb{E}[(K + x_0^T L + x_0^T N x_0 - (K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] + O))^2] \\
-&= \mathbb{E}[(x_0^T L + x_0^T N x_0 - \mathbb{E}[x_0^T] L - \mathbb{E}[x_0^T] N \mathbb{E}[x_0] - O)^2] \\
-& \text{let } \mathbb{E}[x_0^T] L + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] + O = W \\
+\mathbb{E}[J] &= \mathbb{E}[K] + \mathbb{E}[x_0^T L] + \mathbb{E}[x_0^T N x_0] \\
+&= K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] + \text{tr}(N \mathbb{C}ov[x_0]) \\
+Var[J] &= Var[K + x_0^T L + x_0^T N x_0] \\
+&\text{note: $K$ is deterministic, so its variance is 0} \\
 & \text{note: $x_0^T L$ is a scalar, $x_0^T L = L^T x_0$} \\
-& \text{note: $\mathbb{E}[x_0^T] N \mathbb{E}[x_0]$, $O$ are deterministic scalars, so $W$ is a deterministic scalar} \\
-&= \mathbb{E}[(x_0^T L + x_0^T N x_0 - W)^2] \\
-&= \mathbb{E}[x_0^T L x_0^T L + x_0^T L x_0^T N x_0 - x_0^T L W \\
-&+ x_0^T N x_0 x_0^T L + x_0^T N x_0 x_0^T N x_0 - x_0^T N x_0 W \\
-&- W x_0^T L - W x_0^T N x_0 + W^2] \\
-&= \mathbb{E}[x_0^T L L^T x_0 + x_0^T N x_0 x_0^T L - x_0^T L W \\
-&+ x_0^T N x_0 x_0^T L + x_0^T N x_0 x_0^T N x_0 - W x_0^T N x_0 \\
-&- x_0^T L W - W x_0^T N x_0 + W^2] \\
-&= \mathbb{E}[x_0^T L L^T x_0 + 2 x_0^T N x_0 x_0^T L - 2 x_0^T L W + x_0^T N x_0 x_0^T N x_0 - 2 W x_0^T N x_0 + W^2] \\
-&= \mathbb{E}[x_0^T] L L^T \mathbb{E}[x_0] + \text{tr}(LL^T \mathbb{C}ov[x_0]) \\
-&+ 2(2 \mathbb{E}x_0^T N \mathbb{C}ov[x_0] + tr(N \mathbb{C}ov[x_0]) \mathbb{E}[x_0^T] + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] \mathbb{E}[x_0^T]) L \\
-&- 2 \mathbb{E}[x_0^T] L W \\
-&+ 2 \text{tr}(N \mathbb{C}ov[x_0] N \mathbb{C}ov[x_0]) + 4 \mathbb{E}[x_0^T]N\mathbb{C}ov[x_0]N\mathbb{E}[x_0] + (tr(N \mathbb{C}ov[x_0]) + \mathbb{E}[x_0^T] N \mathbb{E}[x_0])^2 \\
-&- 2W (\mathbb{E}[x_0^T] N \mathbb{E}[x_0] + \text{tr}(N \mathbb{C}ov[x_0])) \\
-& + W^2 \\
+&= Var[L^T x_0 + x_0^T N x_0] \\
+&= 2\text{tr}(N \mathbb{C}ov[x_0] N \mathbb{C}ov[x_0]) + 4 \mathbb{E}[x_0^T]N\mathbb{C}ov[x_0]N\mathbb{E}[x_0] + 4 L^T \mathbb{C}ov[x_0] N \mathbb{E}[x_0] + L^T \mathbb{Cov}[x_0] L \\
 \end{aligned}
 $$
+
+We can verify that the expected value and variance of the random cost function when calculated by averaging over all trajectories is the same as the one determined by the aalytical formula derived above.
+
+![Distribution of the Cost Function](figs/0.05_cost_dist.svg){width=50%}
+![Distribution of the Cost Function](figs/0.5_cost_dist.svg){width=50%}
+
+$\pagebreak$
 
 Here we use a simple Monte Carlo estimator to estimate the expected value of the cost function over some realizations of the initial conditions. The variance of this cost function is varies with the number of samples used in the Monte Carlo estimator.
 
 ![Variance of the Cost Function with Number of Samples](figs/0.05_mc_variance.svg){width=50%}
 ![Variance of the Cost Function with Number of Samples](figs/0.5_mc_variance.svg){width=50%}
+
+## Bias for both cases of fidelity
+
+For both low and high fidelity simulation, the solutions are
+
+$$
+\begin{aligned}
+U_h^* &= -H_h^{-1} q_h \\
+U_l^* &= -H_l^{-1} q_l \\
+\text{where for both fidelities} \\
+H_h &= S_h^T \bar{Q} S_h + \bar{R} \\
+q_h &= S_h^T \bar{Q} M_h \mathbb{E}[x_0] \\
+H_l &= S_l^T \bar{Q} S_l + \bar{R} \\
+q_l &= S_l^T \bar{Q} M_l \mathbb{E}[x_0]
+\end{aligned}
+$$
+
+The only difference in the solution comes from the matrices $S$ and $M$. Bias is then the difference between the two solutions.
+
+The problem is that the low fidelity solution contains fewer points in the solution compared to the high fidelity solution, and these fewer solution points need to be "held" and compared to the high fidelity solution for a time determined by ratio of the time steps in each solution. Let the number of time steps in the horizon be $N_h$ and $N_l$ for high and low fidelity respectively. The ratio is then $N_r = \frac{N_h}{N_l}$. To be able to find the difference between the solutions, we need to hold the low fidelity solution for $t$ time steps. This can be done by multiplying the low fidelity solution by a matrix determined $T$ that is constructed using $N_r$.
+
+$$
+\begin{aligned}
+\text{Start with a smaller matrix } T_i &= \begin{bmatrix}
+\mathbb{I}_{n_u \times n_u} \\
+\vdots \\
+\mathbb{I}_{n_u \times n_u}
+\end{bmatrix} \text{with size } N_r n_u \times n_u \\
+\text{Then repeat this matrix in a diagonal matrix }
+T &= \begin{bmatrix}
+T_i & \ldots & 0 \\
+\vdots & \ddots & \vdots \\
+0 & \ldots & T_i\\
+\end{bmatrix}
+\end{aligned}
+$$
+
+The difference between the solutions is then
+
+$$
+\begin{aligned}
+T U_l^* - U_h^* &= T (-H_l^{-1} q_l) - (-H_h^{-1} q_h) \\
+&= -T H_l^{-1} q_l + H_h^{-1} q_h \\
+\end{aligned}
+$$
+
+## MLMC Optimization
+
+For this, we have a fixed cost
 
 ## Reference Expectations
 
