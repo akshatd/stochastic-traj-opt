@@ -61,6 +61,7 @@ ylim(plot_ylim_l);
 legend show; legend boxoff;
 grid on; grid minor;
 saveas(fig, 'figs/ol_det.svg');
+lqrsol = cell(length(TsList), 1);
 
 for idx = 1:length(TsList)
   Ts = TsList(idx);
@@ -74,6 +75,7 @@ for idx = 1:length(TsList)
   [A_ext, B_ext, Q_ext, R_ext, P_ext] = extendState(c2d(msd_sys, Ts), Q, R, P);
   [Kopt, S, M, Qbar, Rbar] = solveLQR(N, A_ext, B_ext, Q_ext, R_ext, P_ext);
   Uopt = Kopt * x0_ext;
+  lqrsol{idx} = struct('x0_ext', x0_ext, 'Uopt', Uopt, 'Q_ext', Q_ext, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar);
   cost_det = LQRCost(x0_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
   display("Deterministic LQR cost: " + cost_det);
   
@@ -235,6 +237,26 @@ for idx = 1:length(TsList)
   legend show; legend boxoff;
   grid on; grid minor;
   saveas(fig, "figs/"+Ts+"_cost_dist.svg");
+end
+
+%% perturb solutions U and check if they are still optimal
+for idx = 1:length(TsList)
+  Ts = TsList(idx);
+  sol = lqrsol{idx};
+  perturbation = -0.5:0.1:0.5;
+  Uopt_perturbed = sol.Uopt + perturbation;
+  cost_perturbed = zeros(length(perturbation), 1);
+  for i = 1:length(perturbation)
+    cost_perturbed(i) = LQRCost(sol.x0_ext, Uopt_perturbed(:, i), sol.Q_ext, sol.S, sol.M, sol.Qbar, sol.Rbar);
+  end
+  fig = figure;
+  plot(perturbation, cost_perturbed, 'b', 'LineWidth', 2, 'DisplayName', 'Cost');
+  hold on;
+  xlabel('Perturbation');
+  ylabel('Cost');
+  title("(Ts:"+Ts+") Cost vs perturbation of U");
+  grid on; grid minor;
+  saveas(fig, "figs/"+Ts+"_cost_perturb.svg");
 end
 
 %% Monte carlo estimator with variance calculation

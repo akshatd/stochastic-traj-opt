@@ -320,6 +320,11 @@ $$
 ![Closed Loop with LQR Control](figs/0.05_cl_det.svg){width=50%}
 ![Closed Loop with LQR Control](figs/0.5_cl_det.svg){width=50%}
 
+Plotting costs when the optimal is perturbed by a small amount for all timesteps (adding a constant offset to $U^*$ at each timestep) , we can see that the cost function is indeed minimized at the optimal control input.
+
+![Cost Function with Perturbed Optimal Control Input](figs/0.05_cost_perturb.svg){width=50%}
+![Cost Function with Perturbed Optimal Control Input](figs/0.5_cost_perturb.svg){width=50%}
+
 ## Stochastic LQR
 
 We will consider the case where the initial state $x_0$ is stochastic, with mean $\mu$ and covariance $\Sigma$.
