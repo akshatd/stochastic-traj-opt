@@ -434,7 +434,7 @@ Var[J] &= Var[K + x_0^T L + x_0^T N x_0] \\
 &\text{note: $K$ is deterministic, so its variance is 0} \\
 & \text{note: $x_0^T L$ is a scalar, $x_0^T L = L^T x_0$} \\
 &= Var[L^T x_0 + x_0^T N x_0] \\
-&= 2\text{tr}(N \mathbb{C}ov[x_0] N \mathbb{C}ov[x_0]) + 4 \mathbb{E}[x_0^T]N\mathbb{C}ov[x_0]N\mathbb{E}[x_0] + 4 L^T \mathbb{C}ov[x_0] N \mathbb{E}[x_0] + L^T \mathbb{Cov}[x_0] L \\
+&= 2\text{tr}(N \mathbb{C}ov[x_0] N \mathbb{C}ov[x_0]) + 4 \mathbb{E}[x_0^T]N\mathbb{C}ov[x_0]N\mathbb{E}[x_0] + 4 L^T \mathbb{C}ov[x_0] N \mathbb{E}[x_0] + L^T \mathbb{C}ov[x_0] L \\
 \end{aligned}
 $$
 
@@ -497,7 +497,13 @@ $$
 
 ## MLMC Optimization
 
-For this, we have a fixed cost
+First, we need an MLMC estimator, $S_n^{MLMC}$ which combines both the low ($S_n^l$) and high fidelity ($S_n^h$) estimators
+
+$$
+\begin{aligned}
+S_n^{MLMC} &= S_n^h + \alpha (S_n^l - \mathbb{E}[J_l]) \\
+\end{aligned}
+$$
 
 ## Reference Expectations
 
