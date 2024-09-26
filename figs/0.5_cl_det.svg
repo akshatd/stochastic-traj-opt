@@ -253,7 +253,7 @@
     ><text x="-91" xml:space="preserve" y="-5" style="stroke:none;"
       >Position [m]/Velocity [m/s]</text
     ></g
-    ><g style="fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; stroke-linejoin:round; stroke:rgb(237,177,32); color-interpolation:linearRGB; stroke-width:0.6667;"
+    ><g style="fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; stroke-linejoin:round; stroke:red; color-interpolation:linearRGB; stroke-width:0.6667;"
     ><line y2="31" style="fill:none;" x1="507" x2="507" y1="373"
       /><line y2="373" style="fill:none;" x1="507" x2="502.66" y1="373"
       /><line y2="335" style="fill:none;" x1="507" x2="502.66" y1="335"
@@ -266,47 +266,47 @@
       /><line y2="69" style="fill:none;" x1="507" x2="502.66" y1="69"
       /><line y2="31" style="fill:none;" x1="507" x2="502.66" y1="31"
     /></g
-    ><g transform="translate(512.3333,373)" style="font-size:13.3333px; fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(237,177,32); color-interpolation:linearRGB;"
+    ><g transform="translate(512.3333,373)" style="font-size:13.3333px; fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:red; color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="5.5" style="stroke:none;"
       >0.5</text
     ></g
-    ><g transform="translate(512.3333,335)" style="font-size:13.3333px; fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(237,177,32); color-interpolation:linearRGB;"
+    ><g transform="translate(512.3333,335)" style="font-size:13.3333px; fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:red; color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="5.5" style="stroke:none;"
       >1</text
     ></g
-    ><g transform="translate(512.3333,297)" style="font-size:13.3333px; fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(237,177,32); color-interpolation:linearRGB;"
+    ><g transform="translate(512.3333,297)" style="font-size:13.3333px; fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:red; color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="5.5" style="stroke:none;"
       >1.5</text
     ></g
-    ><g transform="translate(512.3333,259)" style="font-size:13.3333px; fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(237,177,32); color-interpolation:linearRGB;"
+    ><g transform="translate(512.3333,259)" style="font-size:13.3333px; fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:red; color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="5.5" style="stroke:none;"
       >2</text
     ></g
-    ><g transform="translate(512.3333,221)" style="font-size:13.3333px; fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(237,177,32); color-interpolation:linearRGB;"
+    ><g transform="translate(512.3333,221)" style="font-size:13.3333px; fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:red; color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="5.5" style="stroke:none;"
       >2.5</text
     ></g
-    ><g transform="translate(512.3333,183)" style="font-size:13.3333px; fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(237,177,32); color-interpolation:linearRGB;"
+    ><g transform="translate(512.3333,183)" style="font-size:13.3333px; fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:red; color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="5.5" style="stroke:none;"
       >3</text
     ></g
-    ><g transform="translate(512.3333,145)" style="font-size:13.3333px; fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(237,177,32); color-interpolation:linearRGB;"
+    ><g transform="translate(512.3333,145)" style="font-size:13.3333px; fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:red; color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="5.5" style="stroke:none;"
       >3.5</text
     ></g
-    ><g transform="translate(512.3333,107)" style="font-size:13.3333px; fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(237,177,32); color-interpolation:linearRGB;"
+    ><g transform="translate(512.3333,107)" style="font-size:13.3333px; fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:red; color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="5.5" style="stroke:none;"
       >4</text
     ></g
-    ><g transform="translate(512.3333,69)" style="font-size:13.3333px; fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(237,177,32); color-interpolation:linearRGB;"
+    ><g transform="translate(512.3333,69)" style="font-size:13.3333px; fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:red; color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="5.5" style="stroke:none;"
       >4.5</text
     ></g
-    ><g transform="translate(512.3333,31)" style="font-size:13.3333px; fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(237,177,32); color-interpolation:linearRGB;"
+    ><g transform="translate(512.3333,31)" style="font-size:13.3333px; fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:red; color-interpolation:linearRGB;"
     ><text x="0" xml:space="preserve" y="5.5" style="stroke:none;"
       >5</text
     ></g
-    ><g transform="translate(535.3333,201.9998) rotate(-90)" style="font-size:14.6667px; fill:rgb(237,177,32); text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:rgb(237,177,32); color-interpolation:linearRGB;"
+    ><g transform="translate(535.3333,201.9998) rotate(-90)" style="font-size:14.6667px; fill:red; text-rendering:geometricPrecision; image-rendering:optimizeQuality; color-rendering:optimizeQuality; font-family:'SansSerif'; stroke:red; color-interpolation:linearRGB;"
     ><text x="-59.5" xml:space="preserve" y="16" style="stroke:none;"
       >Control Effort [N]</text
     ></g

@@ -320,10 +320,13 @@ $$
 ![Closed Loop with LQR Control](figs/0.05_cl_det.svg){width=50%}
 ![Closed Loop with LQR Control](figs/0.5_cl_det.svg){width=50%}
 
-Plotting costs when the optimal is perturbed by a small amount for all timesteps (adding a constant offset to $U^*$ at each timestep) , we can see that the cost function is indeed minimized at the optimal control input.
+## Stochastic Dynamics
 
-![Cost Function with Perturbed Optimal Control Input](figs/0.05_cost_perturb.svg){width=50%}
-![Cost Function with Perturbed Optimal Control Input](figs/0.5_cost_perturb.svg){width=50%}
+For stochasic dynamics, we start with the initial state being stochastic. Here we simulate the system with a few different samples of the initial conditions and plot the trajectories of the position.
+
+![Open Loop Dynamics with Stochastic Initial Conditions](figs/ol_stoch_init.svg)
+
+$\pagebreak$
 
 ## Stochastic LQR
 
@@ -341,8 +344,6 @@ $$
  &= A^N \mathbb{E}[x_0] + A^{N-1} B u_0 + A^{N-2} B u_1 + \ldots + B u_{N-1} \\
 \end{aligned}
 $$
-
-![Open Loop Dynamics with Stochastic Initial Conditions](figs/ol_stoch_init.svg)
 
 The matrices $S$ and $M$ remain the same, and we have the following expression for the expectation of the state vector $X$
 
@@ -405,8 +406,13 @@ Which proves that the optimal control input when the initial state is stochastic
 
 To visualize this, we can optmize individual trajectories with randomly sampled initial conditions and plot the average trajectory. The average trajectory is the solution to the stochastic LQR problem.
 
-![Closed Loop with Stochastic LQR Control](figs/0.05_cl_stoch_init.svg)
-![Closed Loop with Stochastic LQR Control](figs/0.5_cl_stoch_init.svg)
+![Closed Loop with Stochastic LQR Control](figs/0.05_cl_stoch_init.svg){width=50%}
+![Closed Loop with Stochastic LQR Control](figs/0.5_cl_stoch_init.svg){width=50%}
+
+Plotting costs when the optimal is perturbed by a small amount for all timesteps (adding a constant offset to $U^*$ at each timestep) , we can see that the cost function is indeed minimized at the optimal control input as calculated above in the stochastic LQR case.
+
+![Cost Function with Perturbed Optimal Control Input](figs/0.05_cost_perturb.svg){width=50%}
+![Cost Function with Perturbed Optimal Control Input](figs/0.5_cost_perturb.svg){width=50%}
 
 ### Expected value and Variance of the cost function
 
@@ -443,7 +449,7 @@ Var[J] &= Var[K + x_0^T L + x_0^T N x_0] \\
 \end{aligned}
 $$
 
-We can verify that the expected value and variance of the random cost function when calculated by averaging over all trajectories is the same as the one determined by the aalytical formula derived above.
+We can verify that the expected value and variance of the random cost function when calculated by averaging over all trajectories is the same as the one determined by the analytical formula derived above.
 
 ![Distribution of the Cost Function](figs/0.05_cost_dist.svg){width=50%}
 ![Distribution of the Cost Function](figs/0.5_cost_dist.svg){width=50%}
@@ -509,6 +515,10 @@ $$
 S_n^{MLMC} &= S_n^h + \alpha (S_n^l - \mathbb{E}[J_l]) \\
 \end{aligned}
 $$
+
+We also need to make sure that the estimators have some correlation, so plotting the cost function after perturbing the optimal control input in the low fidelity and using it in the high fidelity cost function gives the following graph.
+
+![Cost Function with Perturbed Optimal Control Input](figs/cost_perturb_comp_hf.svg){width=50%}
 
 ## Reference Expectations
 

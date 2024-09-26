@@ -54,19 +54,55 @@ fig = figure;
 hold on;
 plot(data.times, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position');
 plot(data.times, data.x_ol(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity');
-title("Open loop dynamics");
-xlabel('Time [s]');
 ylabel('Position [m]/Velocity [m/s]');
 ylim(plot_ylim_l);
+title("Open loop dynamics");
+xlabel('Time [s]');
 legend show; legend boxoff;
 grid on; grid minor;
 saveas(fig, 'figs/ol_det.svg');
+
+%% stochastic with random initial state
+
+% set up problem with stochastic initial state
+x0_rv = mvnrnd(x0_mean, x0_cov, rv_samples)';
+x0_rv_mean = mean(x0_rv, 2);
+x0_rv_cov = cov(x0_rv');
+x0_rv_mean_ext = [x0_rv_mean; u0; ref];
+x0_rv_cov_ext = blkdiag(x0_rv_cov, zeros(3,3));
+
+% simulate open loop dynamics
+data.x_ol_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
+for i = 1:rv_samples
+  [~, x_ode] = ode45(@(t, x) msd(t, x, 0, A_msd, B_msd), 0:Tfid:Tsim, x0_rv(:, i));
+  data.x_ol_stoch(:, :, i) = x_ode';
+end
+
+% plot open loop dynamics
+fig = figure;
+hold on;
+
+for i = 1:rv_samples
+  plot(data.times, data.x_ol_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.2]);
+end
+
+plot(data.times, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic', 'Color', [0 0 1, 0.5]);
+plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
+ylabel('Position [m]');
+ylim(plot_ylim_l);
+title("Open loop dynamics with stochastic initial state (" + rv_samples + " samples)");
+xlabel('Time [s]');
+legend show; legend boxoff;
+grid on; grid minor;
+saveas(fig, 'figs/ol_stoch_init.svg');
+
 lqrsol = cell(length(TsList), 1);
 
 for idx = 1:length(TsList)
   Ts = TsList(idx);
   display("Running with Ts=" + Ts + ", samples=" + rv_samples);
   assert(mod(Ts, Tfid) == 0, "Ts=" + Ts + " is not a multiple of Tfid=" + Tfid);
+  
   %% deterministic LQR
   Tmult = Ts / Tfid;
   N = Tsim/Ts; % prediction horizon, excluding initial state
@@ -75,7 +111,6 @@ for idx = 1:length(TsList)
   [A_ext, B_ext, Q_ext, R_ext, P_ext] = extendState(c2d(msd_sys, Ts), Q, R, P);
   [Kopt, S, M, Qbar, Rbar] = solveLQR(N, A_ext, B_ext, Q_ext, R_ext, P_ext);
   Uopt = Kopt * x0_ext;
-  lqrsol{idx} = struct('x0_ext', x0_ext, 'Uopt', Uopt, 'Q_ext', Q_ext, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar);
   cost_det = LQRCost(x0_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
   display("Deterministic LQR cost: " + cost_det);
   
@@ -102,72 +137,25 @@ for idx = 1:length(TsList)
   hold on;
   plot(data.times, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position');
   plot(data.times, data.x_cl(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity');
-  title("(Ts:"+Ts+") Closed loop dynamics");
-  xlabel('Time [s]');
   ylabel('Position [m]/Velocity [m/s]');
   ylim(plot_ylim_l);
   yyaxis right;
   stairs(times(1:end-1), u0 + cumsum(Uopt), 'r', 'LineWidth', 2, 'DisplayName', 'Control Effort');
   ylabel('Control Effort [N]');
   ylim(plot_ylim_r);
+  ax = gca;
+  ax.YColor = 'r';
+  title("(Ts:"+Ts+") Closed loop dynamics");
+  xlabel('Time [s]');
   legend show; legend boxoff;
   grid on; grid minor;
   saveas(fig, "figs/"+Ts+"_cl_det.svg");
   
-  %% stochastic with random initial state
-  
-  % set up problem with stochastic initial state
-  x0_rv = mvnrnd(x0_mean, x0_cov, rv_samples)';
-  data.x_ol_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
-  
-  % simulate open loop dynamics
-  for i = 1:rv_samples
-    [~, x_ode] = ode45(@(t, x) msd(t, x, 0, A_msd, B_msd), 0:Tfid:Tsim, x0_rv(:, i));
-    data.x_ol_stoch(:, :, i) = x_ode';
-  end
-  
-  % plot open loop dynamics
-  fig = figure;
-  sgtitle("Open loop dynamics with stochastic initial state (" + rv_samples + " samples)");
-  subplot(1, 2, 1);
-  hold on;
-  
-  for i = 1:rv_samples
-    plot(data.times, data.x_ol_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.5]);
-  end
-  
-  plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
-  xlabel('Time [s]');
-  ylabel('Position [m]');
-  ylim(plot_ylim_l);
-  legend show; legend boxoff;
-  grid on; grid minor;
-  hold off;
-  
-  subplot(1, 2, 2);
-  hold on;
-  plot(data.times, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic');
-  plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
-  xlabel('Time [s]');
-  ylabel('Position [m]');
-  ylim(plot_ylim_l);
-  legend show; legend boxoff;
-  grid on; grid minor;
-  hold off;
-  fig.Position = [100 100 1000 500];
-  saveas(fig, 'figs/ol_stoch_init.svg');
-  
   %% set up and solve stochastic LQR problem using robust optimization
   data.x_cl_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
-  x0_rv_mean = mean(x0_rv, 2);
-  x0_rv_cov = cov(x0_rv');
-  x0_rv_mean_ext = [x0_rv_mean; u0; ref];
-  x0_rv_cov_ext = blkdiag(x0_rv_cov, zeros(3,3));
   % Uopt only depends on x0, so we can use the same Kopt
   Uopt = Kopt * x0_rv_mean_ext;
-  [cost_lqr_exp, cost_lqr_var] = LQRcost_stats(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
-  display("Expectaion of Stochastic LQR cost(analytical): " + cost_lqr_exp);
-  display("Variance of Stochastic LQR cost(analytical): " + cost_lqr_var);
+  lqrsol{idx} = struct('x0_ext', x0_ext, 'Uopt', Uopt, 'Q_ext', Q_ext, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar);
   data.cost_lqr = zeros(rv_samples, 1);
   for i = 1:rv_samples
     k = 0;
@@ -187,63 +175,57 @@ for idx = 1:length(TsList)
     data.x_cl_stoch(:, end, i) = xk;
   end
   
+  [cost_lqr_exp, cost_lqr_var] = LQRcost_stats(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
+  display("Expectaion of Stochastic LQR cost(analytical): " + cost_lqr_exp);
+  display("Variance of Stochastic LQR cost(analytical): " + cost_lqr_var);
+  display("Expectation of Stochastic LQR cost(MC): " + mean(data.cost_lqr));
+  display("Variance of Stochastic LQR cost(MC): " + var(data.cost_lqr));
+  
   %% plot closed loop dynamics
   fig = figure;
-  sgtitle("(Ts:"+Ts+") Closed loop dynamics with stochastic initial state (" + rv_samples + " samples)");
-  subplot(1, 2, 1);
   hold on;
   
   for i = 1:rv_samples
-    plot(data.times, data.x_cl_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.5]);
+    plot(data.times, data.x_cl_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.2]);
   end
   
+  plot(data.times, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic', 'Color', [0 0 1, 0.5]);
   plot(data.times, mean(data.x_cl_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
-  xlabel('Time [s]');
   ylabel('Position [m]');
   ylim(plot_ylim_l);
   yyaxis right;
   stairs(times(1:end-1), u0 + cumsum(Uopt), 'r', 'LineWidth', 2, 'DisplayName', 'Control Effort');
   ylabel('Control Effort [N]');
   ylim(plot_ylim_r);
-  legend show; legend boxoff;
-  grid on; grid minor;
-  hold off;
-  
-  subplot(1, 2, 2);
-  hold on;
-  plot(data.times, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic');
-  plot(data.times, mean(data.x_cl_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
+  ax = gca;
+  ax.YColor = 'r';
+  title("(Ts:"+Ts+") Closed loop dynamics with stochastic initial state (" + rv_samples + " samples)");
   xlabel('Time [s]');
-  ylabel('Position [m]');
-  ylim(plot_ylim_l);
   legend show; legend boxoff;
   grid on; grid minor;
-  hold off;
-  fig.Position = [100 100 1200 500];
   saveas(fig, "figs/"+Ts+"_cl_stoch_init.svg");
   
   % plot cost distribution
   fig = figure;
-  histogram(data.cost_lqr, 10, 'Normalization', 'pdf', 'FaceColor', 'b', 'EdgeColor', 'k', 'DisplayName', 'Cost Distribution');
   hold on;
-  display("Expectation of Stochastic LQR cost(MC): " + mean(data.cost_lqr));
-  display("Variance of Stochastic LQR cost(MC): " + var(data.cost_lqr));
+  histogram(data.cost_lqr, 10, 'Normalization', 'pdf', 'FaceColor', 'b', 'EdgeColor', 'k', 'DisplayName', 'Cost Distribution');
   xline(cost_det, 'k', 'LineWidth', 2, 'DisplayName', 'Deterministic Cost');
   xline(cost_lqr_exp, 'g', 'LineWidth', 2, 'DisplayName', "Analytical Mean"+newline+"Var: "+cost_lqr_var);
   xline(mean(data.cost_lqr), '--r', 'LineWidth', 2, 'DisplayName', "Statistical Mean"+newline+"Var: "+var(data.cost_lqr));
+  ylabel('Probability Density');
   title("(Ts:"+Ts+") Cost distribution of stochastic LQR ("+rv_samples+" samples)");
   xlabel('Cost');
-  ylabel('Probability Density');
   legend show; legend boxoff;
   grid on; grid minor;
   saveas(fig, "figs/"+Ts+"_cost_dist.svg");
 end
 
+
 %% perturb solutions U and check if they are still optimal
+perturbation = -1:0.1:1;
 for idx = 1:length(TsList)
   Ts = TsList(idx);
   sol = lqrsol{idx};
-  perturbation = -0.5:0.1:0.5;
   Uopt_perturbed = sol.Uopt + perturbation;
   cost_perturbed = zeros(length(perturbation), 1);
   for i = 1:length(perturbation)
@@ -251,13 +233,43 @@ for idx = 1:length(TsList)
   end
   fig = figure;
   plot(perturbation, cost_perturbed, 'b', 'LineWidth', 2, 'DisplayName', 'Cost');
-  hold on;
-  xlabel('Perturbation');
   ylabel('Cost');
   title("(Ts:"+Ts+") Cost vs perturbation of U");
+  xlabel('Perturbation');
   grid on; grid minor;
   saveas(fig, "figs/"+Ts+"_cost_perturb.svg");
 end
+
+%% correlation check, ONLY FOR 2 LEVEL MLMC
+
+Uopt_hf = lqrsol{1}.Uopt + perturbation;
+% repeat low fid so it can be put into the cost fn of high fid
+Uopt_lf = lqrsol{2}.Uopt + perturbation;
+Uopt_lf_rep = repmat(Uopt_lf, 10, 1);
+
+% calculate costs for both high and low fidelity, for each perturbation
+cost_hf = zeros(length(perturbation), 1);
+cost_lf = zeros(length(perturbation), 1);
+for i = 1:length(perturbation)
+  cost_hf(i) = LQRCost(lqrsol{1}.x0_ext, Uopt_hf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
+  cost_lf(i) = LQRCost(lqrsol{1}.x0_ext, Uopt_lf_rep(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
+end
+% plot both costs
+fig = figure;
+ax = gca;
+yyaxis left % have to do this to be able to specify colors on both axes
+plot(perturbation, cost_hf, 'b', 'LineWidth', 2, 'DisplayName', 'Cost HF');
+ylabel('High fidelity solution');
+ax.YColor = 'b';
+yyaxis right;
+plot(perturbation, cost_lf, 'r', 'LineWidth', 2, 'DisplayName', 'Cost LF');
+ylabel('Low fidelity solution');
+ax.YColor = 'r';
+title("HF simulation cost vs HF and LF solutions with perturbation");
+xlabel('Perturbation');
+legend show; legend boxoff;
+grid on; grid minor;
+saveas(fig, "figs/cost_perturb_comp_hf.svg");
 
 %% Monte carlo estimator with variance calculation
 mc_data.samples = [10, 100, 1000, 10000]; % number of samples for a single MC estimator
