@@ -44,6 +44,7 @@ R = eye(nu) * 10; % input cost
 P = eye(nx) * 0;
 
 rv_samples = 1000;
+perturbation = -1:0.1:1;
 
 % simulate open loop dynamics
 [data.times, x_ode] = ode45(@(t, x) msd(t, x, 0, A_msd, B_msd), 0:Tfid:Tsim, x0);
@@ -222,7 +223,6 @@ end
 
 
 %% perturb solutions U and check if they are still optimal
-perturbation = -1:0.1:1;
 for idx = 1:length(TsList)
   Ts = TsList(idx);
   sol = lqrsol{idx};
@@ -242,34 +242,110 @@ end
 
 %% correlation check, ONLY FOR 2 LEVEL MLMC
 
+% low fid solution in high fid sim
 Uopt_hf = lqrsol{1}.Uopt + perturbation;
 % repeat low fid so it can be put into the cost fn of high fid
 Uopt_lf = lqrsol{2}.Uopt + perturbation;
-Uopt_lf_rep = repmat(Uopt_lf, 10, 1);
+Uopt_lf = repmat(Uopt_lf, 10, 1);
 
 % calculate costs for both high and low fidelity, for each perturbation
 cost_hf = zeros(length(perturbation), 1);
 cost_lf = zeros(length(perturbation), 1);
 for i = 1:length(perturbation)
   cost_hf(i) = LQRCost(lqrsol{1}.x0_ext, Uopt_hf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
-  cost_lf(i) = LQRCost(lqrsol{1}.x0_ext, Uopt_lf_rep(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
+  cost_lf(i) = LQRCost(lqrsol{1}.x0_ext, Uopt_lf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
 end
-% plot both costs
+% plot costs
 fig = figure;
 ax = gca;
 yyaxis left % have to do this to be able to specify colors on both axes
-plot(perturbation, cost_hf, 'b', 'LineWidth', 2, 'DisplayName', 'Cost HF');
-ylabel('High fidelity solution');
+plot(perturbation, cost_hf, 'b', 'LineWidth', 2, 'DisplayName', 'HF cost');
+ylabel('HF solution cost');
 ax.YColor = 'b';
 yyaxis right;
-plot(perturbation, cost_lf, 'r', 'LineWidth', 2, 'DisplayName', 'Cost LF');
-ylabel('Low fidelity solution');
+plot(perturbation, cost_lf, 'r', 'LineWidth', 2, 'DisplayName', 'LF cost');
+ylabel('LF solution cost');
 ax.YColor = 'r';
-title("HF simulation cost vs HF and LF solutions with perturbation");
+title("Cost in High Fidelity simulation");
 xlabel('Perturbation');
 legend show; legend boxoff;
 grid on; grid minor;
 saveas(fig, "figs/cost_perturb_comp_hf.svg");
+
+% calculate correlation between the solutions in high fidelity with all samples
+cost_hf_corr = zeros(length(perturbation), rv_samples);
+cost_lf_corr = zeros(length(perturbation), rv_samples);
+for i = 1:length(perturbation)
+  for j = 1:rv_samples
+    cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
+    cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
+  end
+end
+corr = zeros(length(perturbation), 1);
+for i = 1:length(perturbation)
+  corr_mat = corrcoef(cost_hf_corr(i, :), cost_lf_corr(i, :));
+  % we onnly need the cross correlation, diagnonal will be 1
+  corr(i) = corr_mat(1,2);
+end
+fig = figure;
+plot(perturbation, corr, 'LineWidth', 2);
+title('Correlation in high fidelity simulation')
+xlabel('Perturbation');
+ylabel('Correlation');
+grid on; grid minor;
+saveas(fig, "figs/corr_hf.svg");
+
+% high fid solution in low fid sim
+Uopt_hf = lqrsol{1}.Uopt + perturbation;
+Uopt_hf = Uopt_hf(1:10:end, :); % downsample to low fid
+Uopt_lf = lqrsol{2}.Uopt + perturbation;
+% calculate costs for both high and low fidelity, for each perturbation
+cost_hf = zeros(length(perturbation), 1);
+cost_lf = zeros(length(perturbation), 1);
+
+for i = 1:length(perturbation)
+  cost_hf(i) = LQRCost(lqrsol{2}.x0_ext, Uopt_hf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
+  cost_lf(i) = LQRCost(lqrsol{2}.x0_ext, Uopt_lf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
+end
+% plot costs
+fig = figure;
+ax = gca;
+yyaxis left % have to do this to be able to specify colors on both axes
+plot(perturbation, cost_hf, 'b', 'LineWidth', 2, 'DisplayName', 'HF cost');
+ylabel('HF solution cost');
+ax.YColor = 'b';
+yyaxis right;
+plot(perturbation, cost_lf, 'r', 'LineWidth', 2, 'DisplayName', 'LF cost');
+ylabel('LF solution cost');
+ax.YColor = 'r';
+title("Cost in Low Fidelity simulation");
+xlabel('Perturbation');
+legend show; legend boxoff;
+grid on; grid minor;
+saveas(fig, "figs/cost_perturb_comp_lf.svg");
+
+% calculate correlation between the solutions in high fidelity with all samples
+cost_hf_corr = zeros(length(perturbation), rv_samples);
+cost_lf_corr = zeros(length(perturbation), rv_samples);
+for i = 1:length(perturbation)
+  for j = 1:rv_samples
+    cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
+    cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
+  end
+end
+corr = zeros(length(perturbation), 1);
+for i = 1:length(perturbation)
+  corr_mat = corrcoef(cost_hf_corr(i, :), cost_lf_corr(i, :));
+  % we onnly need the cross correlation, diagnonal will be 1
+  corr(i) = corr_mat(1,2);
+end
+fig = figure;
+plot(perturbation, corr, 'LineWidth', 2);
+title('Correlation in low fidelity simulation')
+xlabel('Perturbation');
+ylabel('Correlation');
+grid on; grid minor;
+saveas(fig, "figs/corr_lf.svg");
 
 %% Monte carlo estimator with variance calculation
 mc_data.samples = [10, 100, 1000, 10000]; % number of samples for a single MC estimator

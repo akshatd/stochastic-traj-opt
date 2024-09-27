@@ -516,9 +516,22 @@ S_n^{MLMC} &= S_n^h + \alpha (S_n^l - \mathbb{E}[J_l]) \\
 \end{aligned}
 $$
 
-We also need to make sure that the estimators have some correlation, so plotting the cost function after perturbing the optimal control input in the low fidelity and using it in the high fidelity cost function gives the following graph.
+We also need to make sure that the estimators have some correlation, so we need to check if
 
-![Cost Function with Perturbed Optimal Control Input](figs/cost_perturb_comp_hf.svg){width=50%}
+- extending the low fidelity solution by repeating it over the finer timesteps of the high fidelity simulation and running it in the high fidelity simulation
+- downsampling the high fidelity solution to the coarser timesteps of the low fidelity simulation and running it in the low fidelity simulation
+
+gives results that correlate with the original solutions in each of the simulations.
+
+To do this, the optimal solutions are perturbed by a small amount and the cost function is plotted for each of the perturbed solutions. Plotting the cost function after perturbing the optimal control input solutions in both fidelities and using it in the both fidelities' cost function gives the following graphs.
+
+![High fidelity simulation with high and low fidelity solutions](figs/cost_perturb_comp_hf.svg){width=50%}
+![Low fidelity simulation with high and low fidelity solutions](figs/cost_perturb_comp_lf.svg){width=50%}
+
+To check correlations, for each perturbation, the cost is calculated for each random sample of the initial conditions. Then, the correlation between all the samples in each perturbation is calculated using `corrcoef`. We are only interested in the off-diagonal elements of the correlation matrix, as the diagonal elements are always 1.
+
+![Correlation in high fidelity simulation](figs/corr_hf.svg){width=50%}
+![Correlation in low fidelity simulation](figs/corr_lf.svg){width=50%}
 
 ## Reference Expectations
 
