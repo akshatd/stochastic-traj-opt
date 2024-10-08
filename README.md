@@ -305,14 +305,14 @@ $$
 Which has a gradient with respect to $U$ as
 
 $$
-\Delta J = 2 H U + 2 q
+\Delta J = 2 H U + 2 q^T
 $$
 
 Assuming minimum exists, we can set the gradient to zero to get the optimal control input $U^*$
 
 $$
 \begin{aligned}
-\Delta J &= 2 H U + 2 q = 0 \\
+\Delta J &= 2 H U + 2 q^T = 0 \\
 \implies U^* &= -H^{-1} q
 \end{aligned}
 $$
@@ -390,14 +390,14 @@ $$
 Which has a gradient with respect to $U$ as
 
 $$
-\Delta J = 2 H U + 2 q
+\Delta J = 2 H U + 2 q^T
 $$
 
 Assuming minimum exists, we can set the gradient to zero to get the optimal control input $U^*$
 
 $$
 \begin{aligned}
-\Delta J &= 2 H U + 2 q = 0 \\
+\Delta J &= 2 H U + 2 q^T = 0 \\
 \implies U^* &= -H^{-1} q
 \end{aligned}
 $$
@@ -523,15 +523,50 @@ We also need to make sure that the estimators have some correlation, so we need 
 
 gives results that correlate with the original solutions in each of the simulations.
 
-To do this, the optimal solutions are perturbed by a small amount and the cost function is plotted for each of the perturbed solutions. Plotting the cost function after perturbing the optimal control input solutions in both fidelities and using it in the both fidelities' cost function gives the following graphs.
+To do this, the optimal solutions are perturbed by a small amount and the cost function is plotted for each of the perturbed solutions. Plotting the cost function after perturbing the optimal control input solutions in both fidelities and using it in the both fidelities' cost function.
+
+To make perturbed control inputs, we can do the following
+
+1. start with 1000 samples of the initial state $x_0$.
+2. use the sample mean to calculate the optimal control inputs $U_l^*$ and $U_h^*$ for the low and high fidelity simulations respectively.
+3. perturb the optimal control inputs by a small amount for each time step, it can be imagined as shifting the control curve up and down by 1.
+   - These perturbations are in the range $[-1, 1]$ with a step of $0.1$, so it produces a range of $21$ control inputs.
+
+To compute the correlation in the high fidelity simulation,
+
+1. Use the perturbed $U_h^*$ as it is.
+2. Repeat the perturbed $U_l^*$ over the timesteps of the high fidelity simulation to make it the same length as $U_h^*$.
+3. For a single perturbation out of the 21, calculate the cost for each of the 1000 random samples of $x_0$ by plugging in $U_h^*$ and repeated $U_l^*$ into the high fidelity cost function.
+4. This way, we will have 1000 samples of the high fidelity cost function for each of $U_h^*$ and repeated $U_l^*$ for a single perturbation.
+5. Calculate the correlation coefficient between the cost samples obtained using $U_h^*$ and repeated $U_l^*$ using the `corrcoef` function.
+6. We will have a symmetric $2\times2$ matrix, where the off-diagonal elements are the correlation coefficients between the two sets of 1000 samples.
+7. These off diagonal elements are then used as the data point for a single perturbation.
+
+This is repeated for all the 21 perturbations to get the graph of correlation in high fidelity simulation.
+
+To compute the correlation in the low fidelity simulation,
+
+1. Use the perturbed $U_l^*$ as it is.
+2. Downsample the perturbed $U_h^*$ by only taking values at times that coincide with the times in $U_l^*$ to make it the same length as $U_l^*$.
+3. For a single perturbation out of the 21, calculate the cost for each of the 1000 random samples of $x_0$ by plugging in downsampled $U_h^*$ and $U_l^*$ into the low fidelity cost function.
+4. This way, we will have 1000 samples of the low fidelity cost function for each of downsampled $U_h^*$ and $U_l^*$ for a single perturbation.
+5. Calculate the correlation coefficient between the cost samples obtained using downsampled $U_h^*$ and $U_l^*$ using the `corrcoef` function.
+6. We will have a symmetric $2\times2$ matrix, where the off-diagonal elements are the correlation coefficients between the two sets of 1000 samples.
+7. These off diagonal elements are then used as the data point for a single perturbation.
+
+This is repeated for all the 21 perturbations to get the graph of correlation in low fidelity simulation.
 
 ![High fidelity simulation with high and low fidelity solutions](figs/cost_perturb_comp_hf.svg){width=50%}
 ![Low fidelity simulation with high and low fidelity solutions](figs/cost_perturb_comp_lf.svg){width=50%}
-
-To check correlations, for each perturbation, the cost is calculated for each random sample of the initial conditions. Then, the correlation between all the samples in each perturbation is calculated using `corrcoef`. We are only interested in the off-diagonal elements of the correlation matrix, as the diagonal elements are always 1.
-
 ![Correlation in high fidelity simulation](figs/corr_hf.svg){width=50%}
 ![Correlation in low fidelity simulation](figs/corr_lf.svg){width=50%}
+
+## TODO
+
+### convergence of discrete time to continuous time
+
+- https://www.sciencedirect.com/science/article/pii/S2405896323016579
+- https://people.clas.ufl.edu/hager/files/rates.pdf p467
 
 ## Reference Expectations
 
@@ -550,6 +585,11 @@ $$
 
 And $B$ is symmetric.
 Also, reference the [Matrix Cookbook](https://www.math.uwaterloo.ca/~hwolkowi/matrixcookbook.pdf) for the following derivations.
+
+some other refs:
+
+- https://math.stackexchange.com/questions/2163694/expectation-of-quartic-form-for-multivariate-gaussian
+- https://math.stackexchange.com/questions/4956451/expectation-of-product-of-quadratic-and-linear-form-for-multivariate-gaussian-ve/4959876#4959876
 
 ### Linear $x^T A$
 

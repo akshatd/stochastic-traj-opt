@@ -44,7 +44,9 @@ R = eye(nu) * 10; % input cost
 P = eye(nx) * 0;
 
 rv_samples = 1000;
-perturbation = -1:0.1:1;
+perturb_dir_samples = 10000;
+perturb_dir_mag = 0.1;
+perturb_range = -1:0.1:1;
 
 % simulate open loop dynamics
 [data.times, x_ode] = ode45(@(t, x) msd(t, x, 0, A_msd, B_msd), 0:Tfid:Tsim, x0);
@@ -223,47 +225,66 @@ end
 
 
 %% perturb solutions U and check if they are still optimal
-for idx = 1:length(TsList)
-  Ts = TsList(idx);
-  sol = lqrsol{idx};
-  Uopt_perturbed = sol.Uopt + perturbation;
-  cost_perturbed = zeros(length(perturbation), 1);
-  for i = 1:length(perturbation)
-    cost_perturbed(i) = LQRCost(sol.x0_ext, Uopt_perturbed(:, i), sol.Q_ext, sol.S, sol.M, sol.Qbar, sol.Rbar);
-  end
-  fig = figure;
-  plot(perturbation, cost_perturbed, 'b', 'LineWidth', 2, 'DisplayName', 'Cost');
-  ylabel('Cost');
-  title("(Ts:"+Ts+") Cost vs perturbation of U");
-  xlabel('Perturbation');
-  grid on; grid minor;
-  saveas(fig, "figs/"+Ts+"_cost_perturb.svg");
-end
+% for idx = 1:length(TsList)
+%   Ts = TsList(idx);
+%   sol = lqrsol{idx};
+%   Uopt_perturbed = sol.Uopt + perturbation;
+%   cost_perturbed = zeros(length(perturbation), 1);
+%   for i = 1:length(perturbation)
+%     cost_perturbed(i) = LQRCost(sol.x0_ext, Uopt_perturbed(:, i), sol.Q_ext, sol.S, sol.M, sol.Qbar, sol.Rbar);
+%   end
+%   fig = figure;
+%   plot(perturbation, cost_perturbed, 'b', 'LineWidth', 2, 'DisplayName', 'Cost');
+%   ylabel('Cost');
+%   title("(Ts:"+Ts+") Cost vs perturbation of U");
+%   xlabel('Perturbation');
+%   grid on; grid minor;
+%   saveas(fig, "figs/"+Ts+"_cost_perturb.svg");
+% end
 
 %% correlation check, ONLY FOR 2 LEVEL MLMC
 
-% low fid solution in high fid sim
+%% low fid solution in high fid sim
+% find gradient of the cost function at the optimal solution in random directions
+rand_grads = zeros(length(lqrsol{1}.Uopt), perturb_dir_samples);
+% generate uniform random samples in range [-1, 1]
+perturb_dirs = - 1 + 2.*rand(length(lqrsol{1}.Uopt), perturb_dir_samples);
+% normalize dirs so they are unit vectors
+perturb_dirs = perturb_dirs ./ sqrt(sum(perturb_dirs.^2, 1));
+% scale the vector to have a magnitude of perturb_dir_mag
+perturb_dirs = perturb_dirs * perturb_dir_mag;
+% check the gradient in random directions
+for i = 1:perturb_dir_samples
+  rand_grads(:, i) = LQRgrad(lqrsol{1}.x0_ext, lqrsol{1}.Uopt + perturb_dirs(:, i), lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
+end
+% pick max gradient direction
+[~, max_grad_idx] = max(sum(rand_grads.^2, 1));
+perturb_dir_max = perturb_dirs(:, max_grad_idx)./ perturb_dir_mag; % length 1
+
+% perturb the solution in the max gradient direction
+perturbation = perturb_dir_max * perturb_range;
+
 Uopt_hf = lqrsol{1}.Uopt + perturbation;
 % repeat low fid so it can be put into the cost fn of high fid
-Uopt_lf = lqrsol{2}.Uopt + perturbation;
-Uopt_lf = repmat(Uopt_lf, 10, 1);
+Uopt_lf = repmat(lqrsol{2}.Uopt, 10, 1) + perturbation;
 
 % calculate costs for both high and low fidelity, for each perturbation
-cost_hf = zeros(length(perturbation), 1);
-cost_lf = zeros(length(perturbation), 1);
-for i = 1:length(perturbation)
+cost_hf = zeros(length(perturb_range), 1);
+cost_lf = zeros(length(perturb_range), 1);
+for i = 1:length(perturb_range)
   cost_hf(i) = LQRCost(lqrsol{1}.x0_ext, Uopt_hf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
   cost_lf(i) = LQRCost(lqrsol{1}.x0_ext, Uopt_lf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
 end
-% plot costs
+
+%% plot costs
 fig = figure;
 ax = gca;
 yyaxis left % have to do this to be able to specify colors on both axes
-plot(perturbation, cost_hf, 'b', 'LineWidth', 2, 'DisplayName', 'HF cost');
+plot(perturb_range, cost_hf, 'b', 'LineWidth', 2, 'DisplayName', 'HF cost');
 ylabel('HF solution cost');
 ax.YColor = 'b';
 yyaxis right;
-plot(perturbation, cost_lf, 'r', 'LineWidth', 2, 'DisplayName', 'LF cost');
+plot(perturb_range, cost_lf, 'r', 'LineWidth', 2, 'DisplayName', 'LF cost');
 ylabel('LF solution cost');
 ax.YColor = 'r';
 title("Cost in High Fidelity simulation");
@@ -272,50 +293,72 @@ legend show; legend boxoff;
 grid on; grid minor;
 saveas(fig, "figs/cost_perturb_comp_hf.svg");
 
-% calculate correlation between the solutions in high fidelity with all samples
-cost_hf_corr = zeros(length(perturbation), rv_samples);
-cost_lf_corr = zeros(length(perturbation), rv_samples);
-for i = 1:length(perturbation)
+%% calculate correlation between the solutions in high fidelity with all samples
+cost_hf_corr = zeros(length(perturb_range), rv_samples);
+cost_lf_corr = zeros(length(perturb_range), rv_samples);
+for i = 1:length(perturb_range)
   for j = 1:rv_samples
     cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
     cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
   end
 end
-corr = zeros(length(perturbation), 1);
-for i = 1:length(perturbation)
+corr = zeros(length(perturb_range), 1);
+for i = 1:length(perturb_range)
   corr_mat = corrcoef(cost_hf_corr(i, :), cost_lf_corr(i, :));
   % we onnly need the cross correlation, diagnonal will be 1
   corr(i) = corr_mat(1,2);
 end
+
+%% plot correlation
 fig = figure;
-plot(perturbation, corr, 'LineWidth', 2);
-title('Correlation in high fidelity simulation')
+plot(perturb_range, corr, 'LineWidth', 2);
+title('Correlation between solutions near HF optimum in HF simulation')
 xlabel('Perturbation');
 ylabel('Correlation');
 grid on; grid minor;
 saveas(fig, "figs/corr_hf.svg");
 
-% high fid solution in low fid sim
-Uopt_hf = lqrsol{1}.Uopt + perturbation;
-Uopt_hf = Uopt_hf(1:10:end, :); % downsample to low fid
+%% high fid solution in low fid sim
+% find gradient of the cost function at the optimal solution in random directions
+rand_grads = zeros(length(lqrsol{2}.Uopt), perturb_dir_samples);
+% generate uniform random samples in range [-1, 1]
+perturb_dirs = - 1 + 2.*rand(length(lqrsol{2}.Uopt), perturb_dir_samples);
+% normalize dirs so they are unit vectors
+perturb_dirs = perturb_dirs ./ sqrt(sum(perturb_dirs.^2, 1));
+% scale the vector to have a magnitude of perturb_dir_mag
+perturb_dirs = perturb_dirs * perturb_dir_mag;
+% check the gradient in random directions
+for i = 1:perturb_dir_samples
+  rand_grads(:, i) = LQRgrad(lqrsol{2}.x0_ext, lqrsol{2}.Uopt + perturb_dirs(:, i), lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
+end
+% pick max gradient direction
+asd = sum(rand_grads.^2, 1);
+[~, max_grad_idx] = max(sum(rand_grads.^2, 1));
+perturb_dir_max = perturb_dirs(:, max_grad_idx)./ perturb_dir_mag; % length 1
+
+% perturb the solution in the max gradient direction
+perturbation = perturb_dir_max * perturb_range;
+
+Uopt_hf = lqrsol{1}.Uopt(1:10:end, :) + perturbation; % downsample to low fid
 Uopt_lf = lqrsol{2}.Uopt + perturbation;
 % calculate costs for both high and low fidelity, for each perturbation
-cost_hf = zeros(length(perturbation), 1);
-cost_lf = zeros(length(perturbation), 1);
+cost_hf = zeros(length(perturb_range), 1);
+cost_lf = zeros(length(perturb_range), 1);
 
-for i = 1:length(perturbation)
+for i = 1:length(perturb_range)
   cost_hf(i) = LQRCost(lqrsol{2}.x0_ext, Uopt_hf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
   cost_lf(i) = LQRCost(lqrsol{2}.x0_ext, Uopt_lf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
 end
-% plot costs
+
+%% plot costs
 fig = figure;
 ax = gca;
 yyaxis left % have to do this to be able to specify colors on both axes
-plot(perturbation, cost_hf, 'b', 'LineWidth', 2, 'DisplayName', 'HF cost');
+plot(perturb_range, cost_hf, 'b', 'LineWidth', 2, 'DisplayName', 'HF cost');
 ylabel('HF solution cost');
 ax.YColor = 'b';
 yyaxis right;
-plot(perturbation, cost_lf, 'r', 'LineWidth', 2, 'DisplayName', 'LF cost');
+plot(perturb_range, cost_lf, 'r', 'LineWidth', 2, 'DisplayName', 'LF cost');
 ylabel('LF solution cost');
 ax.YColor = 'r';
 title("Cost in Low Fidelity simulation");
@@ -324,24 +367,26 @@ legend show; legend boxoff;
 grid on; grid minor;
 saveas(fig, "figs/cost_perturb_comp_lf.svg");
 
-% calculate correlation between the solutions in high fidelity with all samples
-cost_hf_corr = zeros(length(perturbation), rv_samples);
-cost_lf_corr = zeros(length(perturbation), rv_samples);
-for i = 1:length(perturbation)
+%% calculate correlation between the solutions in low fidelity with all samples
+cost_hf_corr = zeros(length(perturb_range), rv_samples);
+cost_lf_corr = zeros(length(perturb_range), rv_samples);
+for i = 1:length(perturb_range)
   for j = 1:rv_samples
     cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
     cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
   end
 end
-corr = zeros(length(perturbation), 1);
-for i = 1:length(perturbation)
+corr = zeros(length(perturb_range), 1);
+for i = 1:length(perturb_range)
   corr_mat = corrcoef(cost_hf_corr(i, :), cost_lf_corr(i, :));
   % we onnly need the cross correlation, diagnonal will be 1
   corr(i) = corr_mat(1,2);
 end
+
+%% plot correlation
 fig = figure;
-plot(perturbation, corr, 'LineWidth', 2);
-title('Correlation in low fidelity simulation')
+plot(perturb_range, corr, 'LineWidth', 2);
+title('Correlation between solutions near LF optimum in LF simulation')
 xlabel('Perturbation');
 ylabel('Correlation');
 grid on; grid minor;
@@ -408,6 +453,14 @@ end
 function cost = LQRCost(x0, u, Q, S, M, Qbar, Rbar)
 cost = u'*(S'*Qbar*S + Rbar)*u + 2*x0'*M'*Qbar*S*u + x0'*(M'*Qbar*M + Q)*x0;
 end
+
+function grad = LQRgrad(x0, u, S, M, Qbar, Rbar)
+% 2HU + 2q
+H = S'*Qbar*S + Rbar;
+q = x0'*M'*Qbar*S;
+grad = 2 * H * u + 2 * q';
+end
+
 
 function [exp, var] = LQRcost_stats(x0_mean, x0_cov, u, Q, S, M, Qbar, Rbar)
 K = u'*(S'*Qbar*S + Rbar)*u;
