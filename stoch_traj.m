@@ -103,7 +103,7 @@ data.lqrsol = cell(length(TsList), 1);
 
 for idx = 1:length(TsList)
   Ts = TsList(idx);
-  display("Running with Ts=" + Ts + ", samples=" + rv_samples);
+  fprintf("\n*** Ts: %f, Samples: %d ***\n", Ts, rv_samples);
   assert(mod(Ts, Tfid) == 0, "Ts=" + Ts + " is not a multiple of Tfid=" + Tfid);
   
   %% deterministic LQR
@@ -116,7 +116,7 @@ for idx = 1:length(TsList)
   [Kopt, S, M, Qbar, Rbar] = solveLQR(N, A_ext, B_ext, Q_ext, R_ext, P_ext);
   Uopt = Kopt * x0_ext;
   cost_det = LQRCost(x0_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
-  display("Deterministic LQR cost: " + cost_det);
+  fprintf("Deterministic LQR cost: %f\n", cost_det);
   
   %% simulate closed loop dynamics
   data.x_cl = sim_closed_loop(Tsim, Tfid, Ts, x0, u0, Uopt, A_msd, B_msd, @msd);
@@ -141,21 +141,17 @@ for idx = 1:length(TsList)
   saveas(fig, "figs/"+Ts+"_cl_det.svg");
   
   %% set up and solve stochastic LQR problem using robust optimization
-  data.x_cl_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
   % Uopt only depends on x0, so we can use the same Kopt
   Uopt = Kopt * x0_rv_mean_ext;
-  data.lqrsol{idx} = struct('x0_ext', x0_ext, 'Uopt', Uopt, 'Q_ext', Q_ext, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar);
-  data.cost_lqr = zeros(rv_samples, 1);
-  for i = 1:rv_samples
-    data.cost_lqr(i) = LQRCost([x0_rv(:, i); u0; ref], Uopt, Q_ext, S, M, Qbar, Rbar);
-    data.x_cl_stoch(:,:,i) = sim_closed_loop(Tsim, Tfid, Ts, x0_rv(:, i), u0, Uopt, A_msd, B_msd, @msd);
+  data.lqrsol{idx} = struct('x0_ext', x0_rv_mean_ext, 'Uopt', Uopt, 'Q_ext', Q_ext, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar);
+  cost_lqr = zeros(rv_samples, 1);
+  x_cl_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
+  parfor i = 1:rv_samples
+    cost_lqr(i) = LQRCost([x0_rv(:, i); u0; ref], Uopt, Q_ext, S, M, Qbar, Rbar);
+    x_cl_stoch(:,:,i) = sim_closed_loop(Tsim, Tfid, Ts, x0_rv(:, i), u0, Uopt, A_msd, B_msd, @msd);
   end
-  
-  [cost_lqr_exp, cost_lqr_var] = LQRcost_stats(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
-  display("Expectaion of Stochastic LQR cost(analytical): " + cost_lqr_exp);
-  display("Variance of Stochastic LQR cost(analytical): " + cost_lqr_var);
-  display("Expectation of Stochastic LQR cost(MC): " + mean(data.cost_lqr));
-  display("Variance of Stochastic LQR cost(MC): " + var(data.cost_lqr));
+  data.cost_lqr = cost_lqr ;
+  data.x_cl_stoch = x_cl_stoch;
   
   %% plot closed loop dynamics
   fig = figure;
@@ -180,6 +176,12 @@ for idx = 1:length(TsList)
   legend show; legend boxoff;
   grid on; grid minor;
   saveas(fig, "figs/"+Ts+"_cl_stoch_init.svg");
+  
+  
+  %% cost distribution
+  [cost_lqr_exp, cost_lqr_var] = LQRcost_stats(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
+  fprintf("Expectaion of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_exp, mean(data.cost_lqr));
+  fprintf("Variance of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_var, var(data.cost_lqr));
   
   % plot cost distribution
   fig = figure;
@@ -223,13 +225,9 @@ Uopt_hf = data.lqrsol{1}.Uopt + perturbation;
 % repeat low fid so it can be put into the cost fn of high fid
 Uopt_lf = repmat(data.lqrsol{2}.Uopt, 10, 1) + perturbation;
 
-% calculate costs for both high and low fidelity, for each perturbation
-cost_hf = zeros(length(perturb_range), 1);
-cost_lf = zeros(length(perturb_range), 1);
-for i = 1:length(perturb_range)
-  cost_hf(i) = LQRCost(data.lqrsol{1}.x0_ext, Uopt_hf(:, i), data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
-  cost_lf(i) = LQRCost(data.lqrsol{1}.x0_ext, Uopt_lf(:, i), data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
-end
+% calculate costs and correlation for both high and low fidelity, for each perturbation
+[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, Uopt_hf, Uopt_lf);
+corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, Uopt_hf, Uopt_lf);
 
 %% plot costs
 fig = figure;
@@ -247,22 +245,6 @@ xlabel('Perturbation');
 legend show; legend boxoff;
 grid on; grid minor;
 saveas(fig, "figs/cost_perturb_comp_hf.svg");
-
-%% calculate correlation between the solutions in high fidelity with all samples
-cost_hf_corr = zeros(length(perturb_range), rv_samples);
-cost_lf_corr = zeros(length(perturb_range), rv_samples);
-for i = 1:length(perturb_range)
-  for j = 1:rv_samples
-    cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
-    cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
-  end
-end
-corr = zeros(length(perturb_range), 1);
-for i = 1:length(perturb_range)
-  corr_mat = corrcoef(cost_hf_corr(i, :), cost_lf_corr(i, :));
-  % we onnly need the cross correlation, diagnonal will be 1
-  corr(i) = corr_mat(1,2);
-end
 
 %% plot correlation
 fig = figure;
@@ -296,14 +278,10 @@ perturbation = perturb_dir_max * perturb_range;
 
 Uopt_hf = data.lqrsol{1}.Uopt(1:10:end, :) + perturbation; % downsample to low fid
 Uopt_lf = data.lqrsol{2}.Uopt + perturbation;
-% calculate costs for both high and low fidelity, for each perturbation
-cost_hf = zeros(length(perturb_range), 1);
-cost_lf = zeros(length(perturb_range), 1);
 
-for i = 1:length(perturb_range)
-  cost_hf(i) = LQRCost(data.lqrsol{2}.x0_ext, Uopt_hf(:, i), data.lqrsol{2}.Q_ext, data.lqrsol{2}.S, data.lqrsol{2}.M, data.lqrsol{2}.Qbar, data.lqrsol{2}.Rbar);
-  cost_lf(i) = LQRCost(data.lqrsol{2}.x0_ext, Uopt_lf(:, i), data.lqrsol{2}.Q_ext, data.lqrsol{2}.S, data.lqrsol{2}.M, data.lqrsol{2}.Qbar, data.lqrsol{2}.Rbar);
-end
+% calculate costs and correlation for both high and low fidelity, for each perturbation
+[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{2}, Uopt_hf, Uopt_lf);
+corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 
 %% plot costs
 fig = figure;
@@ -321,22 +299,6 @@ xlabel('Perturbation');
 legend show; legend boxoff;
 grid on; grid minor;
 saveas(fig, "figs/cost_perturb_comp_lf.svg");
-
-%% calculate correlation between the solutions in low fidelity with all samples
-cost_hf_corr = zeros(length(perturb_range), rv_samples);
-cost_lf_corr = zeros(length(perturb_range), rv_samples);
-for i = 1:length(perturb_range)
-  for j = 1:rv_samples
-    cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), data.lqrsol{2}.Q_ext, data.lqrsol{2}.S, data.lqrsol{2}.M, data.lqrsol{2}.Qbar, data.lqrsol{2}.Rbar);
-    cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), data.lqrsol{2}.Q_ext, data.lqrsol{2}.S, data.lqrsol{2}.M, data.lqrsol{2}.Qbar, data.lqrsol{2}.Rbar);
-  end
-end
-corr = zeros(length(perturb_range), 1);
-for i = 1:length(perturb_range)
-  corr_mat = corrcoef(cost_hf_corr(i, :), cost_lf_corr(i, :));
-  % we onnly need the cross correlation, diagnonal will be 1
-  corr(i) = corr_mat(1,2);
-end
 
 %% plot correlation
 fig = figure;
@@ -444,4 +406,34 @@ for t = times(1: end - 1)
 end
 % add back the last xk
 x(:,end) = xk;
+end
+
+function corr = calc_corr_multifid(x0_rv, u0, ref, lqrsol, Uopt_hf, Uopt_lf)
+perturbs = size(Uopt_hf, 2);
+rv_samples = size(x0_rv, 2);
+cost_hf_corr = zeros(perturbs, rv_samples);
+cost_lf_corr = zeros(perturbs, rv_samples);
+for i = 1:perturbs
+  for j = 1:rv_samples
+    cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
+    cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
+  end
+end
+
+corr = zeros(perturbs, 1);
+for i = 1:perturbs
+  corr_mat = corrcoef(cost_hf_corr(i, :), cost_lf_corr(i, :));
+  % we only need the cross correlation, diagnonal will be 1
+  corr(i) = corr_mat(1,2);
+end
+end
+
+function [cost_hf, cost_lf] = calc_costs_multifid(lqrsol, Uopt_hf, Uopt_lf)
+perturbs = size(Uopt_hf, 2);
+cost_hf = zeros(perturbs, 1);
+cost_lf = zeros(perturbs, 1);
+for i = 1:perturbs
+  cost_hf(i) = LQRCost(lqrsol.x0_ext, Uopt_hf(:, i), lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
+  cost_lf(i) = LQRCost(lqrsol.x0_ext, Uopt_lf(:, i), lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
+end
 end
