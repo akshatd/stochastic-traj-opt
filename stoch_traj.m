@@ -44,19 +44,19 @@ R = eye(nu) * 10; % input cost
 P = eye(nx) * 0;
 
 rv_samples = 1000;
-perturb_dir_samples = 10000;
+perturb_dir_samples = 100;
 perturb_dir_mag = 0.1;
 perturb_range = -1:0.1:1;
 
 % simulate open loop dynamics
-[data.times, x_ode] = ode45(@(t, x) msd(t, x, 0, A_msd, B_msd), 0:Tfid:Tsim, x0);
+[data.t, x_ode] = ode45(@(t, x) msd(t, x, 0, A_msd, B_msd), 0:Tfid:Tsim, x0);
 data.x_ol = x_ode';
 
 % plot open loop dynamics
 fig = figure;
 hold on;
-plot(data.times, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position');
-plot(data.times, data.x_ol(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity');
+plot(data.t, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position');
+plot(data.t, data.x_ol(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity');
 ylabel('Position [m]/Velocity [m/s]');
 ylim(plot_ylim_l);
 title("Open loop dynamics");
@@ -86,11 +86,11 @@ fig = figure;
 hold on;
 
 for i = 1:rv_samples
-  plot(data.times, data.x_ol_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.2]);
+  plot(data.t, data.x_ol_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.2]);
 end
 
-plot(data.times, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic', 'Color', [0 0 1, 0.5]);
-plot(data.times, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
+plot(data.t, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic', 'Color', [0 0 1, 0.5]);
+plot(data.t, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
 ylabel('Position [m]');
 ylim(plot_ylim_l);
 title("Open loop dynamics with stochastic initial state (" + rv_samples + " samples)");
@@ -99,7 +99,7 @@ legend show; legend boxoff;
 grid on; grid minor;
 saveas(fig, 'figs/ol_stoch_init.svg');
 
-lqrsol = cell(length(TsList), 1);
+data.lqrsol = cell(length(TsList), 1);
 
 for idx = 1:length(TsList)
   Ts = TsList(idx);
@@ -108,6 +108,7 @@ for idx = 1:length(TsList)
   
   %% deterministic LQR
   Tmult = Ts / Tfid;
+  times = 0:Ts:Tsim;
   N = Tsim/Ts; % prediction horizon, excluding initial state
   % create the extended state system [x_k, u_k-1, r_k]
   x0_ext = [x0; u0; ref]; %
@@ -118,28 +119,13 @@ for idx = 1:length(TsList)
   display("Deterministic LQR cost: " + cost_det);
   
   %% simulate closed loop dynamics
-  data.x_cl = zeros(nx, Tsim/Tfid + 1);
-  k = 0;
-  xk = x0;
-  ukm1 = u0;
-  times = 0:Ts:Tsim;
-  for t = times(1: end - 1)
-    uk = ukm1 + Uopt(k+1);
-    [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t:Tfid:t + Ts, xk);
-    % skip the last x since it will be repeated in the next sim
-    data.x_cl(:, k*Tmult + 1:(k + 1)*Tmult) = x_ode(1:end-1,:)';
-    xk = x_ode(end, :)';
-    ukm1 = uk;
-    k = k + 1;
-  end
-  % add back the last xk
-  data.x_cl(:,end) = xk;
+  data.x_cl = sim_closed_loop(Tsim, Tfid, Ts, x0, u0, Uopt, A_msd, B_msd, @msd);
   
   %% plot closed loop dynamics
   fig = figure;
   hold on;
-  plot(data.times, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position');
-  plot(data.times, data.x_cl(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity');
+  plot(data.t, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position');
+  plot(data.t, data.x_cl(2, :), 'g', 'LineWidth', 2, 'DisplayName', 'Velocity');
   ylabel('Position [m]/Velocity [m/s]');
   ylim(plot_ylim_l);
   yyaxis right;
@@ -158,24 +144,11 @@ for idx = 1:length(TsList)
   data.x_cl_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
   % Uopt only depends on x0, so we can use the same Kopt
   Uopt = Kopt * x0_rv_mean_ext;
-  lqrsol{idx} = struct('x0_ext', x0_ext, 'Uopt', Uopt, 'Q_ext', Q_ext, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar);
+  data.lqrsol{idx} = struct('x0_ext', x0_ext, 'Uopt', Uopt, 'Q_ext', Q_ext, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar);
   data.cost_lqr = zeros(rv_samples, 1);
   for i = 1:rv_samples
-    k = 0;
-    xk = x0_rv(:, i);
-    ukm1 = u0;
     data.cost_lqr(i) = LQRCost([x0_rv(:, i); u0; ref], Uopt, Q_ext, S, M, Qbar, Rbar);
-    for t = times(1:end - 1)
-      uk = ukm1 + Uopt(k+1);
-      [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t:Tfid:t + Ts, xk);
-      % skip the last x since it will be repeated in the next sim
-      data.x_cl_stoch(:, k*Tmult + 1:(k + 1)*Tmult, i) = x_ode(1:end-1, :)';
-      xk = x_ode(end, :)';
-      ukm1 = uk;
-      k = k + 1;
-    end
-    % add back the last xk
-    data.x_cl_stoch(:, end, i) = xk;
+    data.x_cl_stoch(:,:,i) = sim_closed_loop(Tsim, Tfid, Ts, x0_rv(:, i), u0, Uopt, A_msd, B_msd, @msd);
   end
   
   [cost_lqr_exp, cost_lqr_var] = LQRcost_stats(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
@@ -189,11 +162,11 @@ for idx = 1:length(TsList)
   hold on;
   
   for i = 1:rv_samples
-    plot(data.times, data.x_cl_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.2]);
+    plot(data.t, data.x_cl_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.2]);
   end
   
-  plot(data.times, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic', 'Color', [0 0 1, 0.5]);
-  plot(data.times, mean(data.x_cl_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
+  plot(data.t, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic', 'Color', [0 0 1, 0.5]);
+  plot(data.t, mean(data.x_cl_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
   ylabel('Position [m]');
   ylim(plot_ylim_l);
   yyaxis right;
@@ -223,39 +196,21 @@ for idx = 1:length(TsList)
   saveas(fig, "figs/"+Ts+"_cost_dist.svg");
 end
 
-
-%% perturb solutions U and check if they are still optimal
-% for idx = 1:length(TsList)
-%   Ts = TsList(idx);
-%   sol = lqrsol{idx};
-%   Uopt_perturbed = sol.Uopt + perturbation;
-%   cost_perturbed = zeros(length(perturbation), 1);
-%   for i = 1:length(perturbation)
-%     cost_perturbed(i) = LQRCost(sol.x0_ext, Uopt_perturbed(:, i), sol.Q_ext, sol.S, sol.M, sol.Qbar, sol.Rbar);
-%   end
-%   fig = figure;
-%   plot(perturbation, cost_perturbed, 'b', 'LineWidth', 2, 'DisplayName', 'Cost');
-%   ylabel('Cost');
-%   title("(Ts:"+Ts+") Cost vs perturbation of U");
-%   xlabel('Perturbation');
-%   grid on; grid minor;
-%   saveas(fig, "figs/"+Ts+"_cost_perturb.svg");
-% end
-
-%% correlation check, ONLY FOR 2 LEVEL MLMC
+%% correlation check, ONLY FOR 2 LEVEL
+% MLMC
 
 %% low fid solution in high fid sim
 % find gradient of the cost function at the optimal solution in random directions
-rand_grads = zeros(length(lqrsol{1}.Uopt), perturb_dir_samples);
+rand_grads = zeros(length(data.lqrsol{1}.Uopt), perturb_dir_samples);
 % generate uniform random samples in range [-1, 1]
-perturb_dirs = - 1 + 2.*rand(length(lqrsol{1}.Uopt), perturb_dir_samples);
+perturb_dirs = - 1 + 2.*rand(length(data.lqrsol{1}.Uopt), perturb_dir_samples);
 % normalize dirs so they are unit vectors
 perturb_dirs = perturb_dirs ./ sqrt(sum(perturb_dirs.^2, 1));
 % scale the vector to have a magnitude of perturb_dir_mag
 perturb_dirs = perturb_dirs * perturb_dir_mag;
 % check the gradient in random directions
 for i = 1:perturb_dir_samples
-  rand_grads(:, i) = LQRgrad(lqrsol{1}.x0_ext, lqrsol{1}.Uopt + perturb_dirs(:, i), lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
+  rand_grads(:, i) = LQRgrad(data.lqrsol{1}.x0_ext, data.lqrsol{1}.Uopt + perturb_dirs(:, i), data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
 end
 % pick max gradient direction
 [~, max_grad_idx] = max(sum(rand_grads.^2, 1));
@@ -264,16 +219,16 @@ perturb_dir_max = perturb_dirs(:, max_grad_idx)./ perturb_dir_mag; % length 1
 % perturb the solution in the max gradient direction
 perturbation = perturb_dir_max * perturb_range;
 
-Uopt_hf = lqrsol{1}.Uopt + perturbation;
+Uopt_hf = data.lqrsol{1}.Uopt + perturbation;
 % repeat low fid so it can be put into the cost fn of high fid
-Uopt_lf = repmat(lqrsol{2}.Uopt, 10, 1) + perturbation;
+Uopt_lf = repmat(data.lqrsol{2}.Uopt, 10, 1) + perturbation;
 
 % calculate costs for both high and low fidelity, for each perturbation
 cost_hf = zeros(length(perturb_range), 1);
 cost_lf = zeros(length(perturb_range), 1);
 for i = 1:length(perturb_range)
-  cost_hf(i) = LQRCost(lqrsol{1}.x0_ext, Uopt_hf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
-  cost_lf(i) = LQRCost(lqrsol{1}.x0_ext, Uopt_lf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
+  cost_hf(i) = LQRCost(data.lqrsol{1}.x0_ext, Uopt_hf(:, i), data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
+  cost_lf(i) = LQRCost(data.lqrsol{1}.x0_ext, Uopt_lf(:, i), data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
 end
 
 %% plot costs
@@ -298,8 +253,8 @@ cost_hf_corr = zeros(length(perturb_range), rv_samples);
 cost_lf_corr = zeros(length(perturb_range), rv_samples);
 for i = 1:length(perturb_range)
   for j = 1:rv_samples
-    cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
-    cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol{1}.Q_ext, lqrsol{1}.S, lqrsol{1}.M, lqrsol{1}.Qbar, lqrsol{1}.Rbar);
+    cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
+    cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
   end
 end
 corr = zeros(length(perturb_range), 1);
@@ -320,16 +275,16 @@ saveas(fig, "figs/corr_hf.svg");
 
 %% high fid solution in low fid sim
 % find gradient of the cost function at the optimal solution in random directions
-rand_grads = zeros(length(lqrsol{2}.Uopt), perturb_dir_samples);
+rand_grads = zeros(length(data.lqrsol{2}.Uopt), perturb_dir_samples);
 % generate uniform random samples in range [-1, 1]
-perturb_dirs = - 1 + 2.*rand(length(lqrsol{2}.Uopt), perturb_dir_samples);
+perturb_dirs = - 1 + 2.*rand(length(data.lqrsol{2}.Uopt), perturb_dir_samples);
 % normalize dirs so they are unit vectors
 perturb_dirs = perturb_dirs ./ sqrt(sum(perturb_dirs.^2, 1));
 % scale the vector to have a magnitude of perturb_dir_mag
 perturb_dirs = perturb_dirs * perturb_dir_mag;
 % check the gradient in random directions
 for i = 1:perturb_dir_samples
-  rand_grads(:, i) = LQRgrad(lqrsol{2}.x0_ext, lqrsol{2}.Uopt + perturb_dirs(:, i), lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
+  rand_grads(:, i) = LQRgrad(data.lqrsol{2}.x0_ext, data.lqrsol{2}.Uopt + perturb_dirs(:, i), data.lqrsol{2}.S, data.lqrsol{2}.M, data.lqrsol{2}.Qbar, data.lqrsol{2}.Rbar);
 end
 % pick max gradient direction
 asd = sum(rand_grads.^2, 1);
@@ -339,15 +294,15 @@ perturb_dir_max = perturb_dirs(:, max_grad_idx)./ perturb_dir_mag; % length 1
 % perturb the solution in the max gradient direction
 perturbation = perturb_dir_max * perturb_range;
 
-Uopt_hf = lqrsol{1}.Uopt(1:10:end, :) + perturbation; % downsample to low fid
-Uopt_lf = lqrsol{2}.Uopt + perturbation;
+Uopt_hf = data.lqrsol{1}.Uopt(1:10:end, :) + perturbation; % downsample to low fid
+Uopt_lf = data.lqrsol{2}.Uopt + perturbation;
 % calculate costs for both high and low fidelity, for each perturbation
 cost_hf = zeros(length(perturb_range), 1);
 cost_lf = zeros(length(perturb_range), 1);
 
 for i = 1:length(perturb_range)
-  cost_hf(i) = LQRCost(lqrsol{2}.x0_ext, Uopt_hf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
-  cost_lf(i) = LQRCost(lqrsol{2}.x0_ext, Uopt_lf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
+  cost_hf(i) = LQRCost(data.lqrsol{2}.x0_ext, Uopt_hf(:, i), data.lqrsol{2}.Q_ext, data.lqrsol{2}.S, data.lqrsol{2}.M, data.lqrsol{2}.Qbar, data.lqrsol{2}.Rbar);
+  cost_lf(i) = LQRCost(data.lqrsol{2}.x0_ext, Uopt_lf(:, i), data.lqrsol{2}.Q_ext, data.lqrsol{2}.S, data.lqrsol{2}.M, data.lqrsol{2}.Qbar, data.lqrsol{2}.Rbar);
 end
 
 %% plot costs
@@ -372,8 +327,8 @@ cost_hf_corr = zeros(length(perturb_range), rv_samples);
 cost_lf_corr = zeros(length(perturb_range), rv_samples);
 for i = 1:length(perturb_range)
   for j = 1:rv_samples
-    cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
-    cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol{2}.Q_ext, lqrsol{2}.S, lqrsol{2}.M, lqrsol{2}.Qbar, lqrsol{2}.Rbar);
+    cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), data.lqrsol{2}.Q_ext, data.lqrsol{2}.S, data.lqrsol{2}.M, data.lqrsol{2}.Qbar, data.lqrsol{2}.Rbar);
+    cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), data.lqrsol{2}.Q_ext, data.lqrsol{2}.S, data.lqrsol{2}.M, data.lqrsol{2}.Qbar, data.lqrsol{2}.Rbar);
   end
 end
 corr = zeros(length(perturb_range), 1);
@@ -468,4 +423,25 @@ L = 2 * M' * Qbar * S * u;
 N = M' * Qbar * M + Q;
 exp = K + x0_mean' * L + x0_mean' * N * x0_mean + trace(N * x0_cov);
 var = L' * x0_cov * L + 2 * trace(N * x0_cov * N * x0_cov) + 4 * (x0_mean' * N + L') * x0_cov * N * x0_mean;
+end
+
+function x = sim_closed_loop(Tsim, Tfid, Ts, x0, u0, U, A, B, dyn)
+nx = size(A, 1);
+x = zeros(nx, Tsim/Tfid + 1);
+k = 0;
+xk = x0;
+ukm1 = u0;
+Tmult = Ts / Tfid;
+times = 0:Ts:Tsim;
+for t = times(1: end - 1)
+  uk = ukm1 + U(k+1);
+  [~, x_ode] = ode45(@(t, x) dyn(t, x, uk, A, B), t:Tfid:t + Ts, xk);
+  % skip the last x since it will be repeated in the next sim
+  x(:, k*Tmult + 1:(k + 1)*Tmult) = x_ode(1:end-1,:)';
+  xk = x_ode(end, :)';
+  ukm1 = uk;
+  k = k + 1;
+end
+% add back the last xk
+x(:,end) = xk;
 end
