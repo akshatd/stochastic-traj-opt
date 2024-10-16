@@ -44,7 +44,7 @@ R = eye(nu) * 10; % input cost
 P = eye(nx) * 0;
 
 rv_samples = 1000;
-perturb_dir_samples = 100;
+perturb_dir_samples = 1000;
 perturb_dir_mag = 0.1;
 perturb_range = -1:0.25:6;
 
@@ -199,14 +199,41 @@ for idx = 1:length(TsList)
 end
 
 %% correlation check for MLMC, ONLY FOR 2 LEVEL
+%% correlation at different points in a numerical optimizer in HF
+Uopt_hf = data.lqrsol{1}.Uopt;
+u0_num = zeros(size(Uopt_hf));
+global num_opt_iters num_opt_data;
+num_opt_iters = 0;
+num_opt_data = zeros(size(Uopt_hf,1), 100);
+fun = @(u) LQRCostwithGrad(data.lqrsol{1}.x0_ext, u, data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
+options = optimoptions('fminunc', 'Display', 'iter', 'Algorithm', 'quasi-newton', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
+Uopt_num = fminunc(fun, u0_num, options);
+uopt_diff = sqrt(sum((Uopt_hf - Uopt_num).^2));
 
+U_hf = num_opt_data(:, 1:num_opt_iters);
+% get LF by averaging every 10 values of HF
+
+
+% calculate correlation along the optimizer path
+[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, U_hf, U_lf);
+corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, U_hf, U_lf);
+% TODO: fix title of this graph
+plot_multifid_costs(1:num_opt_iters, cost_hf, cost_lf, corr, "Optimizer path");
+
+% Get correlation for all iterations
+corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, U_hf, U_lf);
+
+%% plot correlation
+plot_corr_2d(corr, "Correlation between HF/LF costs of solutions at different iterations in HF", "hf_iters_corr");
+
+% correlation with perturbations
 %% low fid solution in high fid sim
 % perturb the solution in the max gradient direction
 perturbation = get_perturb_max_grad(data.lqrsol{1}, perturb_dir_samples, perturb_dir_mag, perturb_range);
 
 Uopt_hf = data.lqrsol{1}.Uopt + perturbation;
 % repeat low fid so it can be put into the cost fn of high fid
-Uopt_lf = repmat(data.lqrsol{2}.Uopt, 10, 1) + perturbation;
+Uopt_lf = repelem(data.lqrsol{2}.Uopt + perturbation(1:10:end, :), 10, 1);
 
 % calculate costs and correlation for both high and low fidelity, for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, Uopt_hf, Uopt_lf);
@@ -227,6 +254,9 @@ corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 
 %% plot costs
 plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr, "LF");
+
+% save all data
+save("artefacts/data.mat");
 
 %% Monte carlo estimator with variance calculation
 mc_data.samples = [10, 100, 1000, 10000]; % number of samples for a single MC estimator
@@ -297,6 +327,20 @@ q = x0'*M'*Qbar*S;
 grad = 2 * H * u + 2 * q';
 end
 
+function [f, g] = LQRCostwithGrad(x0, u, Q, S, M, Qbar, Rbar)
+f = LQRCost(x0, u, Q, S, M, Qbar, Rbar);
+g = LQRgrad(x0, u, S, M, Qbar, Rbar);
+end
+
+function stop = outfun(x, optimValues, state)
+% this is for capturing intermediate values of the optimization
+stop = false;
+global num_opt_iters num_opt_data;
+if isequal(state, 'iter')
+  num_opt_iters = num_opt_iters + 1;
+  num_opt_data(:, num_opt_iters) = x;
+end
+end
 
 function [exp, var] = LQRcost_stats(x0_mean, x0_cov, u, Q, S, M, Qbar, Rbar)
 K = u'*(S'*Qbar*S + Rbar)*u;
@@ -367,6 +411,29 @@ for i = 1:perturbs
 end
 end
 
+function corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, lqrsol, Uopt_hf, Uopt_lf)
+iters = size(Uopt_hf, 2);
+rv_samples = size(x0_rv, 2);
+cost_hf_corr = zeros(rv_samples, iters);
+cost_lf_corr = zeros(rv_samples, iters);
+for i = 1:iters
+  for j = 1:rv_samples
+    cost_hf_corr(j, i) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
+    cost_lf_corr(j, i) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
+  end
+end
+
+corr = zeros(iters, iters);
+for i = 1:iters % HF iterations
+  for j = 1:iters % LF iterations
+    corr_mat = corrcoef(cost_hf_corr(:, i), cost_lf_corr(:, j));
+    % we only need the cross correlation, diagnonal will be 1
+    corr(i, j) = corr_mat(1,2); % rowas are HF, cols are LF
+  end
+end
+end
+
+
 function [cost_hf, cost_lf] = calc_costs_multifid(lqrsol, Uopt_hf, Uopt_lf)
 perturbs = size(Uopt_hf, 2);
 cost_hf = zeros(perturbs, 1);
@@ -407,4 +474,30 @@ grid on; grid minor;
 fig.Position(3:4) = [500, 900];
 saveas(fig, "figs/perturb_comp_" + lower(title_str) + ".svg");
 
+end
+
+function plot_corr_2d(corr, title_str, save_str)
+fig = figure;
+sgtitle(title_str);
+
+subplot(1,2,1);
+imagesc(corr);
+set(gca, 'YDir', 'normal');
+title("Heatmap");
+xlabel("LF iterations");
+ylabel("HF iterations");
+colorbar;
+grid on; grid minor;
+
+subplot(1,2,2);
+surf(corr);
+title("3D plot");
+xlabel("LF iterations");
+ylabel("HF iterations");
+zlabel("Correlation");
+view(3);
+grid on; grid minor;
+
+fig.Position(3:4) = [1000, 400];
+saveas(fig, "figs/" + save_str + ".svg");
 end
