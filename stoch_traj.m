@@ -143,7 +143,7 @@ for idx = 1:length(TsList)
   %% set up and solve stochastic LQR problem using robust optimization
   % Uopt only depends on x0, so we can use the same Kopt
   Uopt = Kopt * x0_rv_mean_ext;
-  data.lqrsol{idx} = struct('x0_ext', x0_rv_mean_ext, 'Uopt', Uopt, 'Q_ext', Q_ext, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar);
+  data.lqrsol{idx} = struct('x0_ext', x0_rv_mean_ext, 'Uopt', Uopt, 'Q_ext', Q_ext, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar, 'times', times);
   cost_lqr = zeros(rv_samples, 1);
   x_cl_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
   parfor i = 1:rv_samples
@@ -214,7 +214,7 @@ uopt_diff = sqrt(sum((Uopt_hf - Uopt_num).^2));
 U_hf = num_opt_data(:, 1:num_opt_iters);
 % U_lf = repelem(U_hf(1:10:end, :), 10, 1);
 U_lf = downsample_avg(U_hf, 10); % get LF by avg every 10 values of HF
-
+vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
 % calculate correlation along the optimizer path
 [cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, U_hf, U_lf);
 corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, U_hf, U_lf);
@@ -236,6 +236,7 @@ Uopt_hf = data.lqrsol{1}.Uopt + perturbation;
 % repeat low fid so it can be put into the cost fn of high fid
 perturb_lf = downsample_avg(perturbation, 10);
 Uopt_lf = repelem(data.lqrsol{2}.Uopt + perturb_lf(1:10:end, :), 10, 1);
+vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{1}.times, "HF sim", perturb_range, "Perturbation");
 
 % calculate costs and correlation for both high and low fidelity, for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, Uopt_hf, Uopt_lf);
@@ -251,6 +252,7 @@ perturbation = get_perturb_max_grad(data.lqrsol{2}, perturb_dir_samples, perturb
 Uopt_hf = downsample_avg(data.lqrsol{1}.Uopt, 10); % get HF in LF by avg every 10 values of HF
 Uopt_hf = Uopt_hf(1:10:end) + perturbation;
 Uopt_lf = data.lqrsol{2}.Uopt + perturbation;
+vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{2}.times, "LF sim", perturb_range, "Perturbation");
 
 % calculate costs and correlation for both high and low fidelity, for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{2}, Uopt_hf, Uopt_lf);
@@ -516,4 +518,67 @@ grid on; grid minor;
 
 fig.Position(3:4) = [1500, 600];
 saveas(fig, "figs/" + save_str + ".svg");
+end
+
+function vis_sols(uopt_hf, uopt_lf, times, title_str, zaxis, zaxis_str)
+fig = uifigure("Name", title_str);
+fig.Position(3:4) = [500, 800];
+grd = uigridlayout(fig, [6, 1], "RowHeight", {'1x', '10x', '1x', '10x', '1x', 50});
+
+title = uilabel(grd,'Text','Control output U');
+title.Layout.Row = 1;
+title.HorizontalAlignment = 'center';
+title.FontSize = 16;
+
+ax = uiaxes(grd);
+ax.Layout.Row = 2;
+hold(ax, 'on');
+% TODO: we are assuming u0 to be 0, might not be true in general so might need to add u0 to cumsum
+plot_hf = stairs(ax, times(1:end-1), cumsum(uopt_hf(:, 1)), 'b', 'LineWidth', 2, 'DisplayName', 'HF solution');
+plot_lf = stairs(ax, times(1:end-1), cumsum(uopt_lf(:, 1)), 'r', 'LineWidth', 2, 'DisplayName', 'LF solution');
+xlabel(ax, 'Time [s]');
+ylabel(ax, 'Control Effort [N]');
+grid(ax, 'on')
+legend(ax, 'Location', 'best', 'Box', 'off');
+hold(ax, 'off');
+
+title = uilabel(grd,'Text','Change in control output U');
+title.Layout.Row = 3;
+title.HorizontalAlignment = 'center';
+title.FontSize = 16;
+
+ax = uiaxes(grd);
+ax.Layout.Row = 4;
+hold(ax, 'on');
+plot_hf_raw = stairs(ax, times(1:end-1), uopt_hf(:, 1), 'b', 'LineWidth', 2, 'DisplayName', 'HF solution');
+plot_lf_raw = stairs(ax, times(1:end-1), uopt_lf(:, 1), 'r', 'LineWidth', 2, 'DisplayName', 'LF solution');
+xlabel(ax, 'Time [s]');
+ylabel(ax, 'Control Effort [N]');
+grid(ax, 'on')
+legend(ax, 'Location', 'best', 'Box', 'off');
+hold(ax, 'off');
+
+title = uilabel(grd,'Text',zaxis_str);
+title.Layout.Row = 5;
+title.HorizontalAlignment = 'center';
+title.FontSize = 16;
+
+sld = uislider(grd, 'slider', 'limits', [zaxis(1), zaxis(end)]);
+sld.Layout.Row = 6;
+sld.ValueChangedFcn = @(sld, event) update_plot(sld, plot_hf, plot_lf, plot_hf_raw, plot_lf_raw, uopt_hf, uopt_lf);
+end
+
+function update_plot(sld, plot_hf, plot_lf, plot_hf_raw, plot_lf_raw, uopt_hf, uopt_lf)
+% handle floats in the zaxis and map them back to the data range
+idx = round(interp1(sld.Limits, [1, size(uopt_hf, 2)], sld.Value));
+
+hold(plot_hf.Parent, 'on');
+plot_hf.YData = cumsum(uopt_hf(:, idx));
+plot_lf.YData = cumsum(uopt_lf(:, idx));
+hold(plot_hf.Parent, 'off');
+
+hold(plot_hf_raw.Parent, 'on');
+plot_hf_raw.YData = uopt_hf(:, idx);
+plot_lf_raw.YData = uopt_lf(:, idx);
+hold(plot_hf_raw.Parent, 'off');
 end
