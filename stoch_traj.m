@@ -234,7 +234,8 @@ perturbation = get_perturb_max_grad(data.lqrsol{1}, perturb_dir_samples, perturb
 
 Uopt_hf = data.lqrsol{1}.Uopt + perturbation;
 % repeat low fid so it can be put into the cost fn of high fid
-Uopt_lf = repelem(data.lqrsol{2}.Uopt + perturbation(1:10:end, :), 10, 1);
+perturb_lf = downsample_avg(perturbation, 10);
+Uopt_lf = repelem(data.lqrsol{2}.Uopt + perturb_lf(1:10:end, :), 10, 1);
 
 % calculate costs and correlation for both high and low fidelity, for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, Uopt_hf, Uopt_lf);
