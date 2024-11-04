@@ -199,34 +199,6 @@ for idx = 1:length(TsList)
 end
 
 %% *** correlation check for MLMC, ONLY FOR 2 LEVEL
-%% correlation at different points in a numerical optimizer in HF
-Uopt_hf = data.lqrsol{1}.Uopt;
-% u0_num = zeros(size(Uopt_hf));
-u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
-global num_opt_iters num_opt_data;
-num_opt_iters = 0;
-num_opt_data = zeros(size(Uopt_hf,1), 100);
-fun = @(u) LQRCostwithGrad(data.lqrsol{1}.x0_ext, u, data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
-options = optimoptions('fminunc', 'Display', 'iter', 'Algorithm', 'quasi-newton', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
-Uopt_num = fminunc(fun, u0_num, options);
-uopt_diff = sqrt(sum((Uopt_hf - Uopt_num).^2));
-
-U_hf = num_opt_data(:, 1:num_opt_iters);
-% U_lf = repelem(U_hf(1:10:end, :), 10, 1);
-U_lf = downsample_avg(U_hf, 10); % get LF by avg every 10 values of HF
-vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
-% calculate correlation along the optimizer path
-[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, U_hf, U_lf);
-corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, U_hf, U_lf);
-% TODO: fix title of this graph
-plot_multifid_costs(1:num_opt_iters, cost_hf, cost_lf, corr, "optimizer path", "Iteration");
-
-% Get correlation for all iterations
-corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, U_hf, U_lf);
-
-%% plot correlation
-plot_corr_2d(corr, "Correlation between HF/LF costs of solutions at different iterations in HF", "hf_iters_corr");
-
 %% *** correlation with perturbations
 %% low fid solution in high fid sim
 % perturb the solution in the max gradient direction
@@ -260,6 +232,34 @@ corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 
 %% plot costs
 plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr, "LF sim", "Perturbation");
+
+%% *** correlation at different points in a numerical optimizer in HF
+Uopt_hf = data.lqrsol{1}.Uopt;
+% u0_num = zeros(size(Uopt_hf));
+u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
+global num_opt_iters num_opt_data;
+num_opt_iters = 0;
+num_opt_data = zeros(size(Uopt_hf,1), 100);
+fun = @(u) LQRCostwithGrad(data.lqrsol{1}.x0_ext, u, data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
+options = optimoptions('fminunc', 'Display', 'iter', 'Algorithm', 'quasi-newton', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
+Uopt_num = fminunc(fun, u0_num, options);
+uopt_diff = sqrt(sum((Uopt_hf - Uopt_num).^2));
+
+U_hf = num_opt_data(:, 1:num_opt_iters);
+% U_lf = repelem(U_hf(1:10:end, :), 10, 1);
+U_lf = downsample_avg(U_hf, 10); % get LF by avg every 10 values of HF
+vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
+% calculate correlation along the optimizer path
+[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, U_hf, U_lf);
+corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, U_hf, U_lf);
+% TODO: fix title of this graph
+plot_multifid_costs(1:num_opt_iters, cost_hf, cost_lf, corr, "optimizer path", "Iteration");
+
+% Get correlation for all iterations
+corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, U_hf, U_lf);
+
+%% plot correlation
+plot_corr_2d(corr, "Correlation between HF/LF costs of solutions at different iterations in HF", "hf_iters_corr");
 
 % save all data
 save("artefacts/data.mat");

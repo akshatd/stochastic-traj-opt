@@ -409,11 +409,6 @@ To visualize this, we can optmize individual trajectories with randomly sampled 
 ![Closed Loop with Stochastic LQR Control](figs/0.05_cl_stoch_init.svg){width=50%}
 ![Closed Loop with Stochastic LQR Control](figs/0.5_cl_stoch_init.svg){width=50%}
 
-Plotting costs when the optimal is perturbed by a small amount for all timesteps (adding a constant offset to $U^*$ at each timestep) , we can see that the cost function is indeed minimized at the optimal control input as calculated above in the stochastic LQR case.
-
-![Cost Function with Perturbed Optimal Control Input](figs/0.05_cost_perturb.svg){width=50%}
-![Cost Function with Perturbed Optimal Control Input](figs/0.5_cost_perturb.svg){width=50%}
-
 ### Expected value and Variance of the cost function
 
 We can rewrite the the cost function as
@@ -455,11 +450,6 @@ We can verify that the expected value and variance of the random cost function w
 ![Distribution of the Cost Function](figs/0.5_cost_dist.svg){width=50%}
 
 $\pagebreak$
-
-Here we use a simple Monte Carlo estimator to estimate the expected value of the cost function over some realizations of the initial conditions. The variance of this cost function is varies with the number of samples used in the Monte Carlo estimator.
-
-![Variance of the Cost Function with Number of Samples](figs/0.05_mc_variance.svg){width=50%}
-![Variance of the Cost Function with Number of Samples](figs/0.5_mc_variance.svg){width=50%}
 
 ## Bias for both cases of fidelity
 
@@ -508,13 +498,7 @@ $$
 
 ## MLMC Optimization
 
-First, we need an MLMC estimator, $S_n^{MLMC}$ which combines both the low ($S_n^l$) and high fidelity ($S_n^h$) estimators
-
-$$
-\begin{aligned}
-S_n^{MLMC} &= S_n^h + \alpha (S_n^l - \mathbb{E}[J_l]) \\
-\end{aligned}
-$$
+### Correlation under perturbation in the direction of steepest ascent
 
 We also need to make sure that the estimators have some correlation, so we need to check if
 
@@ -527,39 +511,68 @@ To do this, the optimal solutions are perturbed by a small amount and the cost f
 
 To make perturbed control inputs, we can do the following
 
-1. start with 1000 samples of the initial state $x_0$.
-2. use the sample mean to calculate the optimal control inputs $U_l^*$ and $U_h^*$ for the low and high fidelity simulations respectively.
-3. perturb the optimal control inputs by a small amount for each time step, it can be imagined as shifting the control curve up and down by 1.
-   - These perturbations are in the range $[-1, 1]$ with a step of $0.1$, so it produces a range of $21$ control inputs.
+1. Start with 1000 samples of the initial state $x_0$.
+2. Use the sample mean to calculate the optimal control inputs $U_l^*$ and $U_h^*$ for the low and high fidelity simulations respectively.
+3. At the optimum, perturb the solution by a small amount (0.1) in 1000 different directions and compute the gradient for each of these perturbations.
+   - We cannot take the gradient at the optimum directly since the optimum is calculated analytically and has a gradient of 0.
+4. Take the direction with the maximum gradient as the perturbation direction.
+5. Perturb the optimal control inputs in the range $[-0.25, 6]$ with a step of $0.25$, so it produces a range of control inputs that increase the cost in the direction of the steepest ascent.
 
 To compute the correlation in the high fidelity simulation,
 
 1. Use the perturbed $U_h^*$ as it is.
-2. Repeat the perturbed $U_l^*$ over the timesteps of the high fidelity simulation to make it the same length as $U_h^*$.
-3. For a single perturbation out of the 21, calculate the cost for each of the 1000 random samples of $x_0$ by plugging in $U_h^*$ and repeated $U_l^*$ into the high fidelity cost function.
+2. Average the perturbation to downsample it to the length of $U_l^*$, add it to $U_l^*$, and repeat the perturbed $U_l^*$ over the timesteps of the high fidelity simulation to make it the same length as $U_h^*$.
+3. For a single perturbation, calculate the cost for each of the 1000 random samples of $x_0$ by plugging in $U_h^*$ and repeated $U_l^*$ into the high fidelity cost function.
 4. This way, we will have 1000 samples of the high fidelity cost function for each of $U_h^*$ and repeated $U_l^*$ for a single perturbation.
 5. Calculate the correlation coefficient between the cost samples obtained using $U_h^*$ and repeated $U_l^*$ using the `corrcoef` function.
 6. We will have a symmetric $2\times2$ matrix, where the off-diagonal elements are the correlation coefficients between the two sets of 1000 samples.
 7. These off diagonal elements are then used as the data point for a single perturbation.
 
-This is repeated for all the 21 perturbations to get the graph of correlation in high fidelity simulation.
+This is repeated for all the perturbations to get the graph of correlation in high fidelity simulation.
 
 To compute the correlation in the low fidelity simulation,
 
 1. Use the perturbed $U_l^*$ as it is.
-2. Downsample the perturbed $U_h^*$ by only taking values at times that coincide with the times in $U_l^*$ to make it the same length as $U_l^*$.
-3. For a single perturbation out of the 21, calculate the cost for each of the 1000 random samples of $x_0$ by plugging in downsampled $U_h^*$ and $U_l^*$ into the low fidelity cost function.
+2. Downsample the perturbed $U_h^*$ by averaging values around times that coincide with the times in $U_l^*$ to make it the same length as $U_l^*$.
+3. For a single perturbation, calculate the cost for each of the 1000 random samples of $x_0$ by plugging in downsampled $U_h^*$ and $U_l^*$ into the low fidelity cost function.
 4. This way, we will have 1000 samples of the low fidelity cost function for each of downsampled $U_h^*$ and $U_l^*$ for a single perturbation.
 5. Calculate the correlation coefficient between the cost samples obtained using downsampled $U_h^*$ and $U_l^*$ using the `corrcoef` function.
 6. We will have a symmetric $2\times2$ matrix, where the off-diagonal elements are the correlation coefficients between the two sets of 1000 samples.
 7. These off diagonal elements are then used as the data point for a single perturbation.
 
-This is repeated for all the 21 perturbations to get the graph of correlation in low fidelity simulation.
+This is repeated for all the perturbations to get the graph of correlation in low fidelity simulation.
 
-![High fidelity simulation with high and low fidelity solutions](figs/cost_perturb_comp_hf.svg){width=50%}
-![Low fidelity simulation with high and low fidelity solutions](figs/cost_perturb_comp_lf.svg){width=50%}
-![Correlation in high fidelity simulation](figs/corr_hf.svg){width=50%}
-![Correlation in low fidelity simulation](figs/corr_lf.svg){width=50%}
+![High fidelity simulation with perturbations](figs/perturb_comp_hf.svg){width=50%}
+![Low fidelity simulation with perturbations](figs/perturb_comp_lf.svg){width=50%}
+
+### Correlation along the optimization path of a numerical optimizer
+
+A numerical optimizer can be easily set up to optimize the cost function for the high fidelity simulation. The optimizer can be set up to use the gradient of the cost function with respect to the control inputs to find the optimal control inputs. The optimizer can be set up to use the `fminunc` function in MATLAB.
+
+### Constructing the MLMC estimator
+
+First, we need an MLMC estimator, $S_n^{MLMC}$ which combines both the low ($S_n^l$) and high fidelity ($S_n^h$) estimators
+
+$$
+\begin{aligned}
+S_n^{MLMC} &= S_n^h + \alpha (S_n^l - \mathbb{E}[J_l]) \\
+\end{aligned}
+$$
+
+For getting a convergence plot with the MLMC estimator
+
+- Start with a cost of 1 for the low fidelity, and a cost of 10 for the high fidelity simulation
+- Current method of minimizing the Expectation of the MLMC estimator
+- Start with a point U0
+- Compute the Expectation of the MLMC estimator with different sample allocation in range 0.00:0.05:1.00
+- Keep the best sample allocation that minimizes the variance
+- Compute gradient using finite difference
+- Move in the negative direction of the gradient
+
+Here we use a simple Monte Carlo estimator to estimate the expected value of the cost function over some realizations of the initial conditions. The variance of this cost function is varies with the number of samples used in the Monte Carlo estimator.
+
+![Variance of the Cost Function with Number of Samples](figs/0.05_mc_variance.svg){width=50%}
+![Variance of the Cost Function with Number of Samples](figs/0.5_mc_variance.svg){width=50%}
 
 ## TODO
 
