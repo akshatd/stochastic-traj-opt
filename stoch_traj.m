@@ -4,10 +4,10 @@ clc; clear; close all force;
 % system params
 m = 5; % mass
 k = 2; % spring coefficient
-b = 0.5; % damping coefficient
+c = 0.5; % damping coefficient
 
 A_msd = [0 1;
-  -k / m -b / m];
+  -k / m -c / m];
 B_msd = [0;
   1 / m];
 % C_msd = [1 0]; % only observe position
@@ -212,7 +212,7 @@ vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{1}.times, "HF sim", perturb_range, "Pertu
 
 % calculate costs and correlation for both high and low fidelity, for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, Uopt_hf, Uopt_lf);
-corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, Uopt_hf, Uopt_lf);
+corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{1}, Uopt_hf, Uopt_lf);
 %% plot costs
 plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr, "HF sim", "Perturbation");
 
@@ -228,7 +228,7 @@ vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{2}.times, "LF sim", perturb_range, "Pertu
 
 % calculate costs and correlation for both high and low fidelity, for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{2}, Uopt_hf, Uopt_lf);
-corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{2}, Uopt_hf, Uopt_lf);
+corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{2}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 
 %% plot costs
 plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr, "LF sim", "Perturbation");
@@ -250,19 +250,44 @@ U_hf = num_opt_data(:, 1:num_opt_iters);
 U_lf = downsample_avg(U_hf, 10); % get LF by avg every 10 values of HF
 vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
 % calculate correlation along the optimizer path
-[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, U_hf, U_lf);
-corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, U_hf, U_lf);
+[hf_cost_hf, hf_cost_lf] = calc_costs_multifid(data.lqrsol{1}, U_hf, U_lf);
+corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{1}, U_hf, U_lf);
 % TODO: fix title of this graph
-plot_multifid_costs(1:num_opt_iters, cost_hf, cost_lf, corr, "optimizer path", "Iteration");
+plot_multifid_costs(1:num_opt_iters, hf_cost_hf, hf_cost_lf, corr, "optimizer path in HF", "Iteration");
 
 % Get correlation for all iterations
-corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, U_hf, U_lf);
+corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{1}, U_hf, U_lf);
 
 %% plot correlation
 plot_corr_2d(corr, "Correlation between HF/LF costs of solutions at different iterations in HF", "hf_iters_corr");
 
+%% get costs and correlation in the LF sim
+% this is just to get the costs for the averaged HF solution in LF sim as the MLMC estimator would
+U_lf = U_hf(1:10:end, :);
+[lf_cost_hf, lf_cost_lf] = calc_costs_multifid(data.lqrsol{2}, U_lf, U_lf); % U_lf is the same as U_hf when averaged
+% correlation between the HF sol in HF sim and the avg HF sol in LF sim
+corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+plot_multifid_costs(1:num_opt_iters, hf_cost_hf, lf_cost_lf, corr, "optimizer path(HF in HF sim vs avg HF in LF sim)", "Iteration");
+corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+%% plot correlation
+plot_corr_2d(corr, "Correlation between HF cost in HF sim and avg HF cost in LF sim at different iterations", "mlmc_iters_corr");
 % save all data
 save("artefacts/data.mat");
+
+%% num opt with MLMC estimator
+% safe case, alpha of 0 to eliminate LF evaluations
+alpha = 0.5;
+num_opt_iters = 0;
+num_opt_data = zeros(size(Uopt_hf,1), 100);
+% fun = @(u) LQRCostwithGrad(data.lqrsol{1}.x0_ext, u, data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
+% options = optimoptions('fminunc', 'Display', 'iter', 'Algorithm', 'quasi-newton', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
+% Uopt_num = fminunc(fun, u0_num, options);
+fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, 100, 100, x0_rv, u0, ref, alpha);
+options = optimoptions('fminunc', 'Display', 'iter', 'OptimalityTolerance', 1e-3, 'OutputFcn', @outfun);
+Uopt_num = fminunc(fun, u0_num, options);
+U_hf = num_opt_data(:, 1:num_opt_iters);
+U_lf = downsample_avg(U_hf, 10);
+vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
 
 %% Monte carlo estimator with variance calculation
 mc_data.samples = [10, 100, 1000, 10000]; % number of samples for a single MC estimator
@@ -409,15 +434,15 @@ perturb_dir_max = perturb_dirs(:, max_grad_idx)./ perturb_dir_mag; % length 1 so
 perturbation = perturb_dir_max * perturb_range;
 end
 
-function corr = calc_corr_multifid(x0_rv, u0, ref, lqrsol, Uopt_hf, Uopt_lf)
+function corr = calc_corr_multifid(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, Uopt_hf, Uopt_lf)
 perturbs = size(Uopt_hf, 2);
 rv_samples = size(x0_rv, 2);
 cost_hf_corr = zeros(perturbs, rv_samples);
 cost_lf_corr = zeros(perturbs, rv_samples);
 for i = 1:perturbs
   for j = 1:rv_samples
-    cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
-    cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
+    cost_hf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
+    cost_lf_corr(i, j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
   end
 end
 
@@ -429,15 +454,15 @@ for i = 1:perturbs
 end
 end
 
-function corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, lqrsol, Uopt_hf, Uopt_lf)
+function corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, Uopt_hf, Uopt_lf)
 iters = size(Uopt_hf, 2);
 rv_samples = size(x0_rv, 2);
 cost_hf_corr = zeros(rv_samples, iters);
 cost_lf_corr = zeros(rv_samples, iters);
 for i = 1:iters
   for j = 1:rv_samples
-    cost_hf_corr(j, i) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
-    cost_lf_corr(j, i) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
+    cost_hf_corr(j, i) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
+    cost_lf_corr(j, i) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
   end
 end
 
@@ -581,4 +606,23 @@ hold(plot_hf_raw.Parent, 'on');
 plot_hf_raw.YData = uopt_hf(:, idx);
 plot_lf_raw.YData = uopt_lf(:, idx);
 hold(plot_hf_raw.Parent, 'off');
+end
+
+function cost = calc_mlmc_est(lqrsol_hf, lqrsol_lf, u_hf, n_hf, n_lf, x0_rv, u0, ref, alpha)
+% simple mlmc est with just alpha, not using any difference between the lf and its expectation
+cost_hf = 0;
+for i=1:n_hf
+  cost_hf = cost_hf + LQRCost([x0_rv(:, i); u0; ref], u_hf, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
+end
+cost_hf = cost_hf / n_hf;
+
+u_lf = downsample_avg(u_hf, 10);
+u_lf = u_lf(1:10:end);
+cost_lf = 0;
+for i=1:n_lf
+  cost_lf = cost_lf + LQRCost([x0_rv(:, i); u0; ref], u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+end
+cost_lf = cost_lf / n_lf;
+% cost = cost_hf + alpha * (cost_hf - cost_lf); % complex mixing
+cost = cost_hf + alpha * cost_lf; % simple mixing
 end

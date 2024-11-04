@@ -35,7 +35,7 @@ We have a simple mass spring damper system:
 
 - Mass: m (chosen as 5)
 - Spring constant: k (chosen as 2)
-- Damping coefficient: b (chosen as 0.5)
+- Damping coefficient: c (chosen as 0.5)
 - External force: F
 - Displacement: x
 - Velocity: v = $\dot{x}$
@@ -46,8 +46,8 @@ Hence we have the equality
 
 $$
 \begin{aligned}
-m\ddot{x} &= F - b\dot{x} - kx \\
-\implies \ddot{x} &= \frac{F}{m} - \frac{b}{m}\dot{x} - \frac{k}{m}x
+m\ddot{x} &= F - c\dot{x} - kx \\
+\implies \ddot{x} &= \frac{F}{m} - \frac{c}{m}\dot{x} - \frac{k}{m}x
 \end{aligned}
 $$
 
@@ -60,7 +60,7 @@ $$
 \ddot{x}
 \end{bmatrix} &= \begin{bmatrix}
 0 & 1 \\
--\frac{k}{m} & -\frac{b}{m}
+-\frac{k}{m} & -\frac{c}{m}
 \end{bmatrix} \begin{bmatrix}
 x \\
 \dot{x}
@@ -84,7 +84,7 @@ $$
 \begin{aligned}
 A &= \begin{bmatrix}
 0 & 1 \\
--\frac{k}{m} & -\frac{b}{m}
+-\frac{k}{m} & -\frac{c}{m}
 \end{bmatrix} \\
 B &= \begin{bmatrix}
 0 \\
