@@ -1,5 +1,8 @@
 \documentclass{article}
+\usepackage[a4paper, total={7in, 8in}]{geometry}
 \usepackage{graphicx} % Required for inserting images
+\usepackage{amsmath} % Required for some math elements
+\usepackage{hyperref} % Required for hyperlinks
 
 \title{MultifidelityTrajectoryOptimization}
 \author{goroda }
@@ -9,6 +12,283 @@
 
 \maketitle
 
+\begin{abstract}
+  TODO: abstract
+\end{abstract}
+
 \section{Introduction}
+TODO: introduction
+\section{Background}
+TODO: background
+
+\section{Problem Formulation}
+\subsection{Mass-Spring-Damper System}
+For this paper, we consider a simplified trajectory optimization problem that is easy to understand and analyze.
+We try to solve a reference tracking problem for the position and velocity of a simple mass-spring-damper system.
+The mass-spring-damper system has the following parameters:
+\begin{itemize}
+  \item Mass: $m = 5$ g
+  \item Spring constant: $k = 2$ N/m
+  \item Damping coefficient: $c = 0.5$ Ns/m
+    % \item Initial position: $x_0 = 0$ m
+    % \item Initial velocity: $\dot{x}_0 = 0$ m/s
+\end{itemize}
+
+Given an external force $F$ and the acceleration of the system $\ddot{x}$,
+the dynamics of the system can be written as the equality of forces acting on the mass:
+
+\begin{equation}
+  m\ddot{x} = F - c\dot{x} - kx
+  \implies \ddot{x} = \frac{F}{m} - \frac{c}{m}\dot{x} - \frac{k}{m}x
+\end{equation}
+
+We track the position $x$ and velocity $\dot{x}$ of the mass-spring-damper system using the control input $u$, which applies the force $F$ on the mass.
+These are the states and control inputs of the system, giving use the following dynamics
+
+\begin{equation}
+  \begin{bmatrix}
+    \dot{x} \\
+    \ddot{x}
+  \end{bmatrix} =
+  \begin{bmatrix}
+    0 & 1 \\
+    -\frac{k}{m}  -\frac{c}{m}
+  \end{bmatrix}
+  \begin{bmatrix}
+    x \\
+    \dot{x}
+  \end{bmatrix} +
+  \begin{bmatrix}
+    0 \\
+    \frac{1}{m}
+  \end{bmatrix} u
+\end{equation}
+
+For a closed-loop system, we need to observe the output $y$ of the system, and in this case we observe the position $x$.
+
+\begin{equation}
+  y =
+  \begin{bmatrix}
+    1 & 0
+  \end{bmatrix}
+  \begin{bmatrix}
+    x \\
+    \dot{x}
+  \end{bmatrix}
+\end{equation}
+
+This gives us an LTI system in the form of $\dot{x} = Ax + Bu$ and $y = Cx$, where
+
+\begin{equation}
+  \begin{aligned}
+    A &=
+    \begin{bmatrix}
+      0 & 1 \\
+      -\frac{k}{m} & -\frac{c}{m}
+    \end{bmatrix} \\
+    B &=
+    \begin{bmatrix}
+      0 \\
+      \frac{1}{m}
+    \end{bmatrix} \\
+    C &=
+    \begin{bmatrix}
+      1 & 0
+    \end{bmatrix}
+  \end{aligned}
+\end{equation}
+
+\subsection{LQR Controller}
+We set up an LQR controller to track the reference position and velocity of the mass-spring-damper system.
+An LQR controller was chosen because it has a quadratic cost function that can be minimized analytically and gives us a
+good reference for the trajectory optimization problem.
+
+To set up the LQR controller, we need to define the cost function of the system, which consists of:
+
+\begin{itemize}
+  \item $u_0, u_1 ... u_{N-1}$ : control inputs at each timestep of the trajectory
+  \item $J$ : total cost to be minimized
+  \item $N$ : time horizon
+  \item $x_k$ : state vector at time step $k$
+  \item $u_k$ : control input vector at time step $k$
+  \item $\Delta u_k = u_k - u_{k-1}$ : change in control input at time step $k$
+  \item $r_k$ : reference output at time step $k$
+  \item $e_k = y_k - r_k = Cx - r_k$ : error in the output at time step $k$
+  \item $Q_e$ : error cost matrix
+  \item $R$ : control cost matrix
+\end{itemize}
+The LQR controller minimizes the cost function
+
+\begin{equation}
+  \min_{u_0, u_1 ... u_{N-1}}J = \sum_{k=0}^{N-1} (e_k^T Q_e e_k + \Delta u_k^T R \Delta u_k)
+\end{equation}
+
+\section{Control Variates}
+
+\subsection{Comparing optimums of high and low fidelity models} \label{comp_opt}
+
+To determine if the low fidelity model can be used as a control variate, we need to determine if it coreelates with the high fidelity model.
+
+System Setup:
+\begin{itemize}
+  \item High fidelity model/cost function: $J_h(u, x_0)$
+  \item Low fidelity model/cost function: $J_l(u, x_0)$
+  \item Control input in high fidelity model: $u_h$
+  \item Size of $u_h$: $n_{u_h} \times 1$
+  \item Control input in low fidelity model: $u_l$
+  \item Size of $u_l$: $n_{u_l} \times 1$
+  \item Random initial state: $x_0$
+  \item High fidelity optimum: $u_h^*$
+  \item Low fidelity optimum: $u_l^*$
+\end{itemize}
+
+$u_h$ and $u_l$ do not have the same dimensions, so to compare them we need to scale them to the same dimensions.
+
+To upsample $u_l \rightarrow u_h$, we repeat the elements of $u_l$ to match the dimensions of $u_h$.
+This can be seen as multiplying $u_l$ with a matrix $T_{lh}$ of size $n_{u_h} \times n_{u_l}$:
+
+\begin{equation}
+  T_{lh} =
+  \begin{bmatrix}
+    1 & 0 & \ldots & 0 \\
+    1 & 0 & \ldots & 0 \\
+    \vdots & \vdots & \ddots & \vdots \\
+    0 & 1 & \ldots & 0 \\
+    0 & 1 & \ldots & 0 \\
+    \vdots & \vdots & \ddots & \vdots \\
+    0 & 0 & \ldots & 1 \\
+    0 & 0 & \ldots & 1 \\
+    \vdots & \vdots & \ddots & \vdots \\
+  \end{bmatrix}
+\end{equation}
+
+where the number of repeating ones in each column is determined by the ratio $r_{hl} = n_{u_h} / n_{u_l}$.
+This gives us $u_{lh} = T_{lh} u_l$, which can be compared with $u_h$.
+
+To downsample $u_h \rightarrow u_l$, we can either restrict the dimensions of $u_h$ to match $u_l$ or average the elements of $u_h$ to match the dimensions of $u_l$.
+
+In case of restriction, we can multiply $u_h$ with a matrix $T_{hlr}$ of size $n_{u_l} \times n_{u_h}$:
+
+\begin{equation}
+  T_{hlr} =
+  \begin{bmatrix}
+    1 & 0 & \ldots & 0 & 0 \\
+    0 & \ldots & 1 & \ldots & 0 \\
+    \vdots & \ddots & \vdots & \ddots & \vdots \\
+    0 & 0 & \ldots & 0 & 1 \\
+  \end{bmatrix}
+\end{equation}
+
+Where the number of columns after which the next one is selected is determined by the ratio $r_{hl} = n_{u_l} / n_{u_h}$.
+This gives us $u_{hlr} = T_{hlr} u_h$, which can be compared with $u_l$.
+
+To downsample $u_h$ to $u_l$ by averaging, we need the ratio $r_{lh} = n_{u_h} \ n_{u_l}$.
+We can then multiply $u_h$ with a matrix $T_{hla}$ of size $n_{u_l} \times n_{u_h}$:
+
+\begin{equation}
+  T_{hla} =
+  \begin{bmatrix}
+    r_{lh} & \ldots & 0 & 0 & 0 \\
+    0 & \ldots & r_{lh} & \ldots & 0 \\
+    \vdots & \ddots & \vdots & \vdots & \vdots \\
+    0 & 0 & 0 & r_{lh} & \ldots \\
+  \end{bmatrix}
+\end{equation}
+
+Where $r_{lh}$ is repeated $r_{hl}$ times in each row.
+This gives us $u_{hla} = T_{hla} u_h$, which can be compared with $u_l$.
+
+\subsection{Correlation between high and low fidelity models}
+
+$u_h$ and $u_l$ each have $n_{u_h}$ and $n_{u_l}$ dimensions respectively, which represent the time steps of the simulation.
+After converting them to the same dimensions as done in section \ref{comp_opt},
+we can compute the cost for some realizations of the initial state $x_0$.
+This will give us a set of costs of both high and low fidelity control inputs for a certain model/cost function.
+We can then compute the correlation coefficient $\rho$ between the costs.
+To illustrate this, assume we have $N$ realizations of the initial state $x_0$, and J is the cost function.
+$u_h$ and $u_l$ are the control inputs for the high and low fidelity models respectively, where the dimensions have been
+converted to the same number as described in section \ref{comp_opt}. $\mu_h$ and $\mu_l$ are the mean costs
+of the high and low fidelity control inputs respectively, and $\sigma_h$ and $\sigma_l$ are the standard deviations of
+the costs of the high and low fidelity control inputs respectively.
+
+\begin{equation}
+  \rho = \frac{1}{N-1} \sum_{i=1}^{N} \left( \frac{J(u_h, x_0^i) - \mu_h}{\sigma_h} \right) \left( \frac{J(u_l, x_0^i) - \mu_l}{\sigma_l} \right)
+\end{equation}
+
+This correlation coefficient $\rho$ can be calculated using the MATLAB function \href{https://www.mathworks.com/help/matlab/ref/corrcoef.html#bunkaln}{\texttt{corrcoef}}.
+
+\subsection{Correlation Experiments}
+
+We conducted experiments to check the correlation in 2 scenarios:
+\begin{itemize}
+  \item Perturbation in the direction of steepest ascent
+  \item Along the path of a numerical optimizer
+\end{itemize}
+
+\subsubsection{Perturbation in the direction of steepest ascent}
+
+Since the solution of the cost function is determined analytically, we cannot use it to determine the direction of steepest ascent.
+The gradient at the solution will be 0. To get the direction of steepest ascent, the solution was perturbed slightly in random directions and the direction with the highest gradient
+was chosen as the direction of steepest ascent.
+
+\textbf{Perturbation in the high fidelity model/cost function}
+
+When perturbing in the high fidelity model/cost function, the perturbed high fidelity solution was downsampled to low fidelity
+dimensions by either restricting or averaging as described in section \ref{comp_opt}.
+
+Hence, we have the following important variables:
+
+\begin{itemize}
+  \item High fidelity model/cost function: $J_h$
+  \item Low fidelity model/cost function: $J_l$
+  \item High fidelity optimum: $u_h^*$
+  \item High fidelity perturbation: $p_h$
+  \item Perturbed high fidelity solution: $u_h = u_h^* + p_h$
+  \item Perturbed high fidelity solution downsampled using restriction: $u_{hlr} = T_{hlr} u_h$
+  \item Perturbed high fidelity solution downsampled using averaging: $u_{hla} = T_{hla} u_h$
+\end{itemize}
+
+Comparing $J_h(u_h, x_0)$ and $J_l(u_{hlr}, x_0)$
+
+Comparing $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$
+
+\textbf{Perturbation in the low fidelity model/cost function}
+
+When perturbing in the low fidelity model/cost function, the perturbed high fidelity solution was determined
+by converting the low fidelity perturbation to high fidelity dimensions as described in section \ref{comp_opt}.
+
+Hence, we have the following important variables:
+
+\begin{itemize}
+  \item High fidelity model/cost function: $J_h$
+  \item Low fidelity model/cost function: $J_l$
+  \item Low fidelity optimum: $u_l^*$
+  \item Low fidelity perturbation: $p_l$
+  \item Perturbed low fidelity solution: $u_l = u_l^* + p_l$
+  \item Perturbed high fidelity solution upsampled: $u_{lh} = T_{lh} u_l$
+\end{itemize}
+
+Comparing $J_h(u_{lh}, x_0)$ and $J_l(u_l, x_0)$
+
+\subsubsection{Along the path of a numerical optimizer}
+
+Since in a realistic scenario, one would be optimizing using a numerical optimizer, and desire to reach the high fidelity optimum,
+we conducted experiments to check the correlation along the path of a numerical optimizer in the high fidelity model/cost function.
+
+Here, we warm start with the low fidelity optimum, and check the correlation by downsampling the high fidelity solution using averaging.
+
+Hence, we have the following important variables:
+
+\begin{itemize}
+  \item High fidelity model/cost function: $J_h$
+  \item Low fidelity model/cost function: $J_l$
+  \item High fidelity solution: $u_h$
+  \item High fidelity solution downsampled using restriction: $u_{hlr} = T_{hlr} u_h$
+  \item High fidelity solution downsampled using averaging: $u_{hla} = T_{hla} u_h$
+\end{itemize}
+
+Comparing $J_h(u_h, x_0)$ and $J_h(u_{hlr}, x_0)$
+
+Comparing $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$
 
 \end{document}

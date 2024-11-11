@@ -200,71 +200,50 @@ for idx = 1:length(TsList)
   saveas(fig, "figs/"+Ts+"_cost_dist.svg");
 end
 
-%% *** E. correlation check for MLMC, ONLY FOR 2 LEVEL TODO: extend to work for any number of levels
-%% E.1 correlation with perturbation in direction of maximum ascent
+% *** E. correlation check for MLMC, ONLY FOR 2 LEVEL TODO: extend to work for any number of levels
+% E.1 correlation with perturbation in direction of maximum ascent
 
 %% E.1.1 perturbation in HF objective fn
 perturbation = get_perturb_max_grad(data.lqrsol{1}, perturb_dir_samples, perturb_dir_mag, perturb_range);
-perturb_lf = downsample_avg(perturbation, 10); % downsample to low fid while keeping the same no of elements
-
-%% E.1.1.1 in HF obj
 Uopt_hf = data.lqrsol{1}.Uopt + perturbation; % perturb hf sol
-Uopt_lf = repelem(data.lqrsol{2}.Uopt + perturb_lf(1:10:end, :), 10, 1); % pick every 10th elem and repeat 10 times
-vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
 
-% calculate costs and correlation for HF/LF sols for each perturbation
-[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, data.lqrsol{1}, Uopt_hf, Uopt_lf);
-corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{1}, Uopt_hf, Uopt_lf);
-%% plot costs
-title_str = ["$J_h$", "$J_h$"];
-costs_str = ["$J_h(u_h)$", "$J_h(u_{lh})$"];
-plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr, title_str, costs_str, "Perturbation");
+%% E.1.1.1 restriction
+Uopt_lf = Uopt_hf(1:10:end, :); % pick every 10th elem
+% Uopt_lf = repelem(Uopt_lf, 10, 1); % uncomment to visualize
+% vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
 
-%% E.1.1.2 in In their respective objectives
-Uopt_lf = data.lqrsol{2}.Uopt + perturb_lf(1:10:end, :);
 % calculate costs and correlation for HF/LF sols for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
-%% plot costs
-title_str = ["$J_h$ and $J_l$", "$J_h$"];
-costs_str = ["$J_h(u_h)$", "$J_l(u_l)$"];
+% plot costs
+title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
+costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
+plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr, title_str, costs_str, "Perturbation");
+
+%% E.1.1.2 averaging
+Uopt_lf = downsample_avg(Uopt_hf, 10); % get HF in LF by avg every 10 values of HF
+% vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
+Uopt_lf = Uopt_lf(1:10:end, :); % pick every 10th elem
+% calculate costs and correlation for HF/LF sols for each perturbation
+[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
+corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
+% plot costs
+title_str = ["$J_h$ and $J_l$", "$J_h (averaging)$"];
+costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr, title_str, costs_str, "Perturbation");
 
 
 %% E.1.2 perturbation in LF objective fn
 perturbation = get_perturb_max_grad(data.lqrsol{2}, perturb_dir_samples, perturb_dir_mag, perturb_range);
 Uopt_lf = data.lqrsol{2}.Uopt + perturbation;
-%% E.1.2.1 downsample HF by restriction (picking one every 10)
-Uopt_hf = data.lqrsol{1}.Uopt(1:10:end, :) + perturbation; % downsaple by restriction
-vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{2}.times, "LF obj (restriction)", perturb_range, "Perturbation");
-% calculate costs and correlation for both high and low fidelity, for each perturbation
-[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{2}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
-corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{2}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
-%% plot costs
-title_str = ["$J_l$", "$J_l$ (restriction)"];
-costs_str = ["$J_l(u_hlr)$", "$J_l(u_l)$"];
-plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr, title_str, costs_str, "Perturbation");
-
-%% E.1.2.2 downsample HF by averaging
-Uopt_hf = downsample_avg(data.lqrsol{1}.Uopt, 10); % get HF in LF by avg every 10 values of HF
-Uopt_hf = Uopt_hf(1:10:end) + perturbation; % pick every 10th elem
-vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{2}.times, "LF obj (averaging)", perturb_range, "Perturbation");
-% calculate costs and correlation for both high and low fidelity, for each perturbation
-[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{2}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
-corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{2}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
-%% plot costs
-title_str = ["$J_l$", "$J_l$ (averaging)"];
-costs_str = ["$J_l(u_hla)$", "$J_l(u_l)$"];
-plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr, title_str, costs_str, "Perturbation");
-
-%% E.1.2.2 In their respective objectives
-Uopt_hf = data.lqrsol{1}.Uopt + repelem(perturbation, 10, 1);
+% vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{2}.times, "LF obj (restriction)", perturb_range, "Perturbation");
+Uopt_hf = repelem(Uopt_lf, 10, 1); % repeat the LF sol to match HF sol
 % calculate costs and correlation for both high and low fidelity, for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
-%% plot costs
+% plot costs
 title_str = ["$J_h$ and $J_l$", "$J_l$"];
-costs_str = ["$J_h(u_h)$", "$J_l(u_l)$"];
+costs_str = ["$J_h(u_lh)$", "$J_l(u_l)$"];
 plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr, title_str, costs_str, "Perturbation");
 
 %% *** E.2 correlation at different points in a numerical optimizer
@@ -281,29 +260,38 @@ Uopt_num = fminunc(fun, u0_num, options);
 uopt_diff = sqrt(sum((Uopt_hf - Uopt_num).^2));
 
 U_hf = num_opt_data(:, 1:num_opt_iters);
-% U_lf = repelem(U_hf(1:10:end, :), 10, 1);
-U_lf = downsample_avg(U_hf, 10); % get LF by avg every 10 values of HF
-vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
 
-%% E.2.1.1 calculate correlation: HF sol in HF obj vs LF(avg HF sol) in HF obj
-[hf_cost_hf, hf_cost_lf] = calc_costs_multifid(data.lqrsol{1}, data.lqrsol{1}, U_hf, U_lf);
-corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{1}, U_hf, U_lf);
-plot_multifid_costs(1:num_opt_iters, hf_cost_hf, hf_cost_lf, corr, "optimizer path in HF", "Iteration");
-% Get correlation for all iterations
-corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{1}, U_hf, U_lf);
-%% plot correlation
-plot_corr_2d(corr, "Correlation between costs at iterations: HF vs avg HF solutions in $J_h$", "hf_iters_corr");
-
-%% E.2.1.2 calculate correlation: HF sol in HF obj vs avg HF sol in LF obj
 % this is just to get the costs for the averaged HF solution in LF sim as the MLMC estimator would
-U_lf = U_lf(1:10:end, :);
-[lf_cost_hf, lf_cost_lf] = calc_costs_multifid(data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
-% correlation between the HF sol in HF sim and the avg HF sol in LF sim
+%% E.2.1.1 correlation with restriction
+U_lf = U_hf(1:10:end, :);
+% U_lf = repelem(U_lf, 10, 1); % uncomment to visualize
+% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
+[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
-plot_multifid_costs(1:num_opt_iters, hf_cost_hf, lf_cost_lf, corr, "optimizer path(HF in HF sim vs avg HF in LF sim)", "Iteration");
+
+title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
+costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
+plot_multifid_costs(1:num_opt_iters, cost_hf, cost_lf, corr, title_str, costs_str, "Iteration");
+% Get correlation for all iterations
 corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 %% plot correlation
-plot_corr_2d(corr, "Correlation between costs at iterations: HF sol in $J_h$ vs avg HF sol in LF obj", "mlmc_iters_corr");
+sols_str = ["$u_h$", "$u_{hlr}$"];
+plot_corr_2d(corr, "Correlation between costs in $J_h$ and $J_l$: $u_h$ vs $u_{hla}$", sols_str, "num_iters_res");
+
+%% E.2.1.2 correlation with averaging
+U_lf = downsample_avg(U_hf, 10); % get LF by avg every 10 values of HF
+% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
+U_lf = U_lf(1:10:end, :);
+[cost_hf, cost_lf] = calc_costs_multifid(data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+% correlation between the HF sol in HF sim and the avg HF sol in LF sim
+corr = calc_corr_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+title_str = ["$J_h$ and $J_l$", "$J_h$ (averaging)"];
+costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
+plot_multifid_costs(1:num_opt_iters, cost_hf, cost_lf, corr, title_str, costs_str, "Iteration");
+corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+%% plot correlation
+sols_str = ["$u_h$", "$u_{hla}$"];
+plot_corr_2d(corr, "Correlation between costs in $J_h$ and $J_l$: $u_h$ vs $u_{hla}$", sols_str, "num_iters_avg");
 % save all data
 save("artefacts/data.mat");
 
@@ -521,7 +509,7 @@ end
 
 function plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr, title_str, costs_str, xaxis_str)
 fig = figure;
-sgtitle("Cost in " + title_str(1) + " vs " + xaxis_str + " in " + title_str(2), 'Interpreter', 'latex')
+sgtitle("Mean cost in " + title_str(1) + " vs " + xaxis_str + " in " + title_str(2), 'Interpreter', 'latex')
 
 subplot(2,1,1);
 ax = gca;
@@ -533,7 +521,7 @@ yyaxis right;
 plot(perturb_range, cost_lf, 'r', 'LineWidth', 2, 'DisplayName', costs_str(2));
 ylabel(costs_str(2) + " cost", "Interpreter", "latex", "FontSize", 14);
 ax.YColor = 'r';
-title("Cost");
+title("Mean cost");
 xlabel(xaxis_str);
 legend show; legend boxoff;
 legend('Interpreter', 'latex', 'Location', 'best', "FontSize", 12);
@@ -551,7 +539,7 @@ saveas(fig, "figs/perturb_comp_" + lower(title_str(1)) + "_" + title_str(2) + ".
 
 end
 
-function plot_corr_2d(corr, title_str, save_str)
+function plot_corr_2d(corr, title_str, sols_str, save_str)
 fig = figure;
 sgtitle(title_str, 'Interpreter', 'latex');
 
@@ -559,16 +547,16 @@ subplot(1,2,1);
 imagesc(corr);
 set(gca, 'YDir', 'normal');
 title("Heatmap");
-xlabel("LF solution at iter");
-ylabel("HF solution at iter");
+ylabel(sols_str(1) + " at iteration", "Interpreter", "latex", "FontSize", 14);
+xlabel(sols_str(2) + " at iteration", "Interpreter", "latex", "FontSize", 14);
 colorbar;
 grid on;
 
 subplot(1,2,2);
 surf(corr);
 title("3D plot");
-xlabel("LF solution at iter");
-ylabel("HF solution at iter");
+ylabel(sols_str(1) + " at iteration", "Interpreter", "latex", "FontSize", 14);
+xlabel(sols_str(2) + " at iteration", "Interpreter", "latex", "FontSize", 14);
 zlabel("Correlation");
 view(3);
 grid on;
