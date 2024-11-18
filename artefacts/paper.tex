@@ -3,6 +3,7 @@
 \usepackage{graphicx} % Required for inserting images
 \usepackage{amsmath} % Required for some math elements
 \usepackage{hyperref} % Required for hyperlinks
+\usepackage{amssymb} % Required for probability symbols
 
 \title{MultifidelityTrajectoryOptimization}
 \author{goroda }
@@ -22,9 +23,10 @@ TODO: introduction
 TODO: background
 
 \section{Problem Formulation}
+This secition describes how the state space model of the dynamics is set up, along with the controller design and cost function for the trajectory optimization problem.
 \subsection{Mass-Spring-Damper System}
-For this paper, we consider a simplified trajectory optimization problem that is easy to understand and analyze.
-We try to solve a reference tracking problem for the position and velocity of a simple mass-spring-damper system.
+For this paper, a simplified trajectory optimization problem is considered that is easy to understand and analyze.
+The objective is to solve a reference tracking problem for the position and velocity of a simple mass-spring-damper system.
 The mass-spring-damper system has the following parameters:
 \begin{itemize}
   \item Mass: $m = 5$ g
@@ -42,8 +44,8 @@ the dynamics of the system can be written as the equality of forces acting on th
   \implies \ddot{x} = \frac{F}{m} - \frac{c}{m}\dot{x} - \frac{k}{m}x
 \end{equation}
 
-We track the position $x$ and velocity $\dot{x}$ of the mass-spring-damper system using the control input $u$, which applies the force $F$ on the mass.
-These are the states and control inputs of the system, giving use the following dynamics
+The position $x$ and velocity $\dot{x}$ of the mass-spring-damper system can be changed using the control input $u$,
+which applies the force $F$ on the mass. This yields the following dynamics
 
 \begin{equation}
   \begin{bmatrix}
@@ -64,12 +66,13 @@ These are the states and control inputs of the system, giving use the following 
   \end{bmatrix} u
 \end{equation}
 
-For a closed-loop system, we need to observe the output $y$ of the system, and in this case we observe the position $x$.
+For a closed-loop system, the output $y$ of the system needs to be observed, which is both the position and velocity in this case.
 
 \begin{equation}
   y =
   \begin{bmatrix}
-    1 & 0
+    1 & 0 \\
+    0 & 1
   \end{bmatrix}
   \begin{bmatrix}
     x \\
@@ -77,7 +80,7 @@ For a closed-loop system, we need to observe the output $y$ of the system, and i
   \end{bmatrix}
 \end{equation}
 
-This gives us an LTI system in the form of $\dot{x} = Ax + Bu$ and $y = Cx$, where
+This yields an LTI system in the form of $\dot{x} = Ax + Bu$ and $y = Cx$, where
 
 \begin{equation}
   \begin{aligned}
@@ -93,12 +96,13 @@ This gives us an LTI system in the form of $\dot{x} = Ax + Bu$ and $y = Cx$, whe
     \end{bmatrix} \\
     C &=
     \begin{bmatrix}
-      1 & 0
+      1 & 0 \\
+      0 & 1
     \end{bmatrix}
   \end{aligned}
 \end{equation}
 
-\subsection{LQR Controller}
+\subsection{LQR Controller} \label{lqr_ctrl}
 We set up an LQR controller to track the reference position and velocity of the mass-spring-damper system.
 An LQR controller was chosen because it has a quadratic cost function that can be minimized analytically and gives us a
 good reference for the trajectory optimization problem.
@@ -123,7 +127,160 @@ The LQR controller minimizes the cost function
   \min_{u_0, u_1 ... u_{N-1}}J = \sum_{k=0}^{N-1} (e_k^T Q_e e_k + \Delta u_k^T R \Delta u_k)
 \end{equation}
 
-\section{Control Variates}
+\subsection{Stochastic LQR Controller}
+We will consider the case where the initial state $x_0$ is stochastic, with mean $\mu$ and covariance $\Sigma$.
+The control input vector $U$ is still deterministic.
+
+In this case, the state vector $X$ is stochastic, owing to the the initial condition $x_0$ being a vector of random variables. The state propagation equations are now expectations
+
+\begin{equation}
+  \begin{aligned}
+    \mathbb{E}[x_1] &= \mathbb{E}[A x_0 + B u_0] = A \mathbb{E}[x_0] + B u_0 \\
+    \mathbb{E}[x_2] &= \mathbb{E}[A x_1 + B u_1] = A \mathbb{E}[x_1] + B u_1 = A^2 \mathbb{E}[x_0] + A B u_0 + B u_1 \\
+    \vdots \\
+    \mathbb{E}[x_N] &= \mathbb{E}[A x_{N-1} + B u_{N-1}] = A \mathbb{E}[x_{N-1}] + B u_{N-1} \\
+    &= A^N \mathbb{E}[x_0] + A^{N-1} B u_0 + A^{N-2} B u_1 + \ldots + B u_{N-1} \\
+  \end{aligned}
+\end{equation}
+
+The matrices $S$ and $M$ remain the same, and we have the following expression for the expected value of the state vector $X$
+
+$$
+\mathbb{E}[X] = S U + M \mathbb{E}[x_0]
+$$
+
+The cost matrices $\bar{Q}$ and $\bar{R}$ are also the same. The cost function $J$ is now a random variable,
+with an expected value $\mathbb{E}[J]$ and variance $Var[J]$.
+
+The expected value of the cost function over all possible realizations of the initial conditions is
+$$
+\begin{aligned}
+  \mathbb{E}[J] &= \mathbb{E}[x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)] \\
+  &= \mathbb{E}[X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0] \\
+  &= \mathbb{E}[X^T \bar{Q} X] + \mathbb{E}[U^T \bar{R} U] + \mathbb{E}[x_0^T Q x_0] \\
+  &= \mathbb{E}[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + \mathbb{E}[x_0^T Q x_0] \\
+  &= \mathbb{E}[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
+  &= U^T S^T \bar{Q} S U + \mathbb{E}[U^T S^T \bar{Q} M x_0] + \mathbb{E}[x_0^T M^T \bar{Q} S U] + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
+  &= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M \mathbb{E}[x_0] + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
+  &= U^T (S^T \bar{Q} S + \bar{R}) U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} M \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \text{Cov}[x_0]) \hdots \\
+  & \quad + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
+  &= U^T (S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \text{Cov}[x_0]) \\
+\end{aligned}
+$$
+
+Assuming $\mathbb{E}[x_0]$ and $\text{Cov}[x_0]$ is calculated using a Monte Carlo estimator, we can write the cost function as
+
+$$
+\begin{aligned}
+  H &= S^T \bar{Q} S + \bar{R} = H^T \\
+  q &= (\mathbb{E}[x_0^T] M^T \bar{Q} S)^T = S^T \bar{Q} M \mathbb{E}[x_0] \\
+  c &= \mathbb{E}[x_0^T] (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \text{Cov}[x_0])
+\end{aligned}
+$$
+
+The cost function can now be written as a quadratic function of the control inputs $U$
+
+$$
+J = U^T H U + 2 q^T U + c
+$$
+
+Which has a gradient with respect to $U$ as
+
+$$
+\Delta J = 2 H U + 2 q^T
+$$
+
+Assuming minimum exists, we can set the gradient to zero to get the optimal control input $U^*$
+
+$$
+\begin{aligned}
+  \Delta J &= 2 H U + 2 q^T = 0 \\
+  \implies U^* &= -H^{-1} q
+\end{aligned}
+$$
+
+% ref for quadratic form: https://en.wikipedia.org/wiki/Quadratic_form_(statistics)
+
+Tthe cost function can be rewritten as
+
+$$
+\begin{aligned}
+  J &= U^T(S^T \bar{Q} S + \bar{R}) U + 2 x_0^T M^T \bar{Q} S U + x_0^T(M^T \bar{Q} M + Q) x_0 \\
+  \text{Let}& \\
+  K &= U^T(S^T \bar{Q} S + \bar{R}) U \\
+  L &= 2 M^T \bar{Q} S U \\
+  N &= M^T \bar{Q} M + Q = N^T \\
+  &\text{(quadratic multiplication by diagnonal($\bar{Q}$) results in a symmetric, $Q$ is symmetric)} \\
+  \text{Then}& \\
+  J &= K + x_0^T L + x_0^T N x_0 \\
+\end{aligned}
+$$
+
+Then, the expectation and variance of the cost function is as follows. Take note that the random variable here is $x_0$ and $\mathbb{E}[x_0]$ is a scalar.
+
+% ref:
+% - https://www.math.uwaterloo.ca/~hwolkowi/matrixcookbook.pdf
+% - https://math.stackexchange.com/questions/2163694/expectation-of-quartic-form-for-multivariate-gaussian/4247240#4247240
+% - https://math.stackexchange.com/questions/1302882/variance-of-a-quadratic-form
+
+\begin{equation}
+  \begin{aligned}
+    \mathbb{E}[J] &= \mathbb{E}[K] + \mathbb{E}[x_0^T L] + \mathbb{E}[x_0^T N x_0] \\
+    &= K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] + \text{tr}(N \text{Cov}[x_0]) \\
+    Var[J] &= Var[K + x_0^T L + x_0^T N x_0] \\
+    &\text{note: $K$ is deterministic, so its variance is 0} \\
+    & \text{note: $x_0^T L$ is a scalar, $x_0^T L = L^T x_0$} \\
+    &= Var[L^T x_0 + x_0^T N x_0] \\
+    &= 2\text{tr}(N \text{Cov}[x_0] N \text{Cov}[x_0]) + 4 \mathbb{E}[x_0^T]N\text{Cov}[x_0]N\mathbb{E}[x_0] + 4 L^T \text{Cov}[x_0] N \mathbb{E}[x_0] + L^T \text{Cov}[x_0] L \\
+  \end{aligned}
+\end{equation}
+
+To determine the covariance between the costs of two solutions $U_1$ and $U_2$, the components of $J$ that depend on $U$
+need to be written in terms of $U_1$ and $U_2$.
+
+For $U_1$, the cost function is
+
+$$
+\begin{aligned}
+  J(U_1) &= K_1 + x_0^T L_1 + x_0^T N x_0 \\
+  \text{where} \\
+  K_1 &= U_1^T(S^T \bar{Q} S + \bar{R}) U_1 \\
+  L_1 &= 2 M^T \bar{Q} S U_1 \\
+\end{aligned}
+$$
+
+Similarly, for $U_2$, the cost function is
+
+$$
+\begin{aligned}
+  J(U_2) &= K_2 + x_0^T L_2 + x_0^T N x_0 \\
+  \text{where} \\
+  K_2 &= U_2^T(S^T \bar{Q} S + \bar{R}) U_2 \\
+  L_2 &= 2 M^T \bar{Q} S U_2 \\
+\end{aligned}
+$$
+
+% ref:
+% - https://math.stackexchange.com/questions/1302882/variance-of-a-quadratic-form
+% - https://stats.stackexchange.com/questions/303466/prove-that-mathrmcovxtax-xtbx-2-mathrmtra-sigma-b-sigma-4-mu
+% - https://stats.stackexchange.com/questions/35084/covariance-of-a-linear-and-quadratic-form-of-a-multivariate-normal
+% - https://www.researchgate.net/publication/243770190_Quadratic_Forms_in_Random_Variables P74, 3.2d.9
+the covariance between their costs can be calculated as
+\begin{equation}
+  \begin{aligned}
+    \text{Cov}[J(U_1), J(U_2)] &= \text{Cov}[K_1 + x_0^T L_1 + x_0^T N x_0, K_2 + x_0^T L_2 + x_0^T N x_0] \\
+    &= \text{Cov}[x_0^T L_1 + x_0^T N x_0, x_0^T L_2 + x_0^T N x_0] \text{ (covariance is shift invariant)} \\
+    &= \text{Cov}[x_0^T L_1, x_0^T L_2] + \text{Cov}[x_0^T L_1, x_0^T N x_0] + \text{Cov}[x_0^T N x_0, x_0^T L_2] + \text{Cov}[x_0^T N x_0, x_0^T N x_0] \\
+    &= \text{Cov}[ L_1^T x_0, L_2^T x_0] + \text{Cov}[L_1^T x_0, x_0^T N x_0] + \text{Cov}[x_0^T N x_0, L_2^T x_0] + \text{Cov}[x_0^T N x_0, x_0^T N x_0] \\
+    &= L_1^T \text{Cov}[x_0] L_2 + \text{Cov}[x_0^T N x_0, L_1^T x_0] + \text{Cov}[x_0^T N x_0, x_0^T L_2] + \text{var}[x_0^T N x_0] \\
+    &= L_1^T \text{Cov}[x_0] L_2 + 2\mathbb{E}[x_0^T] N \text{Cov}[x_0] L_1 + 2\mathbb{E}[x_0^T] N \text{Cov}[x_0] L_2 \hdots \\
+    & \quad 4 \mathbb{E}[x_0^T]N\text{Cov}[x_0]N\mathbb{E}[x_0] + 2\text{tr}((N \text{Cov}[x_0])^2) \\
+  \end{aligned}
+\end{equation}
+
+\section{Multi Level Monte Carlo}
+
+This section formulates the stochastic trajectory optimization problem as a multi-level Monte Carlo problem.
 
 \subsection{Comparing optimums of high and low fidelity models} \label{comp_opt}
 
@@ -202,20 +359,49 @@ This gives us $u_{hla} = T_{hla} u_h$, which can be compared with $u_l$.
 
 $u_h$ and $u_l$ each have $n_{u_h}$ and $n_{u_l}$ dimensions respectively, which represent the time steps of the simulation.
 After converting them to the same dimensions as done in section \ref{comp_opt},
-we can compute the cost for some realizations of the initial state $x_0$.
-This will give us a set of costs of both high and low fidelity control inputs for a certain model/cost function.
-We can then compute the correlation coefficient $\rho$ between the costs.
-To illustrate this, assume we have $N$ realizations of the initial state $x_0$, and J is the cost function.
+the cost for some realizations of the initial state $x_0$ can be computed.
+Hence, a set of costs of both high and low fidelity control inputs can be computed for a certain model/cost function.
+The correlation coefficient $\rho$ can then be computed between the distribution of the cost function values.
+To illustrate this, assume there are $N$ realizations of the initial state $x_0$, and $J$ is the cost function.
 $u_h$ and $u_l$ are the control inputs for the high and low fidelity models respectively, where the dimensions have been
 converted to the same number as described in section \ref{comp_opt}. $\mu_h$ and $\mu_l$ are the mean costs
 of the high and low fidelity control inputs respectively, and $\sigma_h$ and $\sigma_l$ are the standard deviations of
 the costs of the high and low fidelity control inputs respectively.
 
 \begin{equation}
-  \rho = \frac{1}{N-1} \sum_{i=1}^{N} \left( \frac{J(u_h, x_0^i) - \mu_h}{\sigma_h} \right) \left( \frac{J(u_l, x_0^i) - \mu_l}{\sigma_l} \right)
+  \rho(J(u_h), J(u_l)) = \frac{1}{N-1} \sum_{i=1}^{N} \left( \frac{J(u_h, x_0^i) - \mu_h}{\sigma_h} \right) \left( \frac{J(u_l, x_0^i) - \mu_l}{\sigma_l} \right)
+\end{equation}
+
+This can be simplified to:
+
+\begin{equation}
+  \rho(J(u_h), J(u_l)) = \frac{\text{Cov}(J(u_h), J(u_l))}{\sigma_h \sigma_l}
 \end{equation}
 
 This correlation coefficient $\rho$ can be calculated using the MATLAB function \href{https://www.mathworks.com/help/matlab/ref/corrcoef.html#bunkaln}{\texttt{corrcoef}}.
+
+The correlation can also be calculated analytically using the covariance of the costs in the high fidelity objective function and the low fidelity objective function.
+Let
+
+\begin{itemize}
+  \item $J_h$: high fidelity cost function
+  \item $U_1$: high fidelity control input
+  \item $U_2$: upsampled low fidelity control input $u_{lh} = T_{lh} u_l$
+  \item $J_1 = J_h(U_1, x_0)$
+  \item $\sigma_1$: standard deviation of $J_1$, $\sqrt{\text{Var}[J_1]}$
+  \item $\sigma_2$: standard deviation of $J_2$, $\sqrt{\text{Var}[J_2]}$
+\end{itemize}
+
+Then correlation coefficient between $J_1$ and $J_2$ is
+
+\begin{equation}
+  \begin{aligned}
+    \rho(J_1, J_2) &= \frac{\text{Cov}(J_1, J_2)}{\sigma_1 \sigma_2} \\
+    &= \frac{\text{Cov}(J_1, J_2)}{\sqrt{\text{Var}[J_1]} \sqrt{\text{Var}[J_2]}}
+  \end{aligned}
+\end{equation}
+
+Where $\text{Cov}(J_1, J_2)$, $\text{Var}[J_1]$ and $\text{Var}[J_2]$ can be calculated using the eqations in section \ref{lqr_ctrl}.
 
 \subsection{Correlation Experiments}
 

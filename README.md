@@ -51,7 +51,7 @@ m\ddot{x} &= F - c\dot{x} - kx \\
 \end{aligned}
 $$
 
-Let the state of the dynamics be $[x, \dot{x}]$ where the control input $u=F$. We just observe the position $x$. Hence we have the state space equations
+Let the state of the dynamics be $[x, \dot{x}]$ where the control input $u=F$. We observe both the position and the velocity. Hence we have the state space equations
 
 $$
 \begin{aligned}
@@ -70,7 +70,8 @@ x \\
 \end{bmatrix} u \\
 y &=
 \begin{bmatrix}
-1 & 0
+1 & 0 \\
+0 & 1
 \end{bmatrix} \begin{bmatrix}
 x \\
 \dot{x}
@@ -91,6 +92,7 @@ B &= \begin{bmatrix}
 \frac{1}{m}
 \end{bmatrix} \\
 C &= \begin{bmatrix}
+1 & 0 \\
 1 & 0
 \end{bmatrix}
 \end{aligned}
