@@ -201,7 +201,7 @@ $$
 
 % ref for quadratic form: https://en.wikipedia.org/wiki/Quadratic_form_(statistics)
 
-Tthe cost function can be rewritten as
+The cost function can be rewritten as
 
 $$
 \begin{aligned}
@@ -235,17 +235,20 @@ Then, the expectation and variance of the cost function is as follows. Take note
   \end{aligned}
 \end{equation}
 
-To determine the covariance between the costs of two solutions $U_1$ and $U_2$, the components of $J$ that depend on $U$
-need to be written in terms of $U_1$ and $U_2$.
+To determine the covariance between the costs of two solutions $U_1$ and $U_2$, in different cost functions
+$J_1$ and $J_2$, we need to first rewrite the cost functions to differentiate between them.
 
 For $U_1$, the cost function is
 
 $$
 \begin{aligned}
-  J(U_1) &= K_1 + x_0^T L_1 + x_0^T N x_0 \\
+  J_1(U_1) &= K_1 + x_0^T L_1 + x_0^T N_1 x_0 \\
   \text{where} \\
-  K_1 &= U_1^T(S^T \bar{Q} S + \bar{R}) U_1 \\
-  L_1 &= 2 M^T \bar{Q} S U_1 \\
+  K_1 &= U_1^T(S_1^T \bar{Q}_1 S_1 + \bar{R}_1) U_1 \\
+  L_1 &= 2 M_1^T \bar{Q}_1 S_1 U_1 \\
+  N_1 &= M_1^T \bar{Q}_1 M + Q_1 \\
+  \text{and} \\
+  & S_1, M_1, \bar{Q}_1, \bar{R}_1, Q_1 \text{ depend on the discrectization timestep of } J_1
 \end{aligned}
 $$
 
@@ -253,10 +256,13 @@ Similarly, for $U_2$, the cost function is
 
 $$
 \begin{aligned}
-  J(U_2) &= K_2 + x_0^T L_2 + x_0^T N x_0 \\
+  J_2(U_2) &= K_2 + x_0^T L_2 + x_0^T N_2 x_0 \\
   \text{where} \\
-  K_2 &= U_2^T(S^T \bar{Q} S + \bar{R}) U_2 \\
-  L_2 &= 2 M^T \bar{Q} S U_2 \\
+  K_2 &= U_2^T(S_2^T \bar{Q}_2 S_2 + \bar{R}_2) U_2 \\
+  L_2 &= 2 M_2^T \bar{Q}_2 S_2 U_2 \\
+  N_2 &= M_2^T \bar{Q}_2 M + Q_2 \\
+  \text{and} \\
+  & S_2, M_2, \bar{Q}_2, \bar{R}_2, Q_2 \text{ depend on the discrectization timestep of } J_2
 \end{aligned}
 $$
 
@@ -264,17 +270,54 @@ $$
 % - https://math.stackexchange.com/questions/1302882/variance-of-a-quadratic-form
 % - https://stats.stackexchange.com/questions/303466/prove-that-mathrmcovxtax-xtbx-2-mathrmtra-sigma-b-sigma-4-mu
 % - https://stats.stackexchange.com/questions/35084/covariance-of-a-linear-and-quadratic-form-of-a-multivariate-normal
-% - https://www.researchgate.net/publication/243770190_Quadratic_Forms_in_Random_Variables P74, 3.2d.9
 the covariance between their costs can be calculated as
+
+\begin{equation}\label{eq:covariance}
+  \begin{aligned}
+    \text{Cov}[J_1(U_1), J_2(U_2)] &= \text{Cov}[K_1 + x_0^T L_1 + x_0^T N_1 x_0, K_2 + x_0^T L_2 + x_0^T N_2 x_0] \\
+    &= \text{Cov}[x_0^T L_1 + x_0^T N_1 x_0, x_0^T L_2 + x_0^T N_2 x_0] \text{ (covariance is shift invariant)} \\
+    &= \text{Cov}[x_0^T L_1, x_0^T L_2] + \text{Cov}[x_0^T L_1, x_0^T N_2 x_0] + \text{Cov}[x_0^T N_1 x_0, x_0^T L_2] + \text{Cov}[x_0^T N_1 x_0, x_0^T N_2 x_0] \\
+  \end{aligned}
+\end{equation}
+
+Determining the covariance of each component in equation \ref{eq:covariance},
+
 \begin{equation}
   \begin{aligned}
-    \text{Cov}[J(U_1), J(U_2)] &= \text{Cov}[K_1 + x_0^T L_1 + x_0^T N x_0, K_2 + x_0^T L_2 + x_0^T N x_0] \\
-    &= \text{Cov}[x_0^T L_1 + x_0^T N x_0, x_0^T L_2 + x_0^T N x_0] \text{ (covariance is shift invariant)} \\
-    &= \text{Cov}[x_0^T L_1, x_0^T L_2] + \text{Cov}[x_0^T L_1, x_0^T N x_0] + \text{Cov}[x_0^T N x_0, x_0^T L_2] + \text{Cov}[x_0^T N x_0, x_0^T N x_0] \\
-    &= \text{Cov}[ L_1^T x_0, L_2^T x_0] + \text{Cov}[L_1^T x_0, x_0^T N x_0] + \text{Cov}[x_0^T N x_0, L_2^T x_0] + \text{Cov}[x_0^T N x_0, x_0^T N x_0] \\
-    &= L_1^T \text{Cov}[x_0] L_2 + \text{Cov}[x_0^T N x_0, L_1^T x_0] + \text{Cov}[x_0^T N x_0, x_0^T L_2] + \text{var}[x_0^T N x_0] \\
-    &= L_1^T \text{Cov}[x_0] L_2 + 2\mathbb{E}[x_0^T] N \text{Cov}[x_0] L_1 + 2\mathbb{E}[x_0^T] N \text{Cov}[x_0] L_2 \hdots \\
-    & \quad 4 \mathbb{E}[x_0^T]N\text{Cov}[x_0]N\mathbb{E}[x_0] + 2\text{tr}((N \text{Cov}[x_0])^2) \\
+    \text{Cov}[x_0^T L_1, x_0^T L_2] &= \text{Cov}[L_1^T x_0, L_2^T x_0] \text{ transpose of a scalar is itself} \\
+    &= L_1^T \text{Cov}[x_0] L_2 \\
+  \end{aligned}
+\end{equation}
+
+\begin{equation}
+  % - https://www.researchgate.net/publication/243770190_Quadratic_Forms_in_Random_Variables P74, 3.2d.9
+  \begin{aligned}
+    \text{Cov}[x_0^T L_1, x_0^T N_2 x_0] &= \text{Cov}[x_0^T N_2 x_0, L_1^T x_0] \text{ transpose of a scalar is itself} \\
+    &= 2 \mathbb{E}[x_0^T] N_2 \text{Cov}[x_0] L_1 \\
+  \end{aligned}
+\end{equation}
+
+\begin{equation}
+  % - https://www.researchgate.net/publication/243770190_Quadratic_Forms_in_Random_Variables P74, 3.2d.9
+  \begin{aligned}
+    \text{Cov}[x_0^T N_1 x_0, x_0^T L_2] &= \text{Cov}[x_0^T N_1 x_0, L_2^T x_0] \text{ transpose of a scalar is itself} \\
+    &= 2 \mathbb{E}[x_0^T] N_1 \text{Cov}[x_0] L_2 \\
+  \end{aligned}
+\end{equation}
+
+\begin{equation}
+  % - https://www.researchgate.net/publication/243770190_Quadratic_Forms_in_Random_Variables P75, 3.2d.12
+  \begin{aligned}
+    \text{Cov}[x_0^T N_1 x_0, x_0^T N_2 x_0] &= 2 \text{tr}(N_1 \text{Cov}[x_0] N_2 \text{Cov}[x_0]) + 4 \mathbb{E}[x_0^T]N_1\text{Cov}[x_0]N_2\mathbb{E}[x_0] \\
+  \end{aligned}
+\end{equation}
+
+Combining these, we get the covariance as
+
+\begin{equation}
+  \begin{aligned}
+    \text{Cov}[J_1(U_1), J_2(U_2)] &= L_1^T \text{Cov}[x_0] L_2 + 2 \mathbb{E}[x_0^T] N_2 \text{Cov}[x_0] L_1 + 2 \mathbb{E}[x_0^T] N_1 \text{Cov}[x_0] L_2 \hdots \\
+    & \quad + 2 \text{tr}(N_1 \text{Cov}[x_0] N_2 \text{Cov}[x_0]) + 4 \mathbb{E}[x_0^T]N_1\text{Cov}[x_0]N_2\mathbb{E}[x_0]
   \end{aligned}
 \end{equation}
 
@@ -385,11 +428,13 @@ Let
 
 \begin{itemize}
   \item $J_h$: high fidelity cost function
+  \item $J_l$: low fidelity cost function
   \item $U_1$: high fidelity control input
-  \item $U_2$: upsampled low fidelity control input $u_{lh} = T_{lh} u_l$
+  \item $U_2$: downsampled high fidelity control input $= T_{hlr} U_1$ or $T_{hla} U_1$
   \item $J_1 = J_h(U_1, x_0)$
-  \item $\sigma_1$: standard deviation of $J_1$, $\sqrt{\text{Var}[J_1]}$
-  \item $\sigma_2$: standard deviation of $J_2$, $\sqrt{\text{Var}[J_2]}$
+  \item $J_2 = J_l(U_2, x_0)$
+  \item $\sigma_1$: standard deviation of $J_1$, $=\sqrt{\text{Var}[J_1]}$
+  \item $\sigma_2$: standard deviation of $J_2$, $=\sqrt{\text{Var}[J_2]}$
 \end{itemize}
 
 Then correlation coefficient between $J_1$ and $J_2$ is
@@ -401,7 +446,7 @@ Then correlation coefficient between $J_1$ and $J_2$ is
   \end{aligned}
 \end{equation}
 
-Where $\text{Cov}(J_1, J_2)$, $\text{Var}[J_1]$ and $\text{Var}[J_2]$ can be calculated using the eqations in section \ref{lqr_ctrl}.
+Where $\text{Cov}(J_1, J_2)$, $\text{Var}[J_1]$ and $\text{Var}[J_2]$ can be calculated using the equations in section \ref{lqr_ctrl}.
 
 \subsection{Correlation Experiments}
 

@@ -92,3 +92,24 @@ term = x' * A + diag(x' * B * x);
 st_var = var(term);
 an_var = 2 * trace(B * x_cov * B * x_cov) + A' * x_cov * A + 4 * (x_mean' * B + A') * x_cov * B * x_mean;
 fprintf("Analytic: %f, Statistic: %f\n", an_var, st_var);
+
+% covariance
+disp(newline + "Covariance");
+K1 = randn;
+K2 = randn;
+L1 = randn(nx, 1);
+L2 = randn(nx, 1);
+N1 = randn(nx, nx);
+N1 = N1 * N1';
+N2 = randn(nx, nx);
+N2 = N2 * N2';
+term1 = zeros(1, samples);
+term2 = zeros(1, samples);
+for i = 1:samples
+	term1(i) = K1 + x(:, i)' * L1 + x(:, i)' * N1 * x(:, i);
+	term2(i) = K2 + x(:, i)' * L2 + x(:, i)' * N2 * x(:, i);
+end
+st_cov = cov(term1', term2'); % cov needs row vectors
+st_cov = st_cov(1, 2); % only need the off diagonal element
+an_cov = L1'*x_cov*L2 + 2*x_mean'*N2*x_cov*L1 + 2*x_mean'*N1*x_cov*L2 + 2*trace(N1*x_cov*N2*x_cov) + 4*x_mean'*N1*x_cov*N2*x_mean;
+fprintf("Analytic: %f, Statistic: %f\n", an_cov, st_cov);
