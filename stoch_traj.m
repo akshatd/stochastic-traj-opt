@@ -43,7 +43,7 @@ R = eye(nu) * 10; % input cost
 % we dont want to penalize the state being away from the origin
 P = eye(nx) * 0;
 
-rv_samples = 10000;
+rv_samples = 1000;
 perturb_dir_samples = 1000;
 perturb_dir_mag = 0.1;
 perturb_range = -1:0.25:6;
@@ -75,20 +75,17 @@ x0_rv_mean_ext = [x0_rv_mean; u0; ref];
 x0_rv_cov_ext = blkdiag(x0_rv_cov, zeros(3,3));
 
 %% C.1 open loop dynamics
-data.x_ol_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
-for i = 1:rv_samples
+x_ol_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
+parfor i = 1:rv_samples
   [~, x_ode] = ode45(@(t, x) msd(t, x, 0, A_msd, B_msd), 0:Tfid:Tsim, x0_rv(:, i));
-  data.x_ol_stoch(:, :, i) = x_ode';
+  x_ol_stoch(:, :, i) = x_ode';
 end
+data.x_ol_stoch = x_ol_stoch;
 
 %% C.2 plot open loop dynamics
 fig = figure;
 hold on;
-
-for i = 1:rv_samples
-  plot(data.t, data.x_ol_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.2]);
-end
-
+plot(data.t, squeeze(data.x_ol_stoch(1, :, :)), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.2]);
 plot(data.t, data.x_ol(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic', 'Color', [0 0 1, 0.5]);
 plot(data.t, mean(data.x_ol_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
 ylabel('Position [m]');
@@ -146,23 +143,19 @@ for idx = 1:length(TsList)
   % Uopt only depends on x0, so we can use the same Kopt
   Uopt = Kopt * x0_rv_mean_ext;
   data.lqrsol{idx} = struct('x0_ext', x0_rv_mean_ext, 'Uopt', Uopt, 'Q_ext', Q_ext, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar, 'times', times);
-  cost_lqr = zeros(rv_samples, 1);
   x_cl_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
+  x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
+  data.cost_lqr = LQRCost_vec(x0_rv_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
   parfor i = 1:rv_samples
-    cost_lqr(i) = LQRCost([x0_rv(:, i); u0; ref], Uopt, Q_ext, S, M, Qbar, Rbar);
     x_cl_stoch(:,:,i) = sim_closed_loop(Tsim, Tfid, Ts, x0_rv(:, i), u0, Uopt, A_msd, B_msd, @msd);
   end
-  data.cost_lqr = cost_lqr ;
   data.x_cl_stoch = x_cl_stoch;
   
   %% plot closed loop dynamics
   fig = figure;
   hold on;
   
-  for i = 1:rv_samples
-    plot(data.t, data.x_cl_stoch(1, :, i), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.2]);
-  end
-  
+  plot(data.t, squeeze(data.x_cl_stoch(1, :, :)), 'b', 'LineWidth', 1, 'HandleVisibility', 'off', 'Color', [0.5 0.5 0.5, 0.2]);
   plot(data.t, data.x_cl(1, :), 'b', 'LineWidth', 2, 'DisplayName', 'Position: Deterministic', 'Color', [0 0 1, 0.5]);
   plot(data.t, mean(data.x_cl_stoch(1, :, :), 3), '--k', 'LineWidth', 2, 'DisplayName', 'Position: Sample Average');
   ylabel('Position [m]');
@@ -215,7 +208,7 @@ Uopt_lf = Uopt_hf(1:10:end, :); % pick every 10th elem
 % calculate costs and correlation for HF/LF sols for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 [corr_st, corr_an] = calc_corr(cost_hf, cost_lf, x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
-%% plot costs
+% plot costs
 title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
 plot_multifid_costs(perturb_range, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Perturbation");
@@ -274,7 +267,7 @@ costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
 plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
 % Get correlation for all iterations
 corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
-%% plot correlation
+% plot correlation
 plot_corr_2d(corr, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hlr})$", costs_str, "num_iters_res");
 
 %% E.2.1.2 correlation with averaging
@@ -288,7 +281,7 @@ title_str = ["$J_h$ and $J_l$", "$J_h$ (averaging)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
 corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
-%% plot correlation
+% plot correlation
 plot_corr_2d(corr, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_avg");
 % save all data
 save("artefacts/data.mat");
@@ -366,6 +359,10 @@ end
 
 function cost = LQRCost(x0, u, Q, S, M, Qbar, Rbar)
 cost = u'*(S'*Qbar*S + Rbar)*u + 2*x0'*M'*Qbar*S*u + x0'*(M'*Qbar*M + Q)*x0;
+end
+
+function cost = LQRCost_vec(x0, u, Q, S, M, Qbar, Rbar) % expects x0 to be multiple samples
+cost = u'*(S'*Qbar*S + Rbar)*u + 2*x0'*M'*Qbar*S*u + diag(x0'*(M'*Qbar*M + Q)*x0);
 end
 
 function grad = LQRgrad(x0, u, S, M, Qbar, Rbar)
@@ -484,19 +481,18 @@ end
 function corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, Uopt_hf, Uopt_lf)
 iters = size(Uopt_hf, 2);
 rv_samples = size(x0_rv, 2);
-cost_hf_corr = zeros(rv_samples, iters);
-cost_lf_corr = zeros(rv_samples, iters);
+cost_hf_corr = zeros(iters, rv_samples);
+cost_lf_corr = zeros(iters, rv_samples);
+x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
 for i = 1:iters
-  for j = 1:rv_samples
-    cost_hf_corr(j, i) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
-    cost_lf_corr(j, i) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
-  end
+  cost_hf_corr(i, :) = LQRCost_vec(x0_rv_ext, Uopt_hf(:, i), lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
+  cost_lf_corr(i, :) = LQRCost_vec(x0_rv_ext, Uopt_lf(:, i), lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
 end
 
 corr = zeros(iters, iters);
 for i = 1:iters % HF iterations
   for j = 1:iters % LF iterations
-    corr_mat = corrcoef(cost_hf_corr(:, i), cost_lf_corr(:, j));
+    corr_mat = corrcoef(cost_hf_corr(i, :), cost_lf_corr(j, :));
     % we only need the cross correlation, diagnonal will be 1
     corr(i, j) = corr_mat(1,2); % rowas are HF, cols are LF
   end
@@ -508,12 +504,12 @@ perturbs = size(Uopt_hf, 2);
 rv_samples = size(x0_rv, 2);
 cost_hf = zeros(perturbs, rv_samples);
 cost_lf = zeros(perturbs, rv_samples);
+x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
 for i = 1:perturbs
-  for j = 1:rv_samples
-    cost_hf(i,j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_hf(:, i), lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
-    cost_lf(i,j) = LQRCost([x0_rv(:, j); u0; ref], Uopt_lf(:, i), lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
-  end
+  cost_hf(i,:) = LQRCost_vec(x0_rv_ext, Uopt_hf(:, i), lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
+  cost_lf(i,:) = LQRCost_vec(x0_rv_ext, Uopt_lf(:, i), lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
 end
+
 end
 
 function plot_multifid_costs(perturb_range, cost_hf, cost_lf, corr_st, corr_an, title_str, costs_str, xaxis_str)
