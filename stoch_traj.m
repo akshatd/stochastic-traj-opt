@@ -207,7 +207,8 @@ Uopt_lf = Uopt_hf(1:10:end, :); % pick every 10th elem
 
 % calculate costs and correlation for HF/LF sols for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
-[corr_st, corr_an] = calc_corr(cost_hf, cost_lf, x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
+corr_st = calc_corr_st(cost_hf, cost_lf);
+corr_an = calc_corr_an(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 % plot costs
 title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
@@ -219,7 +220,8 @@ Uopt_lf = downsample_avg(Uopt_hf, 10); % get HF in LF by avg every 10 values of 
 Uopt_lf = Uopt_lf(1:10:end, :); % pick every 10th elem
 % calculate costs and correlation for HF/LF sols for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
-[corr_st, corr_an] = calc_corr(cost_hf, cost_lf, x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
+corr_st = calc_corr_st(cost_hf, cost_lf);
+corr_an = calc_corr_an(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 % plot costs
 title_str = ["$J_h$ and $J_l$", "$J_h (averaging)$"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
@@ -233,7 +235,8 @@ Uopt_lf = data.lqrsol{2}.Uopt + perturbation;
 Uopt_hf = repelem(Uopt_lf, 10, 1); % repeat the LF sol to match HF sol
 % calculate costs and correlation for both high and low fidelity, for each perturbation
 [cost_hf, cost_lf] = calc_costs_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
-[corr_st, corr_an] = calc_corr(cost_hf, cost_lf, x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
+corr_st = calc_corr_st(cost_hf, cost_lf);
+corr_an = calc_corr_an(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 % plot costs
 title_str = ["$J_h$ and $J_l$", "$J_l$"];
 costs_str = ["$J_h(u_lh)$", "$J_l(u_l)$"];
@@ -260,7 +263,8 @@ U_lf = U_hf(1:10:end, :);
 % U_lf = repelem(U_lf, 10, 1); % uncomment to visualize
 % vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
 [cost_hf, cost_lf] = calc_costs_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
-[corr_st, corr_an] = calc_corr(cost_hf, cost_lf, x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+corr_st = calc_corr_st(cost_hf, cost_lf);
+corr_an = calc_corr_an(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 
 title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
@@ -275,7 +279,8 @@ U_lf = downsample_avg(U_hf, 10); % get LF by avg every 10 values of HF
 % vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
 U_lf = U_lf(1:10:end, :);
 [cost_hf, cost_lf] = calc_costs_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
-[corr_st, corr_an] = calc_corr(cost_hf, cost_lf, x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+corr_st = calc_corr_st(cost_hf, cost_lf);
+corr_an = calc_corr_an(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 
 title_str = ["$J_h$ and $J_l$", "$J_h$ (averaging)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
@@ -461,22 +466,29 @@ perturb_dir_max = perturb_dirs(:, max_grad_idx)./ perturb_dir_mag; % length 1 so
 perturbation = perturb_dir_max * perturb_range;
 end
 
-function [corr_st, corr_an] = calc_corr(cost_hf, cost_lf, x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, U_hf, U_lf)
+function corr_st = calc_corr_st(cost_hf, cost_lf)
 perturbs = size(cost_hf, 1);
 corr_st = zeros(perturbs, 1);
+for i = 1:perturbs
+  corr_mat = corrcoef(cost_hf(i, :), cost_lf(i, :));
+  corr_st(i) = corr_mat(1,2); % we only need the cross correlation, diagnonal will be 1
+end
+end
+
+function corr_an = calc_corr_an(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, U_hf, U_lf)
+perturbs = size(U_hf, 2);
 corr_an = zeros(perturbs, 1);
 x0_rv_ext = [x0_rv; repmat(u0, 1, size(x0_rv, 2)); repmat(ref, 1, size(x0_rv, 2))];
 x_mean = mean(x0_rv_ext, 2);
 x_cov = cov(x0_rv_ext');
 for i = 1:perturbs
-  corr_mat = corrcoef(cost_hf(i, :), cost_lf(i, :));
-  corr_st(i) = corr_mat(1,2); % we only need the cross correlation, diagnonal will be 1
   cov_an = LQRcost_cov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, U_hf(:, i), U_lf(:, i)); % TODO make indices consistent
   [~, var_J1] = LQRcost_stats(x_mean, x_cov, U_hf(:, i), lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
   [~, var_J2] = LQRcost_stats(x_mean, x_cov, U_lf(:, i), lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
   corr_an(i) = cov_an / sqrt(var_J1 * var_J2);
 end
 end
+
 
 function corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, Uopt_hf, Uopt_lf)
 iters = size(Uopt_hf, 2);
