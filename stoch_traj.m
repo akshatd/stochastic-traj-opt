@@ -288,21 +288,74 @@ plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, 
 corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 % plot correlation
 plot_corr_2d(corr, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_avg");
-% save all data
-save("artefacts/data.mat");
 
-%% num opt with MLMC estimator
-% safe case, alpha of 0 to eliminate LF evaluations
-alpha = 0.5;
+%% F num opt with MLMC estimator
+%% F.1 normal MLMC Estimator
+cv_samples = 500;
 num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
-fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, 100, 100, u0, ref, alpha, x0_rv);
-% fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, 100, 1, u0, ref, alpha, x0_mean, x0_cov);
-options = optimoptions('fminunc', 'Display', 'iter', 'OptimalityTolerance', 1e-3, 'OutputFcn', @outfun);
+global alpha_mc;
+alpha_mc = zeros(1, 100);
+fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, cv_samples, cv_samples, u0, ref, x0_rv);
+options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun);
 Uopt_num = fminunc(fun, u0_num, options);
 U_hf = num_opt_data(:, 1:num_opt_iters);
 U_lf = downsample_avg(U_hf, 10);
 vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
+
+U_lf = U_lf(1:10:end, :);
+[cost_hf, cost_lf] = calc_costs_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+corr_st = calc_corr_st(cost_hf, cost_lf);
+corr_an = calc_corr_an(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+
+title_str = ["$J_h$ and $J_l$", "$S_{" + cv_samples + "}^{CV}$"];
+costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
+plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
+corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+% plot correlation
+plot_corr_2d(corr, "$S_{" + cv_samples + "}^{CV}$ opt Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_mlmc");
+
+figure;
+plot(alpha_mc(1:num_opt_iters), 'LineWidth', 2);
+title("MLMC estimator alpha values");
+xlabel("Iteration");
+ylabel("Alpha");
+grid on;
+
+%% F.2 MLMC Estimator with fixed LF solution
+[~, it_max_cor] = max(sum(corr, 1));
+u_lf = U_lf(:, it_max_cor);
+num_opt_iters = 0;
+num_opt_data = zeros(size(Uopt_hf,1), 100);
+alpha_mc = zeros(1, 100);
+fun = @(u) calc_mlmc_est_max_corr(data.lqrsol{1}, data.lqrsol{2}, u, u_lf, cv_samples, cv_samples, u0, ref, x0_rv);
+options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun);
+Uopt_num = fminunc(fun, u0_num, options);
+U_hf = num_opt_data(:, 1:num_opt_iters);
+U_lf = repelem(u_lf, 10, num_opt_iters);
+vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
+
+U_lf = U_lf(1:10:end, :);
+[cost_hf, cost_lf] = calc_costs_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+corr_st = calc_corr_st(cost_hf, cost_lf);
+corr_an = calc_corr_an(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+
+title_str = ["$J_h$ and $J_l$ at max correlation", "$S_{" + cv_samples + "}^{CV}$"];
+costs_str = ["$J_h(u_h)$", "$J_l(u_{hla}^{max})$"];
+plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
+corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+% plot correlation
+plot_corr_2d(corr, "$S_{" + cv_samples + "}^{CV}$ opt Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla}^{max})$", costs_str, "num_iters_mlmc_max_corr");
+
+figure;
+plot(alpha_mc(1:num_opt_iters), 'LineWidth', 2);
+title("MLMC estimator at max corelation alpha values");
+xlabel("Iteration");
+ylabel("Alpha");
+grid on;
+
+%% save all data
+save("artefacts/data.mat");
 
 %% Monte carlo estimator with variance calculation
 mc_data.samples = [10, 100, 1000, 10000]; % number of samples for a single MC estimator
@@ -647,58 +700,56 @@ plot_lf_raw.YData = uopt_lf(:, idx);
 hold(plot_hf_raw.Parent, 'off');
 end
 
-function cost = calc_mlmc_est(lqrsol_hf, lqrsol_lf, u_hf, n_hf, n_lf, u0, ref, alpha, x0_rv)
-cost_hf = 0;
-for i=1:n_hf
-  cost_hf = cost_hf + LQRCost([x0_rv(:, i); u0; ref], u_hf, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
-end
-cost_hf = cost_hf / n_hf;
+function cost = calc_mlmc_est(lqrsol_hf, lqrsol_lf, u_hf, n_hf, n_lf, u0, ref, x0_rv)
+% MC estimator for hf
+x0_rv_ext = [x0_rv(:, 1:n_hf); repmat(u0, 1, n_hf); repmat(ref, 1, n_hf)];
+cost_hf = LQRCost_vec(x0_rv_ext, u_hf, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
+cost_hf = mean(cost_hf);
 
+% reuse same samples for LF
 u_lf = downsample_avg(u_hf, 10);
 u_lf = u_lf(1:10:end);
-cost_lf = 0;
-% reuse same samples for LF
-for i=1:n_hf
-  cost_lf = cost_lf + LQRCost([x0_rv(:, i); u0; ref], u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
-end
-cost_lf = cost_lf / n_hf;
+cost_lf = LQRCost_vec(x0_rv_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+cost_lf = mean(cost_lf);
 
-exp_lf = 0;
-for i=n_hf:n_hf+n_lf
-  exp_lf = exp_lf + LQRCost([x0_rv(:, i); u0; ref], u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
-end
-exp_lf = exp_lf/n_lf;
+% use all samples for expectation
+rv_samples = size(x0_rv, 2);
+x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
+[exp_lf, ~] = LQRcost_stats(mean(x0_rv_ext, 2), cov(x0_rv_ext'), u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
 
+% calculate optimal alpha
+cov_hl = LQRcost_cov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
+[~, var_l] = LQRcost_stats(mean(x0_rv_ext, 2), cov(x0_rv_ext'), u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+alpha = -cov_hl / var_l;
+global alpha_mc num_opt_iters;
+alpha_mc(num_opt_iters+1) = alpha;
 cost = cost_hf + alpha * (cost_lf - exp_lf);
 
 end
 
-% function cost = calc_mlmc_est(lqrsol_hf, lqrsol_lf, u_hf, n_hf, n_lf, u0, ref, alpha, x0_mean, x0_cov)
-% x0_rv_hf = mvnrnd(x0_mean, x0_cov, n_hf)';
-% cost_hf = 0;
-% for i=1:n_hf
-%   cost_hf = cost_hf + LQRCost([x0_rv_hf(:, i); u0; ref], u_hf, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
-% end
-% cost_hf = cost_hf / n_hf;
-%
+function cost = calc_mlmc_est_max_corr(lqrsol_hf, lqrsol_lf, u_hf, u_lf, n_hf, n_lf, u0, ref, x0_rv)
+% MC estimator for hf
+x0_rv_ext = [x0_rv(:, 1:n_hf); repmat(u0, 1, n_hf); repmat(ref, 1, n_hf)];
+cost_hf = LQRCost_vec(x0_rv_ext, u_hf, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
+cost_hf = mean(cost_hf);
+
+% reuse same samples for LF
 % u_lf = downsample_avg(u_hf, 10);
 % u_lf = u_lf(1:10:end);
-% cost_lf = 0;
-% % reuse same samples for LF
-% for i=1:n_hf
-%   cost_lf = cost_lf + LQRCost([x0_rv_hf(:, i); u0; ref], u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
-% end
-% cost_lf = cost_lf / n_hf;
-%
-% % Expectation of LF
-% x0_rv_lf_exp = mvnrnd(x0_mean, x0_cov, n_lf)';
-% exp_lf = 0;
-% for i=1:n_lf
-%   exp_lf = exp_lf + LQRCost([x0_rv_lf_exp(:, i); u0; ref], u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
-% end
-% exp_lf = exp_lf / n_lf;
-%
-% % cost = cost_hf + alpha * (cost_lf - exp_lf);
-% cost = cost_hf;
-%
-% end
+cost_lf = LQRCost_vec(x0_rv_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+cost_lf = mean(cost_lf);
+
+% use all samples for expectation
+rv_samples = size(x0_rv, 2);
+x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
+[exp_lf, ~] = LQRcost_stats(mean(x0_rv_ext, 2), cov(x0_rv_ext'), u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+
+% calculate optimal alpha
+cov_hl = LQRcost_cov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
+[~, var_l] = LQRcost_stats(mean(x0_rv_ext, 2), cov(x0_rv_ext'), u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+alpha = -cov_hl / var_l;
+global alpha_mc num_opt_iters;
+alpha_mc(num_opt_iters+1) = alpha;
+cost = cost_hf + alpha * (cost_lf - exp_lf);
+
+end
