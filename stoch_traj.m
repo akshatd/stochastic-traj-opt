@@ -361,95 +361,132 @@ grid on;
 plot_convergence_dist(data.lqrsol{1}.Uopt, U_num_hf, U_num_mlmc, U_num_mlmc_fix, ["HF", "CV", "CV with max corr"], "Convergence distance comparion");
 
 %% G Convergence and variance with various optimizers and sample sizes
-% num_rv_samples = [10, 100, 500, 1000];
-% num_estimator_samples = 100;
-% u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
-% max_iters = 20;
-% options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun, "MaxIterations", max_iters);
-% for num_samples=num_rv_samples
-%   fprintf("\n*** RV Samples: %d ***\n", num_samples);
-%   temp_cost.hf = zeros(num_estimator_samples, max_iters);
-%   temp_cost.mlmc = zeros(num_estimator_samples, max_iters);
-%   temp_cost.mlmc_fix = zeros(num_estimator_samples, max_iters);
-%   for i=1:num_estimator_samples
-%     % get the RV samples
-%     x0_rv = mvnrnd(x0_mean, x0_cov, num_samples)';
-%     x0_rv_ext = [x0_rv; repmat(u0, 1, num_samples); repmat(ref, 1, num_samples)];
+num_rv_samples = [10, 100, 500, 1000];
+num_estimator_samples = 10;
+u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
+max_iters = 30;
+options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun, "MaxIterations", max_iters);
+data.var_hf = zeros(length(num_rv_samples), max_iters);
+data.var_mlmc = zeros(length(num_rv_samples), max_iters);
+data.var_mlmc_fix = zeros(length(num_rv_samples), max_iters);
+for num_samples=num_rv_samples
+  fprintf("\n*** RV Samples: %d ***\n", num_samples);
+  wait_bar = waitbar(0, "Running estimators with " + num_samples + " samples");
+  temp_cost.hf = zeros(num_estimator_samples, max_iters);
+  temp_cost.mlmc = zeros(num_estimator_samples, max_iters);
+  temp_cost.mlmc_fix = zeros(num_estimator_samples, max_iters);
+  for i=1:num_estimator_samples
+    waitbar(i/num_estimator_samples, wait_bar);
+    % get the RV samples
+    x0_rv = mvnrnd(x0_mean, x0_cov, num_samples)';
+    x0_rv_ext = [x0_rv; repmat(u0, 1, num_samples); repmat(ref, 1, num_samples)];
+    
+    % for just the HF cost fn
+    num_opt_iters = 0;
+    num_opt_data = zeros(size(Uopt_hf,1), max_iters);
+    num_opt_fvals = zeros(1, max_iters);
+    x0_rv_ext_mean = mean(x0_rv_ext, 2);
+    fun = @(u) mean(LQRCost_vec(x0_rv_ext, u, data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar));
+    Uopt_num = fminunc(fun, u0_num, options);
+    temp_cost.hf(i, :) = num_opt_fvals(end-max_iters+1:end);
+    
+    % for MLMC estimator
+    num_opt_iters = 0;
+    num_opt_data = zeros(size(Uopt_hf,1), max_iters);
+    num_opt_fvals = zeros(1, max_iters);
+    fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, num_samples, num_samples, u0, ref, x0_rv, x0_mean, x0_cov);
+    Uopt_num = fminunc(fun, u0_num, options);
+    temp_cost.mlmc(i, :) = num_opt_fvals(end-max_iters+1:end);
+    
+    % for MLMC estimator with fixed LF solution
+    num_opt_iters = 0;
+    num_opt_data = zeros(size(Uopt_hf,1), max_iters);
+    num_opt_fvals = zeros(1, max_iters);
+    [~, it_max_cor] = max(sum(corr, 1));
+    u_lf = U_lf(:, it_max_cor);
+    fun = @(u) calc_mlmc_est_max_corr(data.lqrsol{1}, data.lqrsol{2}, u, u_lf, num_samples, num_samples, u0, ref, x0_rv, x0_mean, x0_cov);
+    Uopt_num = fminunc(fun, u0_num, options);
+    temp_cost.mlmc_fix(i, :) = num_opt_fvals(end-max_iters+1:end);
+  end
+  data.var_hf(num_rv_samples == num_samples, :) = var(temp_cost.hf, 0, 1);
+  data.var_mlmc(num_rv_samples == num_samples, :) = var(temp_cost.mlmc, 0, 1);
+  data.var_mlmc_fix(num_rv_samples == num_samples, :) = var(temp_cost.mlmc_fix, 0, 1);
+  close(wait_bar);
+end
 
-%     % for just the HF cost fn
-%     num_opt_iters = 0;
-%     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
-%     num_opt_fvals = zeros(1, max_iters);
-%     x0_rv_ext_mean = mean(x0_rv_ext, 2);
-%     fun = @(u) LQRCost(x0_rv_ext_mean, u, data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
-%     Uopt_num = fminunc(fun, u0_num, options);
-%     temp_cost.hf(i, :) = num_opt_fvals;
+%% plot variance
+for i=1:length(num_rv_samples)
+  fig = figure;
+  semilogy(1:max_iters, data.var_hf(i, :), 'b', 'LineWidth', 2, 'DisplayName', 'HF');
+  hold on;
+  semilogy(1:max_iters, data.var_mlmc(i, :), 'r', 'LineWidth', 2, 'DisplayName', 'CV');
+  semilogy(1:max_iters, data.var_mlmc_fix(i, :), 'g', 'LineWidth', 2, 'DisplayName', 'CV with max corr');
+  title("Convergence variance comparison with "+num_rv_samples(i)+" samples");
+  xlabel("Iteration");
+  ylabel("Variance");
+  legend show;
+  grid on;
+end
 
-%     % for MLMC estimator
-%     num_opt_iters = 0;
-%     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
-%     num_opt_fvals = zeros(1, max_iters);
-%     fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, num_samples/2, num_samples/2, u0, ref, x0_rv);
-%     Uopt_num = fminunc(fun, u0_num, options);
-%     temp_cost.mlmc(i, :) = num_opt_fvals;
-%   end
-% end
+%% plot convergence
+% plot_convergence_dist(data.lqrsol{1}.Uopt, U_num_hf, U_num_mlmc, U_num_mlmc_fix, ["HF", "CV", "CV with max corr"], "Convergence distance comparion");
+
 %% save all data
 save("artefacts/data.mat");
 
-%% Monte carlo estimator with variance calculation
-mc_data.samples = [10, 100, 1000, 10000]; % number of samples for a single MC estimator
-mc_data.var = zeros(1, length(mc_data.samples));
+% %% Monte carlo estimator with variance calculation
+% mc_data.samples = [10, 100, 1000, 10000]; % number of samples for a single MC estimator
+% mc_data.var = zeros(1, length(mc_data.samples));
 
-% go through MC estimators with different sample sizes
-for samples = mc_data.samples
-  mc_est = zeros(rv_samples, 1);
-  wait_bar = waitbar(0, "Running MC estimator with " + samples + " samples");
-  % run each MC estimator multiple times to get a vaiance estimate
-  for i = 1:rv_samples
-    x0_mc = mvnrnd(x0_mean, x0_cov, samples)'; % take samples for a single estimator
-    x0_mc_mean = mean(x0_mc, 2);
-    x0_mc_mean_ext = [x0_mc_mean; u0; ref];
-    Uopt = Kopt * x0_mc_mean_ext; % control effort for the mean initial state
-    mc_x = zeros(nx, Tsim/Tfid + 1, samples);
-    % simulate trajectories for each sample
-    for j = 1:samples
-      k = 0;
-      xk = x0_mc(:, j);
-      ukm1 = u0;
-      for t = times(1:end - 1)
-        uk = ukm1 + Uopt(k+1);
-        [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t:Tfid:t + Ts, xk);
-        % skip the last x since it will be repeated in the next sim
-        mc_x(:, k*Tmult + 1:(k + 1)*Tmult, j) = x_ode(1:end-1, :)';
-        xk = x_ode(end, :)';
-        ukm1 = uk;
-        k = k + 1;
-      end
-      % add back the last xk
-      mc_x(:, end, j) = xk;
-    end
-    % calculate the MSE of the trajectory
-    mc_cost = squeeze(sum((mc_x - ref).^2, [1,2]));
-    
-    waitbar(i / rv_samples, wait_bar);
-    mc_est(i) = mean(mc_cost);
-  end
-  close(wait_bar);
-  mc_data.var(mc_data.samples == samples) = var(mc_est);
-end
+% % go through MC estimators with different sample sizes
+% for samples = mc_data.samples
+%   mc_est = zeros(rv_samples, 1);
+%   wait_bar = waitbar(0, "Running MC estimator with " + samples + " samples");
+%   % run each MC estimator multiple times to get a vaiance estimate
+%   for i = 1:rv_samples
+%     x0_mc = mvnrnd(x0_mean, x0_cov, samples)'; % take samples for a single estimator
+%     x0_mc_mean = mean(x0_mc, 2);
+%     x0_mc_mean_ext = [x0_mc_mean; u0; ref];
+%     Uopt = Kopt * x0_mc_mean_ext; % control effort for the mean initial state
+%     mc_x = zeros(nx, Tsim/Tfid + 1, samples);
+%     % simulate trajectories for each sample
+%     for j = 1:samples
+%       k = 0;
+%       xk = x0_mc(:, j);
+%       ukm1 = u0;
+%       for t = times(1:end - 1)
+%         uk = ukm1 + Uopt(k+1);
+%         [~, x_ode] = ode45(@(t, x) msd(t, x, uk, A_msd, B_msd), t:Tfid:t + Ts, xk);
+%         % skip the last x since it will be repeated in the next sim
+%         mc_x(:, k*Tmult + 1:(k + 1)*Tmult, j) = x_ode(1:end-1, :)';
+%         xk = x_ode(end, :)';
+%         ukm1 = uk;
+%         k = k + 1;
+%       end
+%       % add back the last xk
+%       mc_x(:, end, j) = xk;
+%     end
+%     % calculate the MSE of the trajectory
+%     mc_cost = squeeze(sum((mc_x - ref).^2, [1,2]));
 
-%% plot MC variance
-fig = figure();
-loglog(mc_data.samples, mc_data.var, 'b', 'LineWidth', 2, 'DisplayName', 'MC Variance');
-hold on;
-title("(Ts:"+Ts+") MC estimator variance of mean sq error");
-xlabel('Number of samples');
-ylabel('Variance');
-legend show;
-grid on;
-saveas(fig, "figs/"+Ts+"_mc_variance.svg");
-hold off;
+%     waitbar(i / rv_samples, wait_bar);
+%     mc_est(i) = mean(mc_cost);
+%   end
+%   close(wait_bar);
+%   mc_data.var(mc_data.samples == samples) = var(mc_est);
+% end
+
+% %% plot MC variance
+% fig = figure();
+% loglog(mc_data.samples, mc_data.var, 'b', 'LineWidth', 2, 'DisplayName', 'MC Variance');
+% hold on;
+% title("(Ts:"+Ts+") MC estimator variance of mean sq error");
+% xlabel('Number of samples');
+% ylabel('Variance');
+% legend show;
+% grid on;
+% saveas(fig, "figs/"+Ts+"_mc_variance.svg");
+% hold off;
 
 function xdot = msd(~, x, u, A, B)
 xdot = A * x + B * u;
@@ -478,7 +515,7 @@ end
 function stop = outfun(x, optimValues, state)
 % this is for capturing intermediate values of the optimization
 stop = false;
-global num_opt_iters num_opt_data;
+global num_opt_iters num_opt_data num_opt_fvals;
 if isequal(state, 'iter')
   num_opt_iters = num_opt_iters + 1;
   num_opt_data(:, num_opt_iters) = x;
@@ -744,14 +781,12 @@ end
 function cost = calc_mlmc_est(lqrsol_hf, lqrsol_lf, u_hf, n_hf, n_lf, u0, ref, x0_rv, x0_rv_mean, x0_rv_cov)
 % MC estimator for hf
 x0_rv_ext = [x0_rv(:, 1:n_hf); repmat(u0, 1, n_hf); repmat(ref, 1, n_hf)];
-cost_hf = LQRCost_vec(x0_rv_ext, u_hf, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
-cost_hf = mean(cost_hf);
+cost_hf = mean(LQRCost_vec(x0_rv_ext, u_hf, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar));
 
 % reuse same samples for LF
 u_lf = downsample_avg(u_hf, 10);
 u_lf = u_lf(1:10:end);
-cost_lf = LQRCost_vec(x0_rv_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
-cost_lf = mean(cost_lf);
+cost_lf = mean(LQRCost_vec(x0_rv_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar));
 
 % use all samples for expectation
 x0_rv_mean_ext = [x0_rv_mean; u0; ref];
