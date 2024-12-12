@@ -297,8 +297,8 @@ num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
 global alpha_mc;
 alpha_mc = zeros(1, 100);
-fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, cv_samples, cv_samples, u0, ref, x0_rv);
-options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun);
+fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, cv_samples, cv_samples, u0, ref, x0_rv, x0_mean, x0_cov);
+options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun); % finite diff
 Uopt_num = fminunc(fun, u0_num, options);
 U_hf = num_opt_data(:, 1:num_opt_iters);
 U_num_mlmc = U_hf; % save for plotting later
@@ -330,8 +330,8 @@ u_lf = U_lf(:, it_max_cor);
 num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
 alpha_mc = zeros(1, 100);
-fun = @(u) calc_mlmc_est_max_corr(data.lqrsol{1}, data.lqrsol{2}, u, u_lf, cv_samples, cv_samples, u0, ref, x0_rv);
-options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun);
+fun = @(u) calc_mlmc_est_max_corr(data.lqrsol{1}, data.lqrsol{2}, u, u_lf, cv_samples, cv_samples, u0, ref, x0_rv, x0_mean, x0_cov);
+options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun); % finite dif
 Uopt_num = fminunc(fun, u0_num, options);
 U_hf = num_opt_data(:, 1:num_opt_iters);
 U_num_mlmc_fix = U_hf; % save for plotting later
@@ -358,7 +358,7 @@ ylabel("Alpha");
 grid on;
 
 %% plot convergence distance comparison
-plot_convergence_dist(data.lqrsol{1}.Uopt, U_num_hf, U_num_mlmc, U_num_mlmc_fix, ["HF", "MLMC", "MLMC with max corr"], "Convergence distance comparion");
+plot_convergence_dist(data.lqrsol{1}.Uopt, U_num_hf, U_num_mlmc, U_num_mlmc_fix, ["HF", "CV", "CV with max corr"], "Convergence distance comparion");
 
 %% G Convergence and variance with various optimizers and sample sizes
 % num_rv_samples = [10, 100, 500, 1000];
@@ -754,17 +754,17 @@ cost_lf = LQRCost_vec(x0_rv_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M
 cost_lf = mean(cost_lf);
 
 % use all samples for expectation
-rv_samples = size(x0_rv, 2);
-x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
-[exp_lf, ~] = LQRcost_stats(mean(x0_rv_ext, 2), cov(x0_rv_ext'), u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+x0_rv_mean_ext = [x0_rv_mean; u0; ref];
+x0_rv_cov_ext = [x0_rv_cov, zeros(size(x0_rv_cov, 1), size(u0, 1) + size(ref, 1));
+  zeros(size(u0, 1) + size(ref, 1), size(x0_rv_cov, 1) + size(u0, 1) + size(ref, 1))];
+[exp_l, var_l] = LQRcost_stats(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
 
 % calculate optimal alpha
 cov_hl = LQRcost_cov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
-[~, var_l] = LQRcost_stats(mean(x0_rv_ext, 2), cov(x0_rv_ext'), u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
 alpha = -cov_hl / var_l;
 global alpha_mc num_opt_iters;
 alpha_mc(num_opt_iters+1) = alpha;
-cost = cost_hf + alpha * (cost_lf - exp_lf);
+cost = cost_hf + alpha * (cost_lf - exp_l);
 
 end
 
@@ -781,17 +781,18 @@ cost_lf = LQRCost_vec(x0_rv_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M
 cost_lf = mean(cost_lf);
 
 % use all samples for expectation
-rv_samples = size(x0_rv, 2);
-x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
-[exp_lf, ~] = LQRcost_stats(mean(x0_rv_ext, 2), cov(x0_rv_ext'), u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+x0_rv_mean_ext = [x0_rv_mean; u0; ref];
+x0_rv_cov_ext = [x0_rv_cov, zeros(size(x0_rv_cov, 1), size(u0, 1) + size(ref, 1));
+  zeros(size(u0, 1) + size(ref, 1), size(x0_rv_cov, 1) + size(u0, 1) + size(ref, 1))];
+[exp_l, var_l] = LQRcost_stats(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+
 
 % calculate optimal alpha
 cov_hl = LQRcost_cov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
-[~, var_l] = LQRcost_stats(mean(x0_rv_ext, 2), cov(x0_rv_ext'), u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
 alpha = -cov_hl / var_l;
 global alpha_mc num_opt_iters;
 alpha_mc(num_opt_iters+1) = alpha;
-cost = cost_hf + alpha * (cost_lf - exp_lf);
+cost = cost_hf + alpha * (cost_lf - exp_l);
 
 end
 
