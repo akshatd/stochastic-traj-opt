@@ -379,10 +379,10 @@ In case of restriction, we can multiply $u_h$ with a matrix $T_{hlr}$ of size $n
   \end{bmatrix}
 \end{equation}
 
-Where the number of columns after which the next one is selected is determined by the ratio $r_{hl} = n_{u_l} / n_{u_h}$.
+Where the number of columns after which the next one is selected is determined by the ratio $r_{hl} = n_{u_h} / n_{u_l}$.
 This gives us $u_{hlr} = T_{hlr} u_h$, which can be compared with $u_l$.
 
-To downsample $u_h$ to $u_l$ by averaging, we need the ratio $r_{lh} = n_{u_h} \ n_{u_l}$.
+To downsample $u_h$ to $u_l$ by averaging, we need the ratio $r_{lh} = n_{u_h} / n_{u_l}$.
 We can then multiply $u_h$ with a matrix $T_{hla}$ of size $n_{u_l} \times n_{u_h}$:
 
 \begin{equation}

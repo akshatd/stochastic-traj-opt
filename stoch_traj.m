@@ -245,9 +245,10 @@ plot_multifid_costs(perturb_range, mean(cost_hf,2), mean(cost_lf,2), corr_st, co
 %% *** E.2 correlation at different points in a numerical optimizer
 %% E.2.1 num opt with HF objective fn
 Uopt_hf = data.lqrsol{1}.Uopt;
-% u0_num = zeros(size(Uopt_hf));
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
-global num_opt_iters num_opt_data;
+% u0_num = zeros(size(Uopt_hf)); % zero start
+% u0_num = randn(size(Uopt_hf)); % random start
+global num_opt_iters num_opt_data num_opt_fvals;
 num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
 fun = @(u) LQRCostwithGrad(data.lqrsol{1}.x0_ext, u, data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
@@ -256,7 +257,7 @@ Uopt_num = fminunc(fun, u0_num, options);
 uopt_diff = sqrt(sum((Uopt_hf - Uopt_num).^2));
 
 U_hf = num_opt_data(:, 1:num_opt_iters);
-
+U_num_hf = U_hf; % save for plotting later
 % this is just to get the costs for the averaged HF solution in LF sim as the MLMC estimator would
 %% E.2.1.1 correlation with restriction
 U_lf = U_hf(1:10:end, :);
@@ -300,8 +301,9 @@ fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, cv_samples, cv_sampl
 options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun);
 Uopt_num = fminunc(fun, u0_num, options);
 U_hf = num_opt_data(:, 1:num_opt_iters);
+U_num_mlmc = U_hf; % save for plotting later
 U_lf = downsample_avg(U_hf, 10);
-vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
+% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
 
 U_lf = U_lf(1:10:end, :);
 [cost_hf, cost_lf] = calc_costs_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
@@ -332,8 +334,9 @@ fun = @(u) calc_mlmc_est_max_corr(data.lqrsol{1}, data.lqrsol{2}, u, u_lf, cv_sa
 options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun);
 Uopt_num = fminunc(fun, u0_num, options);
 U_hf = num_opt_data(:, 1:num_opt_iters);
+U_num_mlmc_fix = U_hf; % save for plotting later
 U_lf = repelem(u_lf, 10, num_opt_iters);
-vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
+% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
 
 U_lf = U_lf(1:10:end, :);
 [cost_hf, cost_lf] = calc_costs_multifid(x0_rv, u0, ref, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
@@ -354,6 +357,43 @@ xlabel("Iteration");
 ylabel("Alpha");
 grid on;
 
+%% plot convergence distance comparison
+plot_convergence_dist(data.lqrsol{1}.Uopt, U_num_hf, U_num_mlmc, U_num_mlmc_fix, ["HF", "MLMC", "MLMC with max corr"], "Convergence distance comparion");
+
+%% G Convergence and variance with various optimizers and sample sizes
+% num_rv_samples = [10, 100, 500, 1000];
+% num_estimator_samples = 100;
+% u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
+% max_iters = 20;
+% options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun, "MaxIterations", max_iters);
+% for num_samples=num_rv_samples
+%   fprintf("\n*** RV Samples: %d ***\n", num_samples);
+%   temp_cost.hf = zeros(num_estimator_samples, max_iters);
+%   temp_cost.mlmc = zeros(num_estimator_samples, max_iters);
+%   temp_cost.mlmc_fix = zeros(num_estimator_samples, max_iters);
+%   for i=1:num_estimator_samples
+%     % get the RV samples
+%     x0_rv = mvnrnd(x0_mean, x0_cov, num_samples)';
+%     x0_rv_ext = [x0_rv; repmat(u0, 1, num_samples); repmat(ref, 1, num_samples)];
+
+%     % for just the HF cost fn
+%     num_opt_iters = 0;
+%     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
+%     num_opt_fvals = zeros(1, max_iters);
+%     x0_rv_ext_mean = mean(x0_rv_ext, 2);
+%     fun = @(u) LQRCost(x0_rv_ext_mean, u, data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
+%     Uopt_num = fminunc(fun, u0_num, options);
+%     temp_cost.hf(i, :) = num_opt_fvals;
+
+%     % for MLMC estimator
+%     num_opt_iters = 0;
+%     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
+%     num_opt_fvals = zeros(1, max_iters);
+%     fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, num_samples/2, num_samples/2, u0, ref, x0_rv);
+%     Uopt_num = fminunc(fun, u0_num, options);
+%     temp_cost.mlmc(i, :) = num_opt_fvals;
+%   end
+% end
 %% save all data
 save("artefacts/data.mat");
 
@@ -435,13 +475,14 @@ f = LQRCost(x0, u, Q, S, M, Qbar, Rbar);
 g = LQRgrad(x0, u, S, M, Qbar, Rbar);
 end
 
-function stop = outfun(x, ~, state)
+function stop = outfun(x, optimValues, state)
 % this is for capturing intermediate values of the optimization
 stop = false;
 global num_opt_iters num_opt_data;
 if isequal(state, 'iter')
   num_opt_iters = num_opt_iters + 1;
   num_opt_data(:, num_opt_iters) = x;
+  num_opt_fvals(num_opt_iters) = optimValues.fval;
 end
 end
 
@@ -700,7 +741,7 @@ plot_lf_raw.YData = uopt_lf(:, idx);
 hold(plot_hf_raw.Parent, 'off');
 end
 
-function cost = calc_mlmc_est(lqrsol_hf, lqrsol_lf, u_hf, n_hf, n_lf, u0, ref, x0_rv)
+function cost = calc_mlmc_est(lqrsol_hf, lqrsol_lf, u_hf, n_hf, n_lf, u0, ref, x0_rv, x0_rv_mean, x0_rv_cov)
 % MC estimator for hf
 x0_rv_ext = [x0_rv(:, 1:n_hf); repmat(u0, 1, n_hf); repmat(ref, 1, n_hf)];
 cost_hf = LQRCost_vec(x0_rv_ext, u_hf, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
@@ -727,7 +768,7 @@ cost = cost_hf + alpha * (cost_lf - exp_lf);
 
 end
 
-function cost = calc_mlmc_est_max_corr(lqrsol_hf, lqrsol_lf, u_hf, u_lf, n_hf, n_lf, u0, ref, x0_rv)
+function cost = calc_mlmc_est_max_corr(lqrsol_hf, lqrsol_lf, u_hf, u_lf, n_hf, n_lf, u0, ref, x0_rv, x0_rv_mean, x0_rv_cov)
 % MC estimator for hf
 x0_rv_ext = [x0_rv(:, 1:n_hf); repmat(u0, 1, n_hf); repmat(ref, 1, n_hf)];
 cost_hf = LQRCost_vec(x0_rv_ext, u_hf, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
@@ -752,4 +793,20 @@ global alpha_mc num_opt_iters;
 alpha_mc(num_opt_iters+1) = alpha;
 cost = cost_hf + alpha * (cost_lf - exp_lf);
 
+end
+
+function plot_convergence_dist(an_sol, U_num_hf, U_num_mlmc, U_num_mlmc_fix, labels, title_str)
+dist_hf = vecnorm(an_sol - U_num_hf, 2, 1);
+dist_mlmc = vecnorm(an_sol - U_num_mlmc, 2, 1);
+dist_mlmc_fix = vecnorm(an_sol - U_num_mlmc_fix, 2, 1);
+figure;
+title(title_str);
+semilogy(dist_hf, 'b', 'LineWidth', 2, 'DisplayName', labels(1));
+hold on;
+semilogy(dist_mlmc, 'r', 'LineWidth', 2, 'DisplayName', labels(2));
+semilogy(dist_mlmc_fix, 'g', 'LineWidth', 2, 'DisplayName', labels(3));
+xlabel("Iteration");
+ylabel("Distance to analytical solution");
+legend show;
+grid on;
 end
