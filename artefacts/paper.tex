@@ -29,9 +29,9 @@ For this paper, a simplified trajectory optimization problem is considered that 
 The objective is to solve a reference tracking problem for the position and velocity of a simple mass-spring-damper system.
 The mass-spring-damper system has the following parameters:
 \begin{itemize}
-  \item Mass: $m = 5$ g
-  \item Spring constant: $k = 2$ N/m
-  \item Damping coefficient: $c = 0.5$ Ns/m
+  \item $m = 5$ g : Mass
+  \item $k = 2$ N/m : Spring constant
+  \item $c = 0.5$ Ns/m : Damping coefficient
     % \item Initial position: $x_0 = 0$ m
     % \item Initial velocity: $\dot{x}_0 = 0$ m/s
 \end{itemize}
@@ -127,7 +127,7 @@ The LQR controller minimizes the cost function
   \min_{u_0, u_1 ... u_{N-1}}J = \sum_{k=0}^{N-1} (e_k^T Q_e e_k + \Delta u_k^T R \Delta u_k)
 \end{equation}
 
-\subsection{Stochastic LQR Controller}
+\subsection{Stochastic LQR Controller} \label{stochastic_lqr}
 We will consider the case where the initial state $x_0$ is stochastic, with mean $\mu$ and covariance $\Sigma$.
 The control input vector $U$ is still deterministic.
 
@@ -321,25 +321,23 @@ Combining these, we get the covariance as
   \end{aligned}
 \end{equation}
 
-\section{Multi Level Monte Carlo}
+\section{Monte Carlo with Control Variates}
 
-This section formulates the stochastic trajectory optimization problem as a multi-level Monte Carlo problem.
+This section formulates the stochastic trajectory optimization problem as a Monte Carlo problem with a low fidelity control variate.
 
 \subsection{Comparing optimums of high and low fidelity models} \label{comp_opt}
 
-To determine if the low fidelity model can be used as a control variate, we need to determine if it coreelates with the high fidelity model.
+To determine if the low fidelity model can be used as a control variate, we need to determine if it correlates with the high fidelity model.
 
 System Setup:
 \begin{itemize}
-  \item High fidelity model/cost function: $J_h(u, x_0)$
-  \item Low fidelity model/cost function: $J_l(u, x_0)$
-  \item Control input in high fidelity model: $u_h$
-  \item Size of $u_h$: $n_{u_h} \times 1$
-  \item Control input in low fidelity model: $u_l$
-  \item Size of $u_l$: $n_{u_l} \times 1$
-  \item Random initial state: $x_0$
-  \item High fidelity optimum: $u_h^*$
-  \item Low fidelity optimum: $u_l^*$
+  \item $J_h(u, x_0)$: High fidelity model/cost function
+  \item $J_l(u, x_0)$: Low fidelity model/cost function
+  \item $u_h$: Control input in high fidelity model, $n_{u_h} \times 1$
+  \item $u_l$: Control input in low fidelity model, $n_{u_l} \times 1$
+  \item $x_0$: Random initial state
+  \item $u_h^*$: High fidelity optimum
+  \item $u_l^*$: Low fidelity optimum
 \end{itemize}
 
 $u_h$ and $u_l$ do not have the same dimensions, so to compare them we need to scale them to the same dimensions.
@@ -470,13 +468,13 @@ dimensions by either restricting or averaging as described in section \ref{comp_
 Hence, we have the following important variables:
 
 \begin{itemize}
-  \item High fidelity model/cost function: $J_h$
-  \item Low fidelity model/cost function: $J_l$
-  \item High fidelity optimum: $u_h^*$
-  \item High fidelity perturbation: $p_h$
-  \item Perturbed high fidelity solution: $u_h = u_h^* + p_h$
-  \item Perturbed high fidelity solution downsampled using restriction: $u_{hlr} = T_{hlr} u_h$
-  \item Perturbed high fidelity solution downsampled using averaging: $u_{hla} = T_{hla} u_h$
+  \item $J_h$: High fidelity model/cost function
+  \item $J_l$: Low fidelity model/cost function
+  \item $u_h^*$: High fidelity optimum
+  \item $p_h$: High fidelity perturbation
+  \item $u_h = u_h^* + p_h$: Perturbed high fidelity solution
+  \item $u_{hlr} = T_{hlr} u_h$: Perturbed high fidelity solution downsampled using restriction:
+  \item $u_{hla} = T_{hla} u_h$: Perturbed high fidelity solution downsampled using averaging
 \end{itemize}
 
 Comparing $J_h(u_h, x_0)$ and $J_l(u_{hlr}, x_0)$
@@ -491,12 +489,12 @@ by converting the low fidelity perturbation to high fidelity dimensions as descr
 Hence, we have the following important variables:
 
 \begin{itemize}
-  \item High fidelity model/cost function: $J_h$
-  \item Low fidelity model/cost function: $J_l$
-  \item Low fidelity optimum: $u_l^*$
-  \item Low fidelity perturbation: $p_l$
-  \item Perturbed low fidelity solution: $u_l = u_l^* + p_l$
-  \item Perturbed high fidelity solution upsampled: $u_{lh} = T_{lh} u_l$
+  \item $J_h$: High fidelity model/cost function
+  \item $J_l$: Low fidelity model/cost function
+  \item $u_l^*$: Low fidelity optimum
+  \item $p_l$: Low fidelity perturbation
+  \item $u_l = u_l^* + p_l$: Perturbed low fidelity solution
+  \item $u_{lh} = T_{lh} u_l$: Perturbed high fidelity solution upsampled
 \end{itemize}
 
 Comparing $J_h(u_{lh}, x_0)$ and $J_l(u_l, x_0)$
@@ -511,15 +509,72 @@ Here, we warm start with the low fidelity optimum, and check the correlation by 
 Hence, we have the following important variables:
 
 \begin{itemize}
-  \item High fidelity model/cost function: $J_h$
-  \item Low fidelity model/cost function: $J_l$
-  \item High fidelity solution: $u_h$
-  \item High fidelity solution downsampled using restriction: $u_{hlr} = T_{hlr} u_h$
-  \item High fidelity solution downsampled using averaging: $u_{hla} = T_{hla} u_h$
+  \item $J_h$: High fidelity model/cost function
+  \item $J_l$: Low fidelity model/cost function
+  \item $u_h$: High fidelity solution
+  \item $u_{hlr} = T_{hlr} u_h$: High fidelity solution downsampled using restriction
+  \item $u_{hla} = T_{hla} u_h$: High fidelity solution downsampled using averaging
 \end{itemize}
 
 Comparing $J_h(u_h, x_0)$ and $J_h(u_{hlr}, x_0)$
 
 Comparing $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$
 
+It is also possible to compute the correlation between $J_h(u_h, x_0)$ and $J_l(u_{hlr}, x_0)$ for every iteration of the numerical optimizer.
+This helps us determine if there is a certain iteration of $J_l(u_{hlr}, x_0)$ that correlates well with all iterations of $J_h(u_h, x_0)$.
+The same comparison can be made with $J_l(u_{hla}, x_0)$.
+
+Comparing correlation between $J_h(u_h, x_0)$ and $J_h(u_{hlr}, x_0)$ across all iterations
+
+Comparing correlation between $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$ across all iterations
+
+\subsection{Control Variate Construction}
+
+The control variate is constructed using the low fidelity model/cost function, since we have found that there is some correlation between $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$.
+Here we are only using the averaged downsampled high fidelity solution $u_{hla}$ as the control variate.
+The important variables for constructing the control variate are:
+
+\begin{itemize}
+  \item $x_0$: Random initial state
+  \item $J_h$: High fidelity model/cost function
+  \item $J_l$: Low fidelity model/cost function
+  \item $u_h$: High fidelity solution
+  \item $u_{hla} = T_{hla} u_h$: High fidelity solution downsampled using averaging
+  \item $S_n^{MC}(J_h(u_h, x_0))$: Monte Carlo estimate of the high fidelity cost function
+  \item $S_n^{MC}(J_l(u_{hla}, x_0))$: Monte Carlo estimate of the low fidelity cost function
+  \item $\alpha$: Control variate coefficient
+\end{itemize}
+
+The control variate coefficient $\alpha$ can be calculated as
+
+\begin{equation}
+  \alpha = -\frac{\text{Cov}(J_h(u_h, x_0), J_l(u_{hla}, x_0))}{\text{Var}[J_l(u_{hla}, x_0)]}
+\end{equation}
+
+Hence, the control variate is
+
+\begin{equation}
+  S_n^{CV}(J_h, J_l) = S_n^{MC}(J_h(u_h, x_0)) + \alpha (S_n^{MC}(J_l(u_{hla}, x_0)) - \mathbb{E}[J_l(u_{hla}, x_0)])
+\end{equation}
+
+Where the samples of $x_0$ used in $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$ are the same.
+
+Note that $\text{Cov}(J_h(u_h, x_0), J_l(u_{hla}, x_0))$, $\text{Var}[J_l(u_{hla}, x_0)]$ and $\mathbb{E}[J_l(u_{hla}, x_0)]$ are calculated analytically using the equations in section \ref{stochastic_lqr}.
+
+\subsection{Numerical optimizer using Control Variate}
+
+The numerical optimizer was run in 3 different scenarios
+
+\begin{itemize}
+  \item $S_n^{MC}(J_h(u_h, x_0))$: MC estimate of the high fidelity cost function
+  \item $S_n^{CV}(J_h, J_l)$: CV estimate with $u_{hla}$ at the current iteration
+  \item $S_n^{CV_{max}}(J_h, J_l)$:CV estimate with $u_{hla}$ at the iteration with the highest correlation
+\end{itemize}
+
+For these experiments, $n$, the number of samples of $x_0$ used in the MC estimate, was compared between 10, 100, 500 and 1000.
+The comparison is done between $S_n^{MC}(J_h(u_h, x_0))$ vs $S_{\frac{n}{2}}^{CV}(J_h, J_l)$ and $S_{\frac{n}{2}}^{CV_{max}}(J_h, J_l)$ to keep the number of cost function evaluations the same with the control variate estimators having a lower computational cost due to half the sammples being used in the low fidelity cost function.
+
+To compare the variance, we ran a numerical optimizer with n random samples of $x_0$ and calculated the variance for each iteration.
+
+The variance was also calculated analytically for each control variate
 \end{document}

@@ -372,23 +372,20 @@ grid on;
 plot_convergence_dist(data.lqrsol{1}.Uopt, U_num_hf, U_num_mlmc, U_num_mlmc_fix, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
 
 %% G Convergence and variance with various optimizers and sample sizes
-num_rv_samples = [100];
+num_rv_samples = [10 100 1000];
 num_estimator_samples = 100;
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 max_iters = 30;
-options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun, "MaxIterations", max_iters);
-data.hf_var = zeros(length(num_rv_samples), max_iters);
-data.mlmc_var = zeros(length(num_rv_samples), max_iters);
-data.mlmc_fix_var = zeros(length(num_rv_samples), max_iters);
+options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun, "MaxIterations", max_iters, "OptimalityTolerance", 1e-12);
+data.hf_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
+data.mlmc_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
+data.mlmc_fix_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
 data.hf_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.mlmc_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.mlmc_fix_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 for num_samples=num_rv_samples
   fprintf("\n*** RV Samples: %d ***\n", num_samples);
   wait_bar = waitbar(0, "Running estimators with " + num_samples + " samples");
-  temp_cost.hf = zeros(num_estimator_samples, max_iters);
-  temp_cost.mlmc = zeros(num_estimator_samples, max_iters);
-  temp_cost.mlmc_fix = zeros(num_estimator_samples, max_iters);
   for i=1:num_estimator_samples
     waitbar(i/num_estimator_samples, wait_bar);
     % get the RV samples
@@ -402,67 +399,91 @@ for num_samples=num_rv_samples
     x0_rv_ext_mean = mean(x0_rv_ext, 2);
     fun = @(u) mean(LQRCost_vec(x0_rv_ext, u, data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar));
     Uopt_num = fminunc(fun, u0_num, options);
-    temp_cost.hf(i, :) = num_opt_fvals(1:max_iters);
+    data.hf_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
     data.hf_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
     
     % for MLMC estimator
     num_opt_iters = 0;
     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
     num_opt_fvals = zeros(1, max_iters);
-    fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, num_samples, num_samples, u0, ref, x0_rv, x0_mean, x0_cov);
+    fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, num_samples/2, num_samples/2, u0, ref, x0_rv, x0_mean, x0_cov);
     Uopt_num = fminunc(fun, u0_num, options);
-    temp_cost.mlmc(i, :) = num_opt_fvals(1:max_iters);
+    data.mlmc_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
     data.mlmc_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
     
     % for MLMC estimator with fixed LF solution
-    u_lf = num_opt_data(:, it_max_cor); % take from prev
+    u_lf = downsample_avg(num_opt_data(:, it_max_cor), 10); % take from prev
     u_lf = u_lf(1:10:end, :);
     num_opt_iters = 0;
     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
     num_opt_fvals = zeros(1, max_iters);
-    fun = @(u) calc_mlmc_est_max_corr(data.lqrsol{1}, data.lqrsol{2}, u, u_lf, num_samples, num_samples, u0, ref, x0_rv, x0_mean, x0_cov);
+    fun = @(u) calc_mlmc_est_max_corr(data.lqrsol{1}, data.lqrsol{2}, u, u_lf, num_samples/2, num_samples/2, u0, ref, x0_rv, x0_mean, x0_cov);
     Uopt_num = fminunc(fun, u0_num, options);
-    temp_cost.mlmc_fix(i, :) = num_opt_fvals(1:max_iters);
+    data.mlmc_fix_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
     data.mlmc_fix_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
   end
-  data.hf_var(num_rv_samples == num_samples, :) = var(temp_cost.hf, 0, 1);
-  data.mlmc_var(num_rv_samples == num_samples, :) = var(temp_cost.mlmc, 0, 1);
-  data.mlmc_fix_var(num_rv_samples == num_samples, :) = var(temp_cost.mlmc_fix, 0, 1);
   close(wait_bar);
 end
 
-%% calculate analytical variance
-data.hf_var_an = zeros(length(num_rv_samples), max_iters);
-data.mlmc_var_an = zeros(length(num_rv_samples), max_iters);
-data.mlmc_fix_var_an = zeros(length(num_rv_samples), max_iters);
+%% plot costs
+for i=1:length(num_rv_samples)
+  fig = figure;
+  semilogy(squeeze(data.hf_cost(:, :, i)), 'LineWidth', 1, 'Color', [0 0 1, 0.1]);
+  hold on;
+  semilogy(squeeze(data.mlmc_cost(:, :, i)), 'LineWidth', 1, 'Color', [1 0 0, 0.1]);
+  semilogy(squeeze(data.mlmc_fix_cost(:, :, i)), 'LineWidth', 1, 'Color', [0 1 0, 0.1]);
+  l{1} = plot(nan, 'b');
+  l{2} = plot(nan, 'r');
+  l{3} = plot(nan, 'g');
+
+  title("Cost convergence vs iterations with "+num_rv_samples(i)+" samples");
+  xlabel("Iteration");
+  ylabel("Cost");
+  legend([l{:}], ["MC HF", "CV", "CV with max corr"]);
+  grid on;
+end
+
+%% calculate variance
+data.hf_var_st = zeros(max_iters, length(num_rv_samples));
+data.mlmc_var_st = zeros(max_iters, length(num_rv_samples));
+data.mlmc_fix_var_st = zeros(max_iters, length(num_rv_samples));
+data.hf_var_an = zeros(max_iters, length(num_rv_samples));
+data.mlmc_var_an = zeros(max_iters, length(num_rv_samples));
+data.mlmc_fix_var_an = zeros(max_iters, length(num_rv_samples));
 x0_rv_mean_ext = [x0_mean; u0; ref];
 x0_rv_cov_ext = blkdiag(x0_cov, zeros(3,3));
+
 for i=1:length(num_rv_samples)
   for j=1:max_iters
-    % average out u vlues for calculating variance
-    hf_u_avg = mean(data.hf_u(:, j, :, i), 3);
-    data.hf_var_an(i, j) = mc_var(data.lqrsol{1}, x0_rv_mean_ext, x0_rv_cov_ext, hf_u_avg, num_rv_samples(i));
-    
-    mlmc_u_avg = mean(data.mlmc_u(:, j, :, i), 3);
-    data.mlmc_var_an(i, j) = cv_var(data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_rv_cov_ext, mlmc_u_avg, num_rv_samples(i));
-    
-    u_lf_avg = mean(data.mlmc_u(:, it_max_cor, :, i), 3);
-    u_lf_avg = u_lf_avg(1:10:end, :);
-    mlmc_fix_u_avg = mean(data.mlmc_fix_u(:, j, :, i), 3);
-    data.mlmc_fix_var_an(i, j) = cv_max_var(data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_rv_cov_ext, mlmc_fix_u_avg, u_lf_avg, num_rv_samples(i));
+    data.hf_var_st(j, i) = var(data.hf_cost(j, :, i));
+    data.mlmc_var_st(j, i) = var(data.mlmc_cost(j, :, i));
+    data.mlmc_fix_var_st(j, i) = var(data.mlmc_fix_cost(j, :, i));
+    temp_hf_var_an = zeros(num_estimator_samples, 1);
+    temp_mlmc_var_an = zeros(num_estimator_samples, 1);
+    temp_mlmc_fix_var_an = zeros(num_estimator_samples, 1);
+    for k=1:num_estimator_samples
+      temp_hf_var_an(k) = mc_var(data.lqrsol{1}, x0_rv_mean_ext, x0_rv_cov_ext, data.hf_u(:, j, k, i), num_rv_samples(i));
+      temp_mlmc_var_an(k) = cv_var(data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_rv_cov_ext, data.mlmc_u(:, j, k, i), num_rv_samples(i)/2);
+      u_lf = downsample_avg(data.mlmc_u(:, 1, k, i), 10);
+      u_lf = u_lf(1:10:end, :);
+      temp_mlmc_fix_var_an(k) = cv_max_var(data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_rv_cov_ext, data.mlmc_fix_u(:, j, k, i), u_lf, num_rv_samples(i)/2);
+    end
+    data.hf_var_an(j, i) = mean(temp_hf_var_an);
+    data.mlmc_var_an(j, i) = mean(temp_mlmc_var_an);
+    data.mlmc_fix_var_an(j, i) = mean(temp_mlmc_fix_var_an);
   end
 end
 
 %% plot variance
 for i=1:length(num_rv_samples)
   fig = figure;
-  semilogy(1:max_iters, data.hf_var(i, :), 'b', 'LineWidth', 2, 'DisplayName', 'HF');
+  semilogy(1:max_iters, data.hf_var_st(:, i), 'b', 'LineWidth', 2, 'DisplayName', 'MC HF');
   hold on;
-  semilogy(1:max_iters, data.mlmc_var(i, :), 'r', 'LineWidth', 2, 'DisplayName', 'CV');
-  semilogy(1:max_iters, data.mlmc_fix_var(i, :), 'g', 'LineWidth', 2, 'DisplayName', 'CV with max corr');
-  semilogy(1:max_iters, data.hf_var_an(i, :), '--b', 'LineWidth', 2, 'DisplayName', 'HF (Analytical)');
-  semilogy(1:max_iters, data.mlmc_var_an(i, :), '--r', 'LineWidth', 2, 'DisplayName', 'CV (Analytical)');
-  semilogy(1:max_iters, data.mlmc_fix_var_an(i, :), '--g', 'LineWidth', 2, 'DisplayName', 'CV with max corr (Analytical)');
+  semilogy(1:max_iters, data.mlmc_var_st(:, i), 'r', 'LineWidth', 2, 'DisplayName', 'CV');
+  semilogy(1:max_iters, data.mlmc_fix_var_st(:, i), 'g', 'LineWidth', 2, 'DisplayName', 'CV with max corr');
+  semilogy(1:max_iters, data.hf_var_an(:, i), '--b', 'LineWidth', 2, 'DisplayName', 'MC HF (Analytical)');
+  semilogy(1:max_iters, data.mlmc_var_an(:, i), '--r', 'LineWidth', 2, 'DisplayName', 'CV (Analytical)');
+  semilogy(1:max_iters, data.mlmc_fix_var_an(:, i), '--g', 'LineWidth', 2, 'DisplayName', 'CV with max corr (Analytical)');
   title("Cost variance vs iterations with "+num_rv_samples(i)+" samples");
   xlabel("Iteration");
   ylabel("Variance");
@@ -473,10 +494,8 @@ end
 %% plot convergence in solution
 for i=1:length(num_rv_samples)
   plot_convergence_dist(data.lqrsol{1}.Uopt, squeeze(data.hf_u(:, :, :, i)), squeeze(data.mlmc_u(:, :, :, i)), squeeze(data.mlmc_fix_u(:, :, :, i)), ...
-    ["HF", "CV", "CV with max corr"], "Convergence distance comparison with " + num_rv_samples(i) + "samples");
+    ["MC HF", "CV", "CV with max corr"], "Convergence distance comparison with " + num_rv_samples(i) + " samples");
 end
-
-%% plot convergence in cost
 
 %% save all data
 save("artefacts/data.mat");
