@@ -7,7 +7,7 @@
 % - calculate 2d correlation analytically
 % - make U and u consistent in naming
 % - make usage of x_ext vs x, u and ref consistent, create ext extrenally and all functions should use that directly
-% - LQRcost_cov should take in the mean directly
+% - LQRCov should take in the mean directly
 
 clc; clear; close all force;
 %% A. state space model
@@ -41,6 +41,7 @@ x0_mean = x0;
 x0_cov = eye(nx)* 0.1;
 ref = [2; 0]; % reference state [pos, vel]
 u0 = 0; % initial control effort
+x0_ext = [x0; u0; ref]; % extended state
 
 Tsim = 6;
 Tfid = 0.01; % simulation fidelity
@@ -121,7 +122,6 @@ for idx = 1:length(TsList)
   times = 0:Ts:Tsim;
   N = Tsim/Ts; % prediction horizon, excluding initial state
   % create the extended state system [x_k, u_k-1, r_k]
-  x0_ext = [x0; u0; ref]; %
   [A_ext, B_ext, Q_ext, R_ext, P_ext] = extendState(c2d(msd_sys, Ts), Q, R, P);
   [Kopt, S, M, Qbar, Rbar] = solveLQR(N, A_ext, B_ext, Q_ext, R_ext, P_ext);
   Uopt = Kopt * x0_ext;
@@ -185,8 +185,9 @@ for idx = 1:length(TsList)
   
   
   %% D.3 cost distribution
-  [cost_lqr_exp, cost_lqr_var] = St.LQRcost_stats(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
+  cost_lqr_exp = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
   fprintf("Expectaion of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_exp, mean(data.cost_lqr));
+  cost_lqr_var = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar);
   fprintf("Variance of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_var, var(data.cost_lqr));
   
   % plot cost distribution
@@ -372,7 +373,7 @@ grid on;
 plot_convergence_dist(data.lqrsol{1}.Uopt, U_num_hf, U_num_mlmc, U_num_mlmc_fix, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
 
 %% G Convergence and variance with various optimizers and sample sizes
-num_rv_samples = [10 100 1000];
+num_rv_samples = [10 100];
 num_estimator_samples = 100;
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 max_iters = 30;
@@ -558,7 +559,7 @@ perturb_dirs = perturb_dirs ./ sqrt(sum(perturb_dirs.^2, 1));
 perturb_dirs = perturb_dirs * perturb_dir_mag;
 % check the gradient in random directions
 for i = 1:perturb_dir_samples
-  rand_grads(:, i) = St.LQRCostGrad(lqrsol.x0_ext, lqrsol.Uopt + perturb_dirs(:, i), lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
+  rand_grads(:, i) = St.LQRGrad(lqrsol.x0_ext, lqrsol.Uopt + perturb_dirs(:, i), lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
 end
 % pick max gradient direction
 [~, max_grad_idx] = max(sum(rand_grads.^2, 1));
@@ -705,10 +706,11 @@ cost_lf = mean(St.LQRCost(x0_rv_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_
 x0_rv_mean_ext = [x0_rv_mean; u0; ref];
 x0_rv_cov_ext = [x0_rv_cov, zeros(size(x0_rv_cov, 1), size(u0, 1) + size(ref, 1));
   zeros(size(u0, 1) + size(ref, 1), size(x0_rv_cov, 1) + size(u0, 1) + size(ref, 1))];
-[exp_l, var_l] = St.LQRcost_stats(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar);
 
 % calculate optimal alpha
-cov_hl = St.LQRcost_cov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
+cov_hl = St.LQRCov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
 alpha = -cov_hl / var_l;
 global alpha_mc num_opt_iters;
 alpha_mc(num_opt_iters+1) = alpha;
@@ -732,11 +734,12 @@ cost_lf = mean(cost_lf);
 x0_rv_mean_ext = [x0_rv_mean; u0; ref];
 x0_rv_cov_ext = [x0_rv_cov, zeros(size(x0_rv_cov, 1), size(u0, 1) + size(ref, 1));
   zeros(size(u0, 1) + size(ref, 1), size(x0_rv_cov, 1) + size(u0, 1) + size(ref, 1))];
-[exp_l, var_l] = St.LQRcost_stats(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar);
 
 
 % calculate optimal alpha
-cov_hl = St.LQRcost_cov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
+cov_hl = St.LQRCov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
 alpha = -cov_hl / var_l;
 global alpha_mc num_opt_iters;
 alpha_mc(num_opt_iters+1) = alpha;
@@ -775,13 +778,13 @@ grid on;
 end
 
 function var = mc_var(lqrsol, x0_rv_ext_mean, x0_rv_ext_cov, u, num_samples)
-[~, var] = St.LQRcost_stats(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
+var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar);
 var = var / num_samples;
 end
 
 function var = cv_var(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, n_hf)
 wtf = mean(x0_rv_ext_mean, 2);
-[~, var_hf] = St.LQRcost_stats(wtf, x0_rv_ext_cov, u, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
+var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar);
 u_lf = downsample_avg(u, 10);
 u_lf = u_lf(1:10:end);
 x0_rv_mean = x0_rv_ext_mean(1:2, :);
@@ -793,7 +796,7 @@ end
 
 function var = cv_max_var(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, n_hf)
 wtf = mean(x0_rv_ext_mean, 2);
-[~, var_hf] = St.LQRcost_stats(wtf, x0_rv_ext_cov, u, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
+var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar);
 x0_rv_mean = x0_rv_ext_mean(1:2, :);
 u0 = x0_rv_ext_mean(3, 1);
 ref = x0_rv_ext_mean(4:5, 1);
