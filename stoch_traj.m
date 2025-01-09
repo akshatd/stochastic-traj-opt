@@ -188,9 +188,9 @@ for idx = 1:length(TsList)
   
   
   %% D.3 cost distribution
-  cost_lqr_exp = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q, S, M, Qbar, Rbar);
+  cost_lqr_exp = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, data.lqrsol{idx});
   fprintf("Expectaion of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_exp, mean(data.cost_lqr));
-  cost_lqr_var = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q, S, M, Qbar);
+  cost_lqr_var = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, data.lqrsol{idx});
   fprintf("Variance of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_var, var(data.cost_lqr));
   
   % plot cost distribution
@@ -709,8 +709,8 @@ cost_lf = mean(St.LQRCost(x0_rv_ext, u_lf, lqrsol_lf));
 x0_rv_mean_ext = [x0_rv_mean; u0; ref];
 x0_rv_cov_ext = [x0_rv_cov, zeros(size(x0_rv_cov, 1), size(u0, 1) + size(ref, 1));
   zeros(size(u0, 1) + size(ref, 1), size(x0_rv_cov, 1) + size(u0, 1) + size(ref, 1))];
-exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
-var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar);
+exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf);
+var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf);
 
 % calculate optimal alpha
 cov_hl = St.LQRCov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
@@ -737,8 +737,8 @@ cost_lf = mean(cost_lf);
 x0_rv_mean_ext = [x0_rv_mean; u0; ref];
 x0_rv_cov_ext = [x0_rv_cov, zeros(size(x0_rv_cov, 1), size(u0, 1) + size(ref, 1));
   zeros(size(u0, 1) + size(ref, 1), size(x0_rv_cov, 1) + size(u0, 1) + size(ref, 1))];
-exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
-var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar);
+exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf);
+var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf);
 
 
 % calculate optimal alpha
@@ -781,13 +781,13 @@ grid on;
 end
 
 function var = mc_var(lqrsol, x0_rv_ext_mean, x0_rv_ext_cov, u, num_samples)
-var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol.Q, lqrsol.S, lqrsol.M, lqrsol.Qbar);
+var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol);
 var = var / num_samples;
 end
 
 function var = cv_var(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, n_hf)
 wtf = mean(x0_rv_ext_mean, 2);
-var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf.Q, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar);
+var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf);
 u_lf = downsample_avg(u, 10);
 u_lf = u_lf(1:10:end);
 x0_rv_mean = x0_rv_ext_mean(1:2, :);
@@ -799,7 +799,7 @@ end
 
 function var = cv_max_var(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, n_hf)
 wtf = mean(x0_rv_ext_mean, 2);
-var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf.Q, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar);
+var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf);
 x0_rv_mean = x0_rv_ext_mean(1:2, :);
 u0 = x0_rv_ext_mean(3, 1);
 ref = x0_rv_ext_mean(4:5, 1);

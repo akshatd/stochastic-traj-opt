@@ -21,14 +21,16 @@ classdef St
 			g = St.LQRGrad(x0, U, lqrsol);
 		end
 		
-		function exp = LQRExp(x0_mean, x0_cov, U, Q, S, M, Qbar, Rbar)
+		function exp = LQRExp(x0_mean, x0_cov, U, lqrsol)
+			Q = lqrsol.Q; S = lqrsol.S; M = lqrsol.M; Qbar = lqrsol.Qbar; Rbar = lqrsol.Rbar;
 			K = U'*(S'*Qbar*S + Rbar)*U;
 			L = 2 * M' * Qbar * S * U;
 			N = M' * Qbar * M + Q;
 			exp = K + x0_mean' * L + x0_mean' * N * x0_mean + trace(N * x0_cov);
 		end
 		
-		function var = LQRVar(x0_mean, x0_cov, U, Q, S, M, Qbar)
+		function var = LQRVar(x0_mean, x0_cov, U, lqrsol)
+			Q = lqrsol.Q; S = lqrsol.S; M = lqrsol.M; Qbar = lqrsol.Qbar;
 			L = 2 * M' * Qbar * S * U;
 			N = M' * Qbar * M + Q;
 			var = L' * x0_cov * L + 2 * trace(N * x0_cov * N * x0_cov) + 4 * (x0_mean' * N + L') * x0_cov * N * x0_mean;
@@ -64,8 +66,8 @@ classdef St
 			x_cov = cov(x0_rv_ext');
 			for i = 1:perturbs
 				cov_an = St.LQRCov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, U_hf(:, i), U_lf(:, i)); % TODO make indices consistent
-				var_J1 = St.LQRVar(x_mean, x_cov, U_hf(:, i), lqrsol_hf.Q, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar);
-				var_J2 = St.LQRVar(x_mean, x_cov, U_lf(:, i), lqrsol_lf.Q, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar);
+				var_J1 = St.LQRVar(x_mean, x_cov, U_hf(:, i), lqrsol_hf);
+				var_J2 = St.LQRVar(x_mean, x_cov, U_lf(:, i), lqrsol_lf);
 				corr_an(i) = cov_an / sqrt(var_J1 * var_J2);
 			end
 		end
