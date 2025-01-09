@@ -9,6 +9,15 @@ classdef St
 			cost = U'*(S'*Qbar*S + Rbar)*U + 2*x0'*M'*Qbar*S*U + diag(x0'*(M'*Qbar*M + Q)*x0);
 		end
 		
+		% cost for multiple x0 samples with multiple Us
+		function cost = LQRCostMulti(x0, U, lqrsol)
+			items = size(U, 2);
+			cost = zeros(items, size(x0, 2)); % rows are items, cols are samples
+			for i = 1:items
+				cost(i, :) = St.LQRCost(x0, U(:, i), lqrsol);
+			end
+		end
+		
 		function grad = LQRGrad(x0, U, lqrsol)
 			S = lqrsol.S; M = lqrsol.M; Qbar = lqrsol.Qbar; Rbar = lqrsol.Rbar;
 			% 2HU + 2q
@@ -54,6 +63,7 @@ classdef St
 			corr = cov / sqrt(var_J1 * var_J2);
 		end
 		
+		% correlation for multiple Us given the mean and cov of x0
 		function corr = LQRCorrMulti(x0_mean, x0_cov, U_hf, U_lf, lqrsol_hf, lqrsol_lf)
 			items = size(U_hf, 2);
 			corr = zeros(items, 1);
@@ -93,17 +103,6 @@ classdef St
 			end
 		end
 		
-		function [cost_hf, cost_lf] = calc_costs_multifid(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, Uopt_hf, Uopt_lf)
-			perturbs = size(Uopt_hf, 2);
-			rv_samples = size(x0_rv, 2);
-			cost_hf = zeros(perturbs, rv_samples);
-			cost_lf = zeros(perturbs, rv_samples);
-			x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
-			for i = 1:perturbs
-				cost_hf(i,:) = St.LQRCost(x0_rv_ext, Uopt_hf(:, i), lqrsol_hf);
-				cost_lf(i,:) = St.LQRCost(x0_rv_ext, Uopt_lf(:, i), lqrsol_lf);
-			end
-		end
 		
 	end
 end
