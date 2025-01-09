@@ -72,37 +72,28 @@ classdef St
 			end
 		end
 		
-		% just loops through the rows of the cost matrices and calculates the correlation
+		% correlation between the same rows of two matrices
 		function corr = CorrMulti(cost_1, cost_2)
 			items = size(cost_1, 1);
 			corr = zeros(items, 1);
 			for i = 1:items
 				corr_mat = corrcoef(cost_1(i, :), cost_2(i, :));
-				corr(i) = corr_mat(1,2); % we only need the cross correlation, diagnonal will be 1
+				corr(i) = corr_mat(1, 2); % we only need the cross correlation, diagnonal will be 1
 			end
 		end
 		
-		% correlation using samples of x0 between each of the Us, giving a 2D correlation result
-		function corr = CorrMulti2D(x0_rv, U_1, U_2, lqrsol_1, lqrsol_2)
-			iters = size(U_1, 2);
-			rv_samples = size(x0_rv, 2);
-			cost_hf_corr = zeros(iters, rv_samples);
-			cost_lf_corr = zeros(iters, rv_samples);
-			for i = 1:iters
-				cost_hf_corr(i, :) = St.LQRCost(x0_rv, U_1(:, i), lqrsol_1);
-				cost_lf_corr(i, :) = St.LQRCost(x0_rv, U_2(:, i), lqrsol_2);
-			end
-			
-			corr = zeros(iters, iters);
-			for i = 1:iters % HF iterations
-				for j = 1:iters % LF iterations
-					corr_mat = corrcoef(cost_hf_corr(i, :), cost_lf_corr(j, :));
-					% we only need the cross correlation, diagnonal will be 1
-					corr(i, j) = corr_mat(1,2); % rows are HF, cols are LF
+		% correlation between all pairs of rows of two matrices
+		function corr = CorrMulti2D(cost_1, cost_2)
+			items = size(cost_1, 1);
+			corr = zeros(items, items);
+			for i = 1:items % iterations in 1
+				for j = 1:items % iterations in 2
+					corr_mat = corrcoef(cost_1(i, :), cost_2(j, :));
+					% rows are from 1, cols are from 2
+					corr(i, j) = corr_mat(1, 2); % we only need the cross correlation, diagnonal will be 1
 				end
 			end
 		end
-		
 		
 	end
 end

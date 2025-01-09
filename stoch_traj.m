@@ -291,7 +291,7 @@ title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
 plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
 % Get correlation for all iterations
-corr = St.CorrMulti2D(x0_rv_ext, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr = St.CorrMulti2D(cost_hf, cost_lf);
 % plot correlation
 plot_corr_2d(corr, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hlr})$", costs_str, "num_iters_res");
 
@@ -307,7 +307,7 @@ corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, d
 title_str = ["$J_h$ and $J_l$", "$J_h$ (averaging)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
-corr = St.CorrMulti2D(x0_rv_ext, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr = St.CorrMulti2D(cost_hf, cost_lf);
 % plot correlation
 plot_corr_2d(corr, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_avg");
 
@@ -335,7 +335,7 @@ corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, d
 title_str = ["$J_h$ and $J_l$", "$S_{" + cv_samples + "}^{CV}$"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
-corr = St.CorrMulti2D(x0_rv_ext, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr = St.CorrMulti2D(cost_hf, cost_lf);
 % plot correlation
 plot_corr_2d(corr, "$S_{" + cv_samples + "}^{CV}$ opt Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_mlmc");
 
@@ -369,7 +369,7 @@ corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, d
 title_str = ["$J_h$ and $J_l$ at max correlation", "$S_{" + cv_samples + "}^{CV}$"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla}^{max})$"];
 plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
-corr = St.CorrMulti2D(x0_rv_ext, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr = St.CorrMulti2D(cost_hf, cost_lf);
 % plot correlation
 plot_corr_2d(corr, "$S_{" + cv_samples + "}^{CV}$ opt Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla}^{max})$", costs_str, "num_iters_mlmc_max_corr");
 
