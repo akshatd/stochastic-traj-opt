@@ -387,7 +387,7 @@ grid on;
 plot_convergence_dist(data.lqrsol{1}.Uopt, U_num_hf, U_num_mlmc, U_num_mlmc_fix, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
 
 %% G Convergence and variance with various optimizers and sample sizes
-num_rv_samples = [10 100];
+num_rv_samples = [10 100 500];
 num_estimator_samples = 100;
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 max_iters = 30;
@@ -465,8 +465,6 @@ data.mlmc_fix_var_st = zeros(max_iters, length(num_rv_samples));
 data.hf_var_an = zeros(max_iters, length(num_rv_samples));
 data.mlmc_var_an = zeros(max_iters, length(num_rv_samples));
 data.mlmc_fix_var_an = zeros(max_iters, length(num_rv_samples));
-x0_rv_ext_mean = [x0_mean; u0; ref];
-x0_rv_ext_cov = blkdiag(x0_cov, zeros(3,3));
 
 for i=1:length(num_rv_samples)
   for j=1:max_iters
@@ -477,11 +475,11 @@ for i=1:length(num_rv_samples)
     temp_mlmc_var_an = zeros(num_estimator_samples, 1);
     temp_mlmc_fix_var_an = zeros(num_estimator_samples, 1);
     for k=1:num_estimator_samples
-      temp_hf_var_an(k) = mc_var(data.lqrsol{1}, x0_rv_ext_mean, x0_rv_ext_cov, data.hf_u(:, j, k, i), num_rv_samples(i));
-      temp_mlmc_var_an(k) = cv_var(data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_rv_ext_cov, data.mlmc_u(:, j, k, i), num_rv_samples(i)/2);
+      temp_hf_var_an(k) = mc_var(data.lqrsol{1}, x0_ext_mean, x0_ext_cov, data.hf_u(:, j, k, i), num_rv_samples(i));
+      temp_mlmc_var_an(k) = cv_var(data.lqrsol{1}, data.lqrsol{2}, x0_ext_mean, x0_ext_cov, data.mlmc_u(:, j, k, i), num_rv_samples(i)/2);
       u_lf = downsample_avg(data.mlmc_u(:, 1, k, i), 10);
       u_lf = u_lf(1:10:end, :);
-      temp_mlmc_fix_var_an(k) = cv_max_var(data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_rv_ext_cov, data.mlmc_fix_u(:, j, k, i), u_lf, num_rv_samples(i)/2);
+      temp_mlmc_fix_var_an(k) = cv_max_var(data.lqrsol{1}, data.lqrsol{2}, x0_ext_mean, x0_ext_cov, data.mlmc_fix_u(:, j, k, i), u_lf, num_rv_samples(i)/2);
     end
     data.hf_var_an(j, i) = mean(temp_hf_var_an);
     data.mlmc_var_an(j, i) = mean(temp_mlmc_var_an);
@@ -797,8 +795,7 @@ var = var / num_samples;
 end
 
 function var = cv_var(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, n_hf)
-wtf = mean(x0_rv_ext_mean, 2);
-var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf);
+var_hf = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol_hf);
 u_lf = downsample_avg(u, 10);
 u_lf = u_lf(1:10:end);
 corr = St.LQRCorrMulti(x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, lqrsol_hf, lqrsol_lf);
@@ -806,8 +803,7 @@ var = var_hf/n_hf * (1 - corr^2);
 end
 
 function var = cv_max_var(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, n_hf)
-wtf = mean(x0_rv_ext_mean, 2);
-var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf);
+var_hf = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol_hf);
 corr = St.LQRCorrMulti(x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, lqrsol_hf, lqrsol_lf);
 var = var_hf/n_hf * (1 - corr^2);
 end
