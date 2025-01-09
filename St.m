@@ -36,17 +36,14 @@ classdef St
 			var = L' * x0_cov * L + 2 * trace(N * x0_cov * N * x0_cov) + 4 * (x0_mean' * N + L') * x0_cov * N * x0_mean;
 		end
 		
-		function lqr_cov = LQRCov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, Uopt_hf, Uopt_lf)
+		function lqr_cov = LQRCov(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, Uopt_hf, Uopt_lf)
 			% K1 = Uopt_hf' * (lqrsol_hf.S' * lqrsol_hf.Qbar * lqrsol_hf.S + lqrsol_hf.Rbar) * Uopt_hf;
 			L1 = 2 * lqrsol_hf.M' * lqrsol_hf.Qbar * lqrsol_hf.S * Uopt_hf;
 			N1 = lqrsol_hf.M' * lqrsol_hf.Qbar * lqrsol_hf.M + lqrsol_hf.Q;
 			% K2 = Uopt_lf' * (lqrsol_lf.S' * lqrsol_lf.Qbar * lqrsol_lf.S + lqrsol_lf.Rbar) * Uopt_lf;
 			L2 = 2 * lqrsol_lf.M' * lqrsol_lf.Qbar * lqrsol_lf.S * Uopt_lf;
 			N2 = lqrsol_lf.M' * lqrsol_lf.Qbar * lqrsol_lf.M + lqrsol_lf.Q;
-			x0_rv_ext = [x0_rv; repmat(u0, 1, size(x0_rv, 2)); repmat(ref, 1, size(x0_rv, 2))];
-			x_mean = mean(x0_rv_ext, 2);
-			x_cov = cov(x0_rv_ext');
-			lqr_cov = L1'*x_cov*L2 + 2*x_mean'*N2*x_cov*L1 + 2*x_mean'*N1*x_cov*L2 + 2*trace(N1*x_cov*N2*x_cov) + 4*x_mean'*N1*x_cov*N2*x_mean;
+			lqr_cov = L1'*x0_cov*L2 + 2*x0_mean'*N2*x0_cov*L1 + 2*x0_mean'*N1*x0_cov*L2 + 2*trace(N1*x0_cov*N2*x0_cov) + 4*x0_mean'*N1*x0_cov*N2*x0_mean;
 		end
 		
 		function corr_st = calc_corr_st(cost_hf, cost_lf)
@@ -62,12 +59,12 @@ classdef St
 			perturbs = size(U_hf, 2);
 			corr_an = zeros(perturbs, 1);
 			x0_rv_ext = [x0_rv; repmat(u0, 1, size(x0_rv, 2)); repmat(ref, 1, size(x0_rv, 2))];
-			x_mean = mean(x0_rv_ext, 2);
-			x_cov = cov(x0_rv_ext');
+			x0_mean = mean(x0_rv_ext, 2);
+			x0_cov = cov(x0_rv_ext');
 			for i = 1:perturbs
-				cov_an = St.LQRCov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, U_hf(:, i), U_lf(:, i)); % TODO make indices consistent
-				var_J1 = St.LQRVar(x_mean, x_cov, U_hf(:, i), lqrsol_hf);
-				var_J2 = St.LQRVar(x_mean, x_cov, U_lf(:, i), lqrsol_lf);
+				cov_an = St.LQRCov(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, U_hf(:, i), U_lf(:, i)); % TODO make indices consistent
+				var_J1 = St.LQRVar(x0_mean, x0_cov, U_hf(:, i), lqrsol_hf);
+				var_J2 = St.LQRVar(x0_mean, x0_cov, U_lf(:, i), lqrsol_lf);
 				corr_an(i) = cov_an / sqrt(var_J1 * var_J2);
 			end
 		end

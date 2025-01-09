@@ -713,7 +713,7 @@ exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf);
 var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf);
 
 % calculate optimal alpha
-cov_hl = St.LQRCov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
+cov_hl = St.LQRCov(x0_rv_mean_ext, x0_rv_cov_ext, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
 alpha = -cov_hl / var_l;
 global alpha_mc num_opt_iters;
 alpha_mc(num_opt_iters+1) = alpha;
@@ -742,7 +742,7 @@ var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf);
 
 
 % calculate optimal alpha
-cov_hl = St.LQRCov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
+cov_hl = St.LQRCov(x0_rv_mean_ext, x0_rv_cov_ext, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
 alpha = -cov_hl / var_l;
 global alpha_mc num_opt_iters;
 alpha_mc(num_opt_iters+1) = alpha;
