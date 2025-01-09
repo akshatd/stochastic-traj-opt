@@ -72,6 +72,17 @@ classdef St
 			end
 		end
 		
+		% correlation for multiple Us across all pairs given the mean and cov of x0
+		function corr = LQRCorrMulti2D(x0_mean, x0_cov, U_1, U_2, lqrsol_1, lqrsol_2)
+			items = size(U_1, 2);
+			corr = zeros(items, items);
+			for i = 1:items
+				for j = 1:items
+					corr(i, j) = St.LQRCorr(x0_mean, x0_cov, U_1(:, i), U_2(:, j), lqrsol_1, lqrsol_2);
+				end
+			end
+		end
+		
 		% correlation between the same rows of two matrices
 		function corr = CorrMulti(cost_1, cost_2)
 			items = size(cost_1, 1);

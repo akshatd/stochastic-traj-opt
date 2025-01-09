@@ -89,7 +89,7 @@ x0_rv_mean = mean(x0_rv, 2);
 x0_rv_cov = cov(x0_rv');
 x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
 x0_rv_ext_mean = [x0_rv_mean; u0; ref];
-x0_rv_ext_cov = blkdiag(x0_rv_cov, zeros(3,3));
+x0_rv_ext_cov = blkdiag(x0_rv_cov, zeros(length(u0), length(u0)), zeros(length(ref), length(ref)));
 
 %% C.1 open loop dynamics
 x_ol_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
@@ -286,14 +286,14 @@ cost_hf = St.LQRCostMulti(x0_rv_ext, U_hf, data.lqrsol{1});
 cost_lf = St.LQRCostMulti(x0_rv_ext, U_lf, data.lqrsol{2});
 corr_st = St.CorrMulti(cost_hf, cost_lf);
 corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+% corr_2d = St.CorrMulti2D(cost_hf, cost_lf);
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
 
+% plot correlation
 title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
 plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
-% Get correlation for all iterations
-corr = St.CorrMulti2D(cost_hf, cost_lf);
-% plot correlation
-plot_corr_2d(corr, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hlr})$", costs_str, "num_iters_res");
+plot_corr_2d(corr_2d, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hlr})$", costs_str, "num_iters_res");
 
 %% E.2.1.2 correlation with averaging
 U_lf = downsample_avg(U_hf, 10); % get LF by avg every 10 values of HF
@@ -303,13 +303,14 @@ cost_hf = St.LQRCostMulti(x0_rv_ext, U_hf, data.lqrsol{1});
 cost_lf = St.LQRCostMulti(x0_rv_ext, U_lf, data.lqrsol{2});
 corr_st = St.CorrMulti(cost_hf, cost_lf);
 corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+% corr_2d = St.CorrMulti2D(cost_hf, cost_lf);
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
 
+% plot correlation
 title_str = ["$J_h$ and $J_l$", "$J_h$ (averaging)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
-corr = St.CorrMulti2D(cost_hf, cost_lf);
-% plot correlation
-plot_corr_2d(corr, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_avg");
+plot_corr_2d(corr_2d, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_avg");
 
 %% F num opt with MLMC estimator
 %% F.1 normal MLMC Estimator
@@ -331,13 +332,14 @@ cost_hf = St.LQRCostMulti(x0_rv_ext, U_hf, data.lqrsol{1});
 cost_lf = St.LQRCostMulti(x0_rv_ext, U_lf, data.lqrsol{2});
 corr_st = St.CorrMulti(cost_hf, cost_lf);
 corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+% corr_2d = St.CorrMulti2D(cost_hf, cost_lf);
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
 
+% plot correlation
 title_str = ["$J_h$ and $J_l$", "$S_{" + cv_samples + "}^{CV}$"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
-corr = St.CorrMulti2D(cost_hf, cost_lf);
-% plot correlation
-plot_corr_2d(corr, "$S_{" + cv_samples + "}^{CV}$ opt Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_mlmc");
+plot_corr_2d(corr_2d, "$S_{" + cv_samples + "}^{CV}$ opt Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_mlmc");
 
 figure;
 plot(alpha_mc(1:num_opt_iters), 'LineWidth', 2);
@@ -347,7 +349,7 @@ ylabel("Alpha");
 grid on;
 
 %% F.2 MLMC Estimator with fixed LF solution
-[~, it_max_cor] = max(sum(corr, 1));
+[~, it_max_cor] = max(sum(corr_2d, 1));
 u_lf = U_lf(:, it_max_cor);
 num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
@@ -365,13 +367,14 @@ cost_hf = St.LQRCostMulti(x0_rv_ext, U_hf, data.lqrsol{1});
 cost_lf = St.LQRCostMulti(x0_rv_ext, U_lf, data.lqrsol{2});
 corr_st = St.CorrMulti(cost_hf, cost_lf);
 corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+% corr_2d = St.CorrMulti2D(cost_hf, cost_lf);
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
 
+% plot correlation
 title_str = ["$J_h$ and $J_l$ at max correlation", "$S_{" + cv_samples + "}^{CV}$"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla}^{max})$"];
 plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
-corr = St.CorrMulti2D(cost_hf, cost_lf);
-% plot correlation
-plot_corr_2d(corr, "$S_{" + cv_samples + "}^{CV}$ opt Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla}^{max})$", costs_str, "num_iters_mlmc_max_corr");
+plot_corr_2d(corr_2d, "$S_{" + cv_samples + "}^{CV}$ opt Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla}^{max})$", costs_str, "num_iters_mlmc_max_corr");
 
 figure;
 plot(alpha_mc(1:num_opt_iters), 'LineWidth', 2);
