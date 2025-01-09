@@ -10,11 +10,11 @@ classdef St
 		end
 		
 		% cost for multiple x0 samples with multiple Us
-		function cost = LQRCostMulti(x0, U, lqrsol)
+		function cost = LQRCostMulti(x0_rv, U, lqrsol)
 			items = size(U, 2);
-			cost = zeros(items, size(x0, 2)); % rows are items, cols are samples
+			cost = zeros(items, size(x0_rv, 2)); % rows are items, cols are samples
 			for i = 1:items
-				cost(i, :) = St.LQRCost(x0, U(:, i), lqrsol);
+				cost(i, :) = St.LQRCost(x0_rv, U(:, i), lqrsol);
 			end
 		end
 		
@@ -46,51 +46,51 @@ classdef St
 			var = L' * x0_cov * L + 2 * trace(N * x0_cov * N * x0_cov) + 4 * (x0_mean' * N + L') * x0_cov * N * x0_mean;
 		end
 		
-		function cov = LQRCov(x0_mean, x0_cov, U_hf, U_lf, lqrsol_hf, lqrsol_lf)
+		function cov = LQRCov(x0_mean, x0_cov, U_1, U_2, lqrsol_1, lqrsol_2)
 			% K1 = Uopt_hf' * (lqrsol_hf.S' * lqrsol_hf.Qbar * lqrsol_hf.S + lqrsol_hf.Rbar) * Uopt_hf;
-			L1 = 2 * lqrsol_hf.M' * lqrsol_hf.Qbar * lqrsol_hf.S * U_hf;
-			N1 = lqrsol_hf.M' * lqrsol_hf.Qbar * lqrsol_hf.M + lqrsol_hf.Q;
+			L1 = 2 * lqrsol_1.M' * lqrsol_1.Qbar * lqrsol_1.S * U_1;
+			N1 = lqrsol_1.M' * lqrsol_1.Qbar * lqrsol_1.M + lqrsol_1.Q;
 			% K2 = Uopt_lf' * (lqrsol_lf.S' * lqrsol_lf.Qbar * lqrsol_lf.S + lqrsol_lf.Rbar) * Uopt_lf;
-			L2 = 2 * lqrsol_lf.M' * lqrsol_lf.Qbar * lqrsol_lf.S * U_lf;
-			N2 = lqrsol_lf.M' * lqrsol_lf.Qbar * lqrsol_lf.M + lqrsol_lf.Q;
+			L2 = 2 * lqrsol_2.M' * lqrsol_2.Qbar * lqrsol_2.S * U_2;
+			N2 = lqrsol_2.M' * lqrsol_2.Qbar * lqrsol_2.M + lqrsol_2.Q;
 			cov = L1'*x0_cov*L2 + 2*x0_mean'*N2*x0_cov*L1 + 2*x0_mean'*N1*x0_cov*L2 + 2*trace(N1*x0_cov*N2*x0_cov) + 4*x0_mean'*N1*x0_cov*N2*x0_mean;
 		end
 		
-		function corr = LQRCorr(x0_mean, x0_cov, U_hf, U_lf, lqrsol_hf, lqrsol_lf)
-			cov = St.LQRCov(x0_mean, x0_cov, U_hf, U_lf, lqrsol_hf, lqrsol_lf);
-			var_J1 = St.LQRVar(x0_mean, x0_cov, U_hf, lqrsol_hf);
-			var_J2 = St.LQRVar(x0_mean, x0_cov, U_lf, lqrsol_lf);
+		function corr = LQRCorr(x0_mean, x0_cov, U_1, U_2, lqrsol_1, lqrsol_2)
+			cov = St.LQRCov(x0_mean, x0_cov, U_1, U_2, lqrsol_1, lqrsol_2);
+			var_J1 = St.LQRVar(x0_mean, x0_cov, U_1, lqrsol_1);
+			var_J2 = St.LQRVar(x0_mean, x0_cov, U_2, lqrsol_2);
 			corr = cov / sqrt(var_J1 * var_J2);
 		end
 		
 		% correlation for multiple Us given the mean and cov of x0
-		function corr = LQRCorrMulti(x0_mean, x0_cov, U_hf, U_lf, lqrsol_hf, lqrsol_lf)
-			items = size(U_hf, 2);
+		function corr = LQRCorrMulti(x0_mean, x0_cov, U_1, U_2, lqrsol_1, lqrsol_2)
+			items = size(U_1, 2);
 			corr = zeros(items, 1);
 			for i = 1:items
-				corr(i) = St.LQRCorr(x0_mean, x0_cov, U_hf(:, i), U_lf(:, i), lqrsol_hf, lqrsol_lf);
+				corr(i) = St.LQRCorr(x0_mean, x0_cov, U_1(:, i), U_2(:, i), lqrsol_1, lqrsol_2);
 			end
 		end
 		
 		% just loops through the rows of the cost matrices and calculates the correlation
-		function corr = CorrMulti(cost_A, cost_B)
-			items = size(cost_A, 1);
+		function corr = CorrMulti(cost_1, cost_2)
+			items = size(cost_1, 1);
 			corr = zeros(items, 1);
 			for i = 1:items
-				corr_mat = corrcoef(cost_A(i, :), cost_B(i, :));
+				corr_mat = corrcoef(cost_1(i, :), cost_2(i, :));
 				corr(i) = corr_mat(1,2); % we only need the cross correlation, diagnonal will be 1
 			end
 		end
 		
-		function corr = calc_corr_multifid_2d_iters(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, Uopt_hf, Uopt_lf)
-			iters = size(Uopt_hf, 2);
+		% correlation using samples of x0 between each of the Us, giving a 2D correlation result
+		function corr = CorrMulti2D(x0_rv, U_1, U_2, lqrsol_1, lqrsol_2)
+			iters = size(U_1, 2);
 			rv_samples = size(x0_rv, 2);
 			cost_hf_corr = zeros(iters, rv_samples);
 			cost_lf_corr = zeros(iters, rv_samples);
-			x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
 			for i = 1:iters
-				cost_hf_corr(i, :) = St.LQRCost(x0_rv_ext, Uopt_hf(:, i), lqrsol_hf);
-				cost_lf_corr(i, :) = St.LQRCost(x0_rv_ext, Uopt_lf(:, i), lqrsol_lf);
+				cost_hf_corr(i, :) = St.LQRCost(x0_rv, U_1(:, i), lqrsol_1);
+				cost_lf_corr(i, :) = St.LQRCost(x0_rv, U_2(:, i), lqrsol_2);
 			end
 			
 			corr = zeros(iters, iters);
