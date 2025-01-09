@@ -1,4 +1,7 @@
 % TODOS:
+% - make the small matrices Pe, Qe, Re, and extended matrices P, Q, R
+%   - write this shit down pls
+%   - change how it is represented in lqrsol
 % - we are assuming u0 to be 0, might not be true in general so might need to add u0 to cumsum
 % - extend MLMC to work for any number of levels
 % - make indices consistent when storing U in row vs column (make everything row based)
@@ -49,11 +52,11 @@ Tfid = 0.01; % simulation fidelity
 % Ts = 0.5; % sampling time, MUST BE MULTIPLE OF Tfid
 TsList = [0.05, 0.5];
 
-Q = eye(nx) * 2; % state cost
-R = eye(nu) * 10; % input cost
+Qe = eye(nx) * 2; % state cost
+Re = eye(nu) * 10; % input cost
 % terminal state cost, needs to be 0 for the extended state since
 % we dont want to penalize the state being away from the origin
-P = eye(nx) * 0;
+Pe = eye(nx) * 0;
 
 rv_samples = 1000;
 perturb_dir_samples = 1000;
@@ -122,10 +125,10 @@ for idx = 1:length(TsList)
   times = 0:Ts:Tsim;
   N = Tsim/Ts; % prediction horizon, excluding initial state
   % create the extended state system [x_k, u_k-1, r_k]
-  [A_ext, B_ext, Q_ext, R_ext, P_ext] = extendState(c2d(msd_sys, Ts), Q, R, P);
-  [Kopt, S, M, Qbar, Rbar] = solveLQR(N, A_ext, B_ext, Q_ext, R_ext, P_ext);
+  [A_ext, B_ext, Q, R, P] = extendState(c2d(msd_sys, Ts), Qe, Re, Pe);
+  [Kopt, S, M, Qbar, Rbar] = solveLQR(N, A_ext, B_ext, Q, R, P);
   Uopt = Kopt * x0_ext;
-  cost_det = St.LQRCost(x0_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
+  cost_det = St.LQRCost(x0_ext, Uopt, struct('Q', Q, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar));
   fprintf("Deterministic LQR cost: %f\n", cost_det);
   
   %% simulate closed loop dynamics
@@ -153,10 +156,10 @@ for idx = 1:length(TsList)
   %% D.2 stochastic LQR using robust SAA
   % Uopt only depends on x0, so we can use the same Kopt
   Uopt = Kopt * x0_rv_mean_ext;
-  data.lqrsol{idx} = struct('x0_ext', x0_rv_mean_ext, 'Uopt', Uopt, 'Q_ext', Q_ext, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar, 'times', times);
+  data.lqrsol{idx} = struct('x0_ext', x0_rv_mean_ext, 'Uopt', Uopt, 'Q', Q, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar, 'times', times);
   x_cl_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
   x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
-  data.cost_lqr = St.LQRCost(x0_rv_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
+  data.cost_lqr = St.LQRCost(x0_rv_ext, Uopt, data.lqrsol{idx});
   parfor i = 1:rv_samples
     x_cl_stoch(:,:,i) = sim_closed_loop(Tsim, Tfid, Ts, x0_rv(:, i), u0, Uopt, A_msd, B_msd, @msd);
   end
@@ -185,9 +188,9 @@ for idx = 1:length(TsList)
   
   
   %% D.3 cost distribution
-  cost_lqr_exp = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar, Rbar);
+  cost_lqr_exp = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q, S, M, Qbar, Rbar);
   fprintf("Expectaion of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_exp, mean(data.cost_lqr));
-  cost_lqr_var = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q_ext, S, M, Qbar);
+  cost_lqr_var = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, Uopt, Q, S, M, Qbar);
   fprintf("Variance of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_var, var(data.cost_lqr));
   
   % plot cost distribution
@@ -263,7 +266,7 @@ u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 global num_opt_iters num_opt_data num_opt_fvals;
 num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
-fun = @(u) St.LQRCostwGrad(data.lqrsol{1}.x0_ext, u, data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar);
+fun = @(u) St.LQRCostwGrad(data.lqrsol{1}.x0_ext, u, data.lqrsol{1});
 options = optimoptions('fminunc', 'Display', 'iter', 'Algorithm', 'quasi-newton', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
 Uopt_num = fminunc(fun, u0_num, options);
 uopt_diff = sqrt(sum((Uopt_hf - Uopt_num).^2));
@@ -398,7 +401,7 @@ for num_samples=num_rv_samples
     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
     num_opt_fvals = zeros(1, max_iters);
     x0_rv_ext_mean = mean(x0_rv_ext, 2);
-    fun = @(u) mean(St.LQRCost(x0_rv_ext, u, data.lqrsol{1}.Q_ext, data.lqrsol{1}.S, data.lqrsol{1}.M, data.lqrsol{1}.Qbar, data.lqrsol{1}.Rbar));
+    fun = @(u) mean(St.LQRCost(x0_rv_ext, u, data.lqrsol{1}));
     Uopt_num = fminunc(fun, u0_num, options);
     data.hf_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
     data.hf_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
@@ -559,7 +562,7 @@ perturb_dirs = perturb_dirs ./ sqrt(sum(perturb_dirs.^2, 1));
 perturb_dirs = perturb_dirs * perturb_dir_mag;
 % check the gradient in random directions
 for i = 1:perturb_dir_samples
-  rand_grads(:, i) = St.LQRGrad(lqrsol.x0_ext, lqrsol.Uopt + perturb_dirs(:, i), lqrsol.S, lqrsol.M, lqrsol.Qbar, lqrsol.Rbar);
+  rand_grads(:, i) = St.LQRGrad(lqrsol.x0_ext, lqrsol.Uopt + perturb_dirs(:, i), lqrsol);
 end
 % pick max gradient direction
 [~, max_grad_idx] = max(sum(rand_grads.^2, 1));
@@ -695,19 +698,19 @@ end
 function cost = calc_mlmc_est(lqrsol_hf, lqrsol_lf, u_hf, n_hf, n_lf, u0, ref, x0_rv, x0_rv_mean, x0_rv_cov)
 % MC estimator for hf
 x0_rv_ext = [x0_rv(:, 1:n_hf); repmat(u0, 1, n_hf); repmat(ref, 1, n_hf)];
-cost_hf = mean(St.LQRCost(x0_rv_ext, u_hf, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar));
+cost_hf = mean(St.LQRCost(x0_rv_ext, u_hf, lqrsol_hf));
 
 % reuse same samples for LF
 u_lf = downsample_avg(u_hf, 10);
 u_lf = u_lf(1:10:end);
-cost_lf = mean(St.LQRCost(x0_rv_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar));
+cost_lf = mean(St.LQRCost(x0_rv_ext, u_lf, lqrsol_lf));
 
 % use all samples for expectation
 x0_rv_mean_ext = [x0_rv_mean; u0; ref];
 x0_rv_cov_ext = [x0_rv_cov, zeros(size(x0_rv_cov, 1), size(u0, 1) + size(ref, 1));
   zeros(size(u0, 1) + size(ref, 1), size(x0_rv_cov, 1) + size(u0, 1) + size(ref, 1))];
-exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
-var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar);
+exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar);
 
 % calculate optimal alpha
 cov_hl = St.LQRCov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
@@ -721,21 +724,21 @@ end
 function cost = calc_mlmc_est_max_corr(lqrsol_hf, lqrsol_lf, u_hf, u_lf, n_hf, n_lf, u0, ref, x0_rv, x0_rv_mean, x0_rv_cov)
 % MC estimator for hf
 x0_rv_ext = [x0_rv(:, 1:n_hf); repmat(u0, 1, n_hf); repmat(ref, 1, n_hf)];
-cost_hf = St.LQRCost(x0_rv_ext, u_hf, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
+cost_hf = St.LQRCost(x0_rv_ext, u_hf, lqrsol_hf);
 cost_hf = mean(cost_hf);
 
 % reuse same samples for LF
 % u_lf = downsample_avg(u_hf, 10);
 % u_lf = u_lf(1:10:end);
-cost_lf = St.LQRCost(x0_rv_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+cost_lf = St.LQRCost(x0_rv_ext, u_lf, lqrsol_lf);
 cost_lf = mean(cost_lf);
 
 % use all samples for expectation
 x0_rv_mean_ext = [x0_rv_mean; u0; ref];
 x0_rv_cov_ext = [x0_rv_cov, zeros(size(x0_rv_cov, 1), size(u0, 1) + size(ref, 1));
   zeros(size(u0, 1) + size(ref, 1), size(x0_rv_cov, 1) + size(u0, 1) + size(ref, 1))];
-exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
-var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar);
+exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf.Q, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar);
 
 
 % calculate optimal alpha
@@ -778,13 +781,13 @@ grid on;
 end
 
 function var = mc_var(lqrsol, x0_rv_ext_mean, x0_rv_ext_cov, u, num_samples)
-var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol.Q_ext, lqrsol.S, lqrsol.M, lqrsol.Qbar);
+var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol.Q, lqrsol.S, lqrsol.M, lqrsol.Qbar);
 var = var / num_samples;
 end
 
 function var = cv_var(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, n_hf)
 wtf = mean(x0_rv_ext_mean, 2);
-var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar);
+var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf.Q, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar);
 u_lf = downsample_avg(u, 10);
 u_lf = u_lf(1:10:end);
 x0_rv_mean = x0_rv_ext_mean(1:2, :);
@@ -796,7 +799,7 @@ end
 
 function var = cv_max_var(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, n_hf)
 wtf = mean(x0_rv_ext_mean, 2);
-var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar);
+var_hf = St.LQRVar(wtf, x0_rv_ext_cov, u, lqrsol_hf.Q, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar);
 x0_rv_mean = x0_rv_ext_mean(1:2, :);
 u0 = x0_rv_ext_mean(3, 1);
 ref = x0_rv_ext_mean(4:5, 1);

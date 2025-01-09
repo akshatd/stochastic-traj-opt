@@ -2,21 +2,23 @@
 
 classdef St
 	methods(Static) % so that we don't need to create an object to use these functions
-		function cost = LQRCost(x0, U, Q, S, M, Qbar, Rbar)
+		function cost = LQRCost(x0, U, lqrsol)
+			Q = lqrsol.Q; S = lqrsol.S; M = lqrsol.M; Qbar = lqrsol.Qbar; Rbar = lqrsol.Rbar;
 			% handles x0 having multiple samples with diag
 			cost = U'*(S'*Qbar*S + Rbar)*U + 2*x0'*M'*Qbar*S*U + diag(x0'*(M'*Qbar*M + Q)*x0);
 		end
 		
-		function grad = LQRGrad(x0, U, S, M, Qbar, Rbar)
+		function grad = LQRGrad(x0, U, lqrsol)
+			S = lqrsol.S; M = lqrsol.M; Qbar = lqrsol.Qbar; Rbar = lqrsol.Rbar;
 			% 2HU + 2q
 			H = S'*Qbar*S + Rbar;
 			q = x0'*M'*Qbar*S;
 			grad = 2 * H * U + 2 * q';
 		end
 		
-		function [f, g] = LQRCostwGrad(x0, U, Q, S, M, Qbar, Rbar)
-			f = St.LQRCost(x0, U, Q, S, M, Qbar, Rbar);
-			g = St.LQRGrad(x0, U, S, M, Qbar, Rbar);
+		function [f, g] = LQRCostwGrad(x0, U, lqrsol)
+			f = St.LQRCost(x0, U, lqrsol);
+			g = St.LQRGrad(x0, U, lqrsol);
 		end
 		
 		function exp = LQRExp(x0_mean, x0_cov, U, Q, S, M, Qbar, Rbar)
@@ -35,10 +37,10 @@ classdef St
 		function lqr_cov = LQRCov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, Uopt_hf, Uopt_lf)
 			% K1 = Uopt_hf' * (lqrsol_hf.S' * lqrsol_hf.Qbar * lqrsol_hf.S + lqrsol_hf.Rbar) * Uopt_hf;
 			L1 = 2 * lqrsol_hf.M' * lqrsol_hf.Qbar * lqrsol_hf.S * Uopt_hf;
-			N1 = lqrsol_hf.M' * lqrsol_hf.Qbar * lqrsol_hf.M + lqrsol_hf.Q_ext;
+			N1 = lqrsol_hf.M' * lqrsol_hf.Qbar * lqrsol_hf.M + lqrsol_hf.Q;
 			% K2 = Uopt_lf' * (lqrsol_lf.S' * lqrsol_lf.Qbar * lqrsol_lf.S + lqrsol_lf.Rbar) * Uopt_lf;
 			L2 = 2 * lqrsol_lf.M' * lqrsol_lf.Qbar * lqrsol_lf.S * Uopt_lf;
-			N2 = lqrsol_lf.M' * lqrsol_lf.Qbar * lqrsol_lf.M + lqrsol_lf.Q_ext;
+			N2 = lqrsol_lf.M' * lqrsol_lf.Qbar * lqrsol_lf.M + lqrsol_lf.Q;
 			x0_rv_ext = [x0_rv; repmat(u0, 1, size(x0_rv, 2)); repmat(ref, 1, size(x0_rv, 2))];
 			x_mean = mean(x0_rv_ext, 2);
 			x_cov = cov(x0_rv_ext');
@@ -62,8 +64,8 @@ classdef St
 			x_cov = cov(x0_rv_ext');
 			for i = 1:perturbs
 				cov_an = St.LQRCov(x0_rv, u0, ref, lqrsol_hf, lqrsol_lf, U_hf(:, i), U_lf(:, i)); % TODO make indices consistent
-				var_J1 = St.LQRVar(x_mean, x_cov, U_hf(:, i), lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar);
-				var_J2 = St.LQRVar(x_mean, x_cov, U_lf(:, i), lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar);
+				var_J1 = St.LQRVar(x_mean, x_cov, U_hf(:, i), lqrsol_hf.Q, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar);
+				var_J2 = St.LQRVar(x_mean, x_cov, U_lf(:, i), lqrsol_lf.Q, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar);
 				corr_an(i) = cov_an / sqrt(var_J1 * var_J2);
 			end
 		end
@@ -75,8 +77,8 @@ classdef St
 			cost_lf_corr = zeros(iters, rv_samples);
 			x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
 			for i = 1:iters
-				cost_hf_corr(i, :) = St.LQRCost(x0_rv_ext, Uopt_hf(:, i), lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
-				cost_lf_corr(i, :) = St.LQRCost(x0_rv_ext, Uopt_lf(:, i), lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+				cost_hf_corr(i, :) = St.LQRCost(x0_rv_ext, Uopt_hf(:, i), lqrsol_hf);
+				cost_lf_corr(i, :) = St.LQRCost(x0_rv_ext, Uopt_lf(:, i), lqrsol_lf);
 			end
 			
 			corr = zeros(iters, iters);
@@ -96,8 +98,8 @@ classdef St
 			cost_lf = zeros(perturbs, rv_samples);
 			x0_rv_ext = [x0_rv; repmat(u0, 1, rv_samples); repmat(ref, 1, rv_samples)];
 			for i = 1:perturbs
-				cost_hf(i,:) = St.LQRCost(x0_rv_ext, Uopt_hf(:, i), lqrsol_hf.Q_ext, lqrsol_hf.S, lqrsol_hf.M, lqrsol_hf.Qbar, lqrsol_hf.Rbar);
-				cost_lf(i,:) = St.LQRCost(x0_rv_ext, Uopt_lf(:, i), lqrsol_lf.Q_ext, lqrsol_lf.S, lqrsol_lf.M, lqrsol_lf.Qbar, lqrsol_lf.Rbar);
+				cost_hf(i,:) = St.LQRCost(x0_rv_ext, Uopt_hf(:, i), lqrsol_hf);
+				cost_lf(i,:) = St.LQRCost(x0_rv_ext, Uopt_lf(:, i), lqrsol_lf);
 			end
 		end
 		

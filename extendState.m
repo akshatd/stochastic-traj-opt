@@ -1,4 +1,4 @@
-function [Aext, Bext, Qext, Rext, Pext] = extendState(system, Q, R, P)
+function [Aext, Bext, Q, R, P] = extendState(system, Qe, Re, Pe)
 
 A = system.A;
 B = system.B;
@@ -20,8 +20,8 @@ Bext = [B;
 
 E = [C, zeros(ny,nu), -eye(nr)];
 
-Qext = E'*Q*E;
-Rext = R;
-Pext = blkdiag(P, zeros(size(Aext,1) - nx));
+Q = E'*Qe*E;
+R = Re;
+P = blkdiag(Pe, zeros(size(Aext,1) - nx));
 
 end
