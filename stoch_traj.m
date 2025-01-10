@@ -1,15 +1,9 @@
 % TODOS:
-% - make the small matrices Pe, Qe, Re, and extended matrices P, Q, R
-%   - write this shit down pls
-%   - change how it is represented in lqrsol
 % - we are assuming u0 to be 0, might not be true in general so might need to add u0 to cumsum
 % - extend MLMC to work for any number of levels
 % - make indices consistent when storing U in row vs column (make everything row based)
-% - split out all the stats related functions into a separate file
 % - calculate correlation in cv estimator as it goes along instead of all at once
-% - calculate 2d correlation analytically
 % - make U and u consistent in naming
-% - make usage of x_ext vs x, u and ref consistent, create ext extrenally and all functions should use that directly
 
 clc; clear; close all force;
 %% A. state space model
@@ -130,7 +124,7 @@ for idx = 1:length(TsList)
   [A_ext, B_ext, Q, R, P] = extendState(c2d(msd_sys, Ts), Qe, Re, Pe);
   [Kopt, S, M, Qbar, Rbar] = solveLQR(N, A_ext, B_ext, Q, R, P);
   Uopt = Kopt * x0_ext;
-  cost_det = St.LQRCost(x0_ext, Uopt, struct('Q', Q, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar));
+  cost_det = St.LQRCost(x0_ext, struct('Q', Q, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar), Uopt);
   fprintf("Deterministic LQR cost: %f\n", cost_det);
   
   %% simulate closed loop dynamics
@@ -160,7 +154,7 @@ for idx = 1:length(TsList)
   Uopt = Kopt * x0_rv_ext_mean;
   data.lqrsol{idx} = struct('x0_ext', x0_rv_ext_mean, 'Uopt', Uopt, 'Q', Q, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar, 'times', times);
   x_cl_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
-  data.cost_lqr = St.LQRCost(x0_rv_ext, Uopt, data.lqrsol{idx});
+  data.cost_lqr = St.LQRCost(x0_rv_ext, data.lqrsol{idx}, Uopt);
   parfor i = 1:rv_samples
     x_cl_stoch(:,:,i) = sim_closed_loop(Tsim, Tfid, Ts, x0_rv(:, i), u0, Uopt, A_msd, B_msd, @msd);
   end
@@ -189,9 +183,9 @@ for idx = 1:length(TsList)
   
   
   %% D.3 cost distribution
-  cost_lqr_exp = St.LQRExp(x0_rv_ext_mean, x0_rv_ext_cov, Uopt, data.lqrsol{idx});
+  cost_lqr_exp = St.LQRExp(x0_rv_ext_mean, x0_rv_ext_cov, data.lqrsol{idx}, Uopt);
   fprintf("Expectaion of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_exp, mean(data.cost_lqr));
-  cost_lqr_var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, Uopt, data.lqrsol{idx});
+  cost_lqr_var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, data.lqrsol{idx}, Uopt);
   fprintf("Variance of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_var, var(data.cost_lqr));
   
   % plot cost distribution
@@ -222,10 +216,10 @@ Uopt_lf = Uopt_hf(1:10:end, :); % pick every 10th elem
 % vis_sols(Uopt_hf, Uopt_lf_vis, data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
 
 % calculate costs and correlation for HF/LF sols for each perturbation
-cost_hf = St.LQRCostMulti(x0_rv_ext, Uopt_hf, data.lqrsol{1});
-cost_lf = St.LQRCostMulti(x0_rv_ext, Uopt_lf, data.lqrsol{2});
+cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, Uopt_hf);
+cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, Uopt_lf);
 corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, Uopt_hf, Uopt_lf, data.lqrsol{1}, data.lqrsol{2});
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 % plot costs
 title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
@@ -236,10 +230,10 @@ Uopt_lf = downsample_avg(Uopt_hf, 10); % get HF in LF by avg every 10 values of 
 % Uopt_lf = downsample_avg(Uopt_hf, 10, true); % uncomment to visualize
 % vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
 % calculate costs and correlation for HF/LF sols for each perturbation
-cost_hf = St.LQRCostMulti(x0_rv_ext, Uopt_hf, data.lqrsol{1});
-cost_lf = St.LQRCostMulti(x0_rv_ext, Uopt_lf, data.lqrsol{2});
+cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, Uopt_hf);
+cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, Uopt_lf);
 corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, Uopt_hf, Uopt_lf, data.lqrsol{1}, data.lqrsol{2});
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 % plot costs
 title_str = ["$J_h$ and $J_l$", "$J_h (averaging)$"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
@@ -252,10 +246,10 @@ Uopt_lf = data.lqrsol{2}.Uopt + perturbation;
 % vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{2}.times, "LF obj (restriction)", perturb_range, "Perturbation");
 Uopt_hf = repelem(Uopt_lf, 10, 1); % repeat the LF sol to match HF sol
 % calculate costs and correlation for both high and low fidelity, for each perturbation
-cost_hf = St.LQRCostMulti(x0_rv_ext, Uopt_hf, data.lqrsol{1});
-cost_lf = St.LQRCostMulti(x0_rv_ext, Uopt_lf, data.lqrsol{2});
+cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, Uopt_hf);
+cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, Uopt_lf);
 corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, Uopt_hf, Uopt_lf, data.lqrsol{1}, data.lqrsol{2});
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
 % plot costs
 title_str = ["$J_h$ and $J_l$", "$J_l$"];
 costs_str = ["$J_h(u_lh)$", "$J_l(u_l)$"];
@@ -270,7 +264,7 @@ u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 global num_opt_iters num_opt_data num_opt_fvals;
 num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
-fun = @(u) St.LQRCostwGrad(data.lqrsol{1}.x0_ext, u, data.lqrsol{1});
+fun = @(u) St.LQRCostwGrad(data.lqrsol{1}.x0_ext, data.lqrsol{1}, u);
 options = optimoptions('fminunc', 'Display', 'iter', 'Algorithm', 'quasi-newton', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
 Uopt_num = fminunc(fun, u0_num, options);
 uopt_diff = sqrt(sum((Uopt_hf - Uopt_num).^2));
@@ -282,12 +276,12 @@ U_num_hf = U_hf; % save for plotting later
 U_lf = U_hf(1:10:end, :);
 % U_lf = repelem(U_lf, 10, 1); % uncomment to visualize
 % vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
-cost_hf = St.LQRCostMulti(x0_rv_ext, U_hf, data.lqrsol{1});
-cost_lf = St.LQRCostMulti(x0_rv_ext, U_lf, data.lqrsol{2});
+cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_hf);
+cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_lf);
 corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 % corr_2d = St.CorrMulti2D(cost_hf, cost_lf);
-corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 
 % plot correlation
 title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
@@ -299,12 +293,12 @@ plot_corr_2d(corr_2d, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hlr})
 U_lf = downsample_avg(U_hf, 10); % get LF by avg every 10 values of HF
 % U_lf = downsample_avg(U_hf, 10, true); % uncomment to visualize
 % vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
-cost_hf = St.LQRCostMulti(x0_rv_ext, U_hf, data.lqrsol{1});
-cost_lf = St.LQRCostMulti(x0_rv_ext, U_lf, data.lqrsol{2});
+cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_hf);
+cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_lf);
 corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 % corr_2d = St.CorrMulti2D(cost_hf, cost_lf);
-corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 
 % plot correlation
 title_str = ["$J_h$ and $J_l$", "$J_h$ (averaging)"];
@@ -319,7 +313,7 @@ num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
 global alpha_mc;
 alpha_mc = zeros(1, 100);
-fun = @(u) Cv(x0_rv_ext, x0_ext_mean, x0_ext_cov, u, data.lqrsol{1}, data.lqrsol{2}, cv_samples, cv_samples);
+fun = @(u) CvEst(x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, cv_samples, cv_samples, u);
 options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun); % finite diff
 Uopt_num = fminunc(fun, u0_num, options);
 U_hf = num_opt_data(:, 1:num_opt_iters);
@@ -328,12 +322,12 @@ U_lf = downsample_avg(U_hf, 10);
 % U_lf = downsample_avg(U_hf, 10, true); % uncomment to visualize
 % vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
 
-cost_hf = St.LQRCostMulti(x0_rv_ext, U_hf, data.lqrsol{1});
-cost_lf = St.LQRCostMulti(x0_rv_ext, U_lf, data.lqrsol{2});
+cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_hf);
+cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_lf);
 corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 % corr_2d = St.CorrMulti2D(cost_hf, cost_lf);
-corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 
 % plot correlation
 title_str = ["$J_h$ and $J_l$", "$S_{" + cv_samples + "}^{CV}$"];
@@ -354,7 +348,7 @@ u_lf = U_lf(:, it_max_cor);
 num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
 alpha_mc = zeros(1, 100);
-fun = @(u) CvMax(x0_rv_ext, x0_ext_mean, x0_ext_cov, u, u_lf, data.lqrsol{1}, data.lqrsol{2}, cv_samples, cv_samples);
+fun = @(u) CvEst(x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, cv_samples, cv_samples, u, u_lf);
 options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun); % finite dif
 Uopt_num = fminunc(fun, u0_num, options);
 U_hf = num_opt_data(:, 1:num_opt_iters);
@@ -363,12 +357,12 @@ U_lf = repelem(u_lf, 10, num_opt_iters);
 % vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
 
 U_lf = U_lf(1:10:end, :);
-cost_hf = St.LQRCostMulti(x0_rv_ext, U_hf, data.lqrsol{1});
-cost_lf = St.LQRCostMulti(x0_rv_ext, U_lf, data.lqrsol{2});
+cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_hf);
+cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_lf);
 corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 % corr_2d = St.CorrMulti2D(cost_hf, cost_lf);
-corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, U_hf, U_lf, data.lqrsol{1}, data.lqrsol{2});
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
 
 % plot correlation
 title_str = ["$J_h$ and $J_l$ at max correlation", "$S_{" + cv_samples + "}^{CV}$"];
@@ -412,7 +406,7 @@ for num_samples=num_rv_samples
     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
     num_opt_fvals = zeros(1, max_iters);
     x0_rv_ext_mean = mean(x0_rv_ext, 2);
-    fun = @(u) mean(St.LQRCost(x0_rv_ext, u, data.lqrsol{1}));
+    fun = @(u) mean(St.LQRCost(x0_rv_ext, data.lqrsol{1}, u));
     Uopt_num = fminunc(fun, u0_num, options);
     data.hf_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
     data.hf_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
@@ -421,7 +415,7 @@ for num_samples=num_rv_samples
     num_opt_iters = 0;
     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
     num_opt_fvals = zeros(1, max_iters);
-    fun = @(u) Cv(x0_rv_ext, x0_ext_mean, x0_ext_cov, u, data.lqrsol{1}, data.lqrsol{2}, num_samples/2, num_samples/2);
+    fun = @(u) CvEst(x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, num_samples/2, num_samples/2, u);
     Uopt_num = fminunc(fun, u0_num, options);
     data.mlmc_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
     data.mlmc_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
@@ -431,7 +425,7 @@ for num_samples=num_rv_samples
     num_opt_iters = 0;
     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
     num_opt_fvals = zeros(1, max_iters);
-    fun = @(u) CvMax(x0_rv_ext, x0_ext_mean, x0_ext_cov, u, u_lf, data.lqrsol{1}, data.lqrsol{2}, num_samples/2, num_samples/2);
+    fun = @(u) CvEst(x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, num_samples/2, num_samples/2, u, u_lf);
     Uopt_num = fminunc(fun, u0_num, options);
     data.mlmc_fix_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
     data.mlmc_fix_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
@@ -576,7 +570,7 @@ perturb_dirs = perturb_dirs ./ sqrt(sum(perturb_dirs.^2, 1));
 perturb_dirs = perturb_dirs * perturb_dir_mag;
 % check the gradient in random directions
 for i = 1:perturb_dir_samples
-  rand_grads(:, i) = St.LQRGrad(lqrsol.x0_ext, lqrsol.Uopt + perturb_dirs(:, i), lqrsol);
+  rand_grads(:, i) = St.LQRGrad(lqrsol.x0_ext, lqrsol, lqrsol.Uopt + perturb_dirs(:, i));
 end
 % pick max gradient direction
 [~, max_grad_idx] = max(sum(rand_grads.^2, 1));
@@ -709,41 +703,30 @@ plot_lf_raw.YData = uopt_lf(:, idx);
 hold(plot_hf_raw.Parent, 'off');
 end
 
-function cost = Cv(x0_rv_ext, x0_mean, x0_cov, u_hf, lqrsol_hf, lqrsol_lf, n_hf, n_lf)
-% MC estimator for hf
-cost_hf = mean(St.LQRCost(x0_rv_ext(:, 1:n_hf), u_hf, lqrsol_hf));
-
-% reuse same samples for LF
-u_lf = downsample_avg(u_hf, 10);
-cost_lf = mean(St.LQRCost(x0_rv_ext(:, 1:n_lf), u_lf, lqrsol_lf));
-
-% use actual mean, cov for expectation
-exp_l = St.LQRExp(x0_mean, x0_cov, u_lf, lqrsol_lf);
-var_l = St.LQRVar(x0_mean, x0_cov, u_lf, lqrsol_lf);
-
-% calculate optimal alpha
-cov_hl = St.LQRCov(x0_mean, x0_cov, u_hf, u_lf, lqrsol_hf, lqrsol_lf);
-alpha = -cov_hl / var_l;
-global alpha_mc num_opt_iters;
-alpha_mc(num_opt_iters+1) = alpha;
-cost = cost_hf + alpha * (cost_lf - exp_l);
-
+function cost = CvEst(x0_rv_ext, x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, n_hf, n_lf, u_hf, u_lf)
+arguments
+  x0_rv_ext (:, :) double
+  x0_mean (:, 1) double
+  x0_cov (:, :) double
+  lqrsol_hf struct
+  lqrsol_lf struct
+  n_hf int32
+  n_lf int32
+  u_hf (:, 1) double
+  u_lf (:, 1) double = downsample_avg(u_hf, 10) % convert hf to lf by default
 end
-
-function cost = CvMax(x0_rv_ext, x0_mean, x0_cov, u_hf, u_lf, lqrsol_hf, lqrsol_lf, n_hf, n_lf)
 % MC estimator for hf
-cost_hf = mean(St.LQRCost(x0_rv_ext(:, 1:n_hf), u_hf, lqrsol_hf));
+cost_hf = mean(St.LQRCost(x0_rv_ext(:, 1:n_hf), lqrsol_hf, u_hf));
 
 % reuse same samples for LF
-% u_lf = downsample_avg(u_hf, 10);
-cost_lf = mean(St.LQRCost(x0_rv_ext(:, 1:n_lf), u_lf, lqrsol_lf));
+cost_lf = mean(St.LQRCost(x0_rv_ext(:, 1:n_lf), lqrsol_lf, u_lf));
 
 % use actual mean, cov for expectation
-exp_l = St.LQRExp(x0_mean, x0_cov, u_lf, lqrsol_lf);
-var_l = St.LQRVar(x0_mean, x0_cov, u_lf, lqrsol_lf);
+exp_l = St.LQRExp(x0_mean, x0_cov, lqrsol_lf, u_lf);
+var_l = St.LQRVar(x0_mean, x0_cov, lqrsol_lf, u_lf);
 
 % calculate optimal alpha
-cov_hl = St.LQRCov(x0_mean, x0_cov, u_hf, u_lf, lqrsol_hf, lqrsol_lf);
+cov_hl = St.LQRCov(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, u_hf, u_lf);
 alpha = -cov_hl / var_l;
 global alpha_mc num_opt_iters;
 alpha_mc(num_opt_iters+1) = alpha;
@@ -782,19 +765,19 @@ grid on;
 end
 
 function var = McVar(lqrsol, x0_rv_ext_mean, x0_rv_ext_cov, u, num_samples)
-var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol);
+var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, lqrsol, u);
 var = var / num_samples;
 end
 
 function var = CvVar(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, n_hf)
-var_hf = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol_hf);
+var_hf = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, lqrsol_hf, u);
 u_lf = downsample_avg(u, 10);
-corr = St.LQRCorrMulti(x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, lqrsol_hf, lqrsol_lf);
+corr = St.LQRCorrMulti(x0_rv_ext_mean, x0_rv_ext_cov, lqrsol_hf, lqrsol_lf, u, u_lf);
 var = var_hf/n_hf * (1 - corr^2);
 end
 
 function var = CvMaxVar(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, n_hf)
-var_hf = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol_hf);
-corr = St.LQRCorrMulti(x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, lqrsol_hf, lqrsol_lf);
+var_hf = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, lqrsol_hf, u);
+corr = St.LQRCorrMulti(x0_rv_ext_mean, x0_rv_ext_cov, lqrsol_hf, lqrsol_lf, u, u_lf);
 var = var_hf/n_hf * (1 - corr^2);
 end
