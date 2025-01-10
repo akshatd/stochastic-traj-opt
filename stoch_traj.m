@@ -468,10 +468,10 @@ for i=1:length(num_rv_samples)
     temp_mlmc_var_an = zeros(num_estimator_samples, 1);
     temp_mlmc_fix_var_an = zeros(num_estimator_samples, 1);
     for k=1:num_estimator_samples
-      temp_hf_var_an(k) = McVar(data.lqrsol{1}, x0_ext_mean, x0_ext_cov, data.hf_u(:, j, k, i), num_rv_samples(i));
-      temp_mlmc_var_an(k) = CvVar(data.lqrsol{1}, data.lqrsol{2}, x0_ext_mean, x0_ext_cov, data.mlmc_u(:, j, k, i), num_rv_samples(i)/2);
-      u_lf = downsample_avg(data.mlmc_u(:, 1, k, i), 10);
-      temp_mlmc_fix_var_an(k) = CvMaxVar(data.lqrsol{1}, data.lqrsol{2}, x0_ext_mean, x0_ext_cov, data.mlmc_fix_u(:, j, k, i), u_lf, num_rv_samples(i)/2);
+      temp_hf_var_an(k) = McVar(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, num_rv_samples(i), data.hf_u(:, j, k, i));
+      temp_mlmc_var_an(k) = CvVar(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, num_rv_samples(i)/2, data.mlmc_u(:, j, k, i));
+      u_lf = downsample_avg(data.mlmc_u(:, 1, k, i), 10); % take 1st iter cos max corr
+      temp_mlmc_fix_var_an(k) = CvVar(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, num_rv_samples(i)/2, data.mlmc_fix_u(:, j, k, i), u_lf);
     end
     data.hf_var_an(j, i) = mean(temp_hf_var_an);
     data.mlmc_var_an(j, i) = mean(temp_mlmc_var_an);
@@ -764,20 +764,21 @@ legend([l{:}], labels);
 grid on;
 end
 
-function var = McVar(lqrsol, x0_rv_ext_mean, x0_rv_ext_cov, u, num_samples)
-var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, lqrsol, u);
-var = var / num_samples;
+function var = McVar(x0_mean, x0_cov, lqrsol, num_samples, U)
+var = St.LQRVar(x0_mean, x0_cov, lqrsol, U) / num_samples;
 end
 
-function var = CvVar(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, n_hf)
-var_hf = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, lqrsol_hf, u);
-u_lf = downsample_avg(u, 10);
-corr = St.LQRCorrMulti(x0_rv_ext_mean, x0_rv_ext_cov, lqrsol_hf, lqrsol_lf, u, u_lf);
-var = var_hf/n_hf * (1 - corr^2);
+function var = CvVar(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, n_hf, U_hf, U_lf)
+arguments
+  x0_mean (:, 1) double
+  x0_cov (:, :) double
+  lqrsol_hf struct
+  lqrsol_lf struct
+  n_hf int32
+  U_hf (:, 1) double
+  U_lf (:, 1) double = downsample_avg(U_hf, 10) % convert hf to lf by default
 end
-
-function var = CvMaxVar(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, n_hf)
-var_hf = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, lqrsol_hf, u);
-corr = St.LQRCorrMulti(x0_rv_ext_mean, x0_rv_ext_cov, lqrsol_hf, lqrsol_lf, u, u_lf);
+var_hf = St.LQRVar(x0_mean, x0_cov, lqrsol_hf, U_hf);
+corr = St.LQRCorr(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, U_hf, U_lf);
 var = var_hf/n_hf * (1 - corr^2);
 end
