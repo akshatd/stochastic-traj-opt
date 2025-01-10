@@ -319,7 +319,7 @@ num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
 global alpha_mc;
 alpha_mc = zeros(1, 100);
-fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, cv_samples, cv_samples, u0, ref, x0_rv, x0_mean, x0_cov);
+fun = @(u) Cv(x0_rv_ext, x0_ext_mean, x0_ext_cov, u, data.lqrsol{1}, data.lqrsol{2}, cv_samples, cv_samples);
 options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun); % finite diff
 Uopt_num = fminunc(fun, u0_num, options);
 U_hf = num_opt_data(:, 1:num_opt_iters);
@@ -354,7 +354,7 @@ u_lf = U_lf(:, it_max_cor);
 num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
 alpha_mc = zeros(1, 100);
-fun = @(u) calc_mlmc_est_max_corr(data.lqrsol{1}, data.lqrsol{2}, u, u_lf, cv_samples, cv_samples, u0, ref, x0_rv, x0_mean, x0_cov);
+fun = @(u) CvMax(x0_rv_ext, x0_ext_mean, x0_ext_cov, u, u_lf, data.lqrsol{1}, data.lqrsol{2}, cv_samples, cv_samples);
 options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun); % finite dif
 Uopt_num = fminunc(fun, u0_num, options);
 U_hf = num_opt_data(:, 1:num_opt_iters);
@@ -387,7 +387,7 @@ grid on;
 plot_convergence_dist(data.lqrsol{1}.Uopt, U_num_hf, U_num_mlmc, U_num_mlmc_fix, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
 
 %% G Convergence and variance with various optimizers and sample sizes
-num_rv_samples = [10 100 500];
+num_rv_samples = [10];
 num_estimator_samples = 100;
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 max_iters = 30;
@@ -421,7 +421,7 @@ for num_samples=num_rv_samples
     num_opt_iters = 0;
     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
     num_opt_fvals = zeros(1, max_iters);
-    fun = @(u) calc_mlmc_est(data.lqrsol{1}, data.lqrsol{2}, u, num_samples/2, num_samples/2, u0, ref, x0_rv, x0_mean, x0_cov);
+    fun = @(u) Cv(x0_rv_ext, x0_ext_mean, x0_ext_cov, u, data.lqrsol{1}, data.lqrsol{2}, num_samples/2, num_samples/2);
     Uopt_num = fminunc(fun, u0_num, options);
     data.mlmc_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
     data.mlmc_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
@@ -432,7 +432,7 @@ for num_samples=num_rv_samples
     num_opt_iters = 0;
     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
     num_opt_fvals = zeros(1, max_iters);
-    fun = @(u) calc_mlmc_est_max_corr(data.lqrsol{1}, data.lqrsol{2}, u, u_lf, num_samples/2, num_samples/2, u0, ref, x0_rv, x0_mean, x0_cov);
+    fun = @(u) CvMax(x0_rv_ext, x0_ext_mean, x0_ext_cov, u, u_lf, data.lqrsol{1}, data.lqrsol{2}, num_samples/2, num_samples/2);
     Uopt_num = fminunc(fun, u0_num, options);
     data.mlmc_fix_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
     data.mlmc_fix_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
@@ -475,11 +475,11 @@ for i=1:length(num_rv_samples)
     temp_mlmc_var_an = zeros(num_estimator_samples, 1);
     temp_mlmc_fix_var_an = zeros(num_estimator_samples, 1);
     for k=1:num_estimator_samples
-      temp_hf_var_an(k) = mc_var(data.lqrsol{1}, x0_ext_mean, x0_ext_cov, data.hf_u(:, j, k, i), num_rv_samples(i));
-      temp_mlmc_var_an(k) = cv_var(data.lqrsol{1}, data.lqrsol{2}, x0_ext_mean, x0_ext_cov, data.mlmc_u(:, j, k, i), num_rv_samples(i)/2);
+      temp_hf_var_an(k) = McVar(data.lqrsol{1}, x0_ext_mean, x0_ext_cov, data.hf_u(:, j, k, i), num_rv_samples(i));
+      temp_mlmc_var_an(k) = CvVar(data.lqrsol{1}, data.lqrsol{2}, x0_ext_mean, x0_ext_cov, data.mlmc_u(:, j, k, i), num_rv_samples(i)/2);
       u_lf = downsample_avg(data.mlmc_u(:, 1, k, i), 10);
       u_lf = u_lf(1:10:end, :);
-      temp_mlmc_fix_var_an(k) = cv_max_var(data.lqrsol{1}, data.lqrsol{2}, x0_ext_mean, x0_ext_cov, data.mlmc_fix_u(:, j, k, i), u_lf, num_rv_samples(i)/2);
+      temp_mlmc_fix_var_an(k) = CvMaxVar(data.lqrsol{1}, data.lqrsol{2}, x0_ext_mean, x0_ext_cov, data.mlmc_fix_u(:, j, k, i), u_lf, num_rv_samples(i)/2);
     end
     data.hf_var_an(j, i) = mean(temp_hf_var_an);
     data.mlmc_var_an(j, i) = mean(temp_mlmc_var_an);
@@ -704,25 +704,21 @@ plot_lf_raw.YData = uopt_lf(:, idx);
 hold(plot_hf_raw.Parent, 'off');
 end
 
-function cost = calc_mlmc_est(lqrsol_hf, lqrsol_lf, u_hf, n_hf, n_lf, u0, ref, x0_rv, x0_rv_mean, x0_rv_cov)
+function cost = Cv(x0_rv_ext, x0_mean, x0_cov, u_hf, lqrsol_hf, lqrsol_lf, n_hf, n_lf)
 % MC estimator for hf
-x0_rv_ext = [x0_rv(:, 1:n_hf); repmat(u0, 1, n_hf); repmat(ref, 1, n_hf)];
-cost_hf = mean(St.LQRCost(x0_rv_ext, u_hf, lqrsol_hf));
+cost_hf = mean(St.LQRCost(x0_rv_ext(:, 1:n_hf), u_hf, lqrsol_hf));
 
 % reuse same samples for LF
 u_lf = downsample_avg(u_hf, 10);
 u_lf = u_lf(1:10:end);
-cost_lf = mean(St.LQRCost(x0_rv_ext, u_lf, lqrsol_lf));
+cost_lf = mean(St.LQRCost(x0_rv_ext(:, 1:n_lf), u_lf, lqrsol_lf));
 
-% use all samples for expectation
-x0_rv_mean_ext = [x0_rv_mean; u0; ref];
-x0_rv_cov_ext = [x0_rv_cov, zeros(size(x0_rv_cov, 1), size(u0, 1) + size(ref, 1));
-  zeros(size(u0, 1) + size(ref, 1), size(x0_rv_cov, 1) + size(u0, 1) + size(ref, 1))];
-exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf);
-var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf);
+% use actual mean, cov for expectation
+exp_l = St.LQRExp(x0_mean, x0_cov, u_lf, lqrsol_lf);
+var_l = St.LQRVar(x0_mean, x0_cov, u_lf, lqrsol_lf);
 
 % calculate optimal alpha
-cov_hl = St.LQRCov(x0_rv_mean_ext, x0_rv_cov_ext, u_hf, u_lf, lqrsol_hf, lqrsol_lf);
+cov_hl = St.LQRCov(x0_mean, x0_cov, u_hf, u_lf, lqrsol_hf, lqrsol_lf);
 alpha = -cov_hl / var_l;
 global alpha_mc num_opt_iters;
 alpha_mc(num_opt_iters+1) = alpha;
@@ -730,28 +726,21 @@ cost = cost_hf + alpha * (cost_lf - exp_l);
 
 end
 
-function cost = calc_mlmc_est_max_corr(lqrsol_hf, lqrsol_lf, u_hf, u_lf, n_hf, n_lf, u0, ref, x0_rv, x0_rv_mean, x0_rv_cov)
+function cost = CvMax(x0_rv_ext, x0_mean, x0_cov, u_hf, u_lf, lqrsol_hf, lqrsol_lf, n_hf, n_lf)
 % MC estimator for hf
-x0_rv_ext = [x0_rv(:, 1:n_hf); repmat(u0, 1, n_hf); repmat(ref, 1, n_hf)];
-cost_hf = St.LQRCost(x0_rv_ext, u_hf, lqrsol_hf);
-cost_hf = mean(cost_hf);
+cost_hf = mean(St.LQRCost(x0_rv_ext(:, 1:n_hf), u_hf, lqrsol_hf));
 
 % reuse same samples for LF
 % u_lf = downsample_avg(u_hf, 10);
 % u_lf = u_lf(1:10:end);
-cost_lf = St.LQRCost(x0_rv_ext, u_lf, lqrsol_lf);
-cost_lf = mean(cost_lf);
+cost_lf = mean(St.LQRCost(x0_rv_ext(:, 1:n_lf), u_lf, lqrsol_lf));
 
-% use all samples for expectation
-x0_rv_mean_ext = [x0_rv_mean; u0; ref];
-x0_rv_cov_ext = [x0_rv_cov, zeros(size(x0_rv_cov, 1), size(u0, 1) + size(ref, 1));
-  zeros(size(u0, 1) + size(ref, 1), size(x0_rv_cov, 1) + size(u0, 1) + size(ref, 1))];
-exp_l = St.LQRExp(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf);
-var_l = St.LQRVar(x0_rv_mean_ext, x0_rv_cov_ext, u_lf, lqrsol_lf);
-
+% use actual mean, cov for expectation
+exp_l = St.LQRExp(x0_mean, x0_cov, u_lf, lqrsol_lf);
+var_l = St.LQRVar(x0_mean, x0_cov, u_lf, lqrsol_lf);
 
 % calculate optimal alpha
-cov_hl = St.LQRCov(x0_rv_mean_ext, x0_rv_cov_ext, u_hf, u_lf, lqrsol_hf, lqrsol_lf);
+cov_hl = St.LQRCov(x0_mean, x0_cov, u_hf, u_lf, lqrsol_hf, lqrsol_lf);
 alpha = -cov_hl / var_l;
 global alpha_mc num_opt_iters;
 alpha_mc(num_opt_iters+1) = alpha;
@@ -789,12 +778,12 @@ legend([l{:}], labels);
 grid on;
 end
 
-function var = mc_var(lqrsol, x0_rv_ext_mean, x0_rv_ext_cov, u, num_samples)
+function var = McVar(lqrsol, x0_rv_ext_mean, x0_rv_ext_cov, u, num_samples)
 var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol);
 var = var / num_samples;
 end
 
-function var = cv_var(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, n_hf)
+function var = CvVar(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, n_hf)
 var_hf = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol_hf);
 u_lf = downsample_avg(u, 10);
 u_lf = u_lf(1:10:end);
@@ -802,7 +791,7 @@ corr = St.LQRCorrMulti(x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, lqrsol_hf, lqrsol
 var = var_hf/n_hf * (1 - corr^2);
 end
 
-function var = cv_max_var(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, n_hf)
+function var = CvMaxVar(lqrsol_hf, lqrsol_lf, x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, n_hf)
 var_hf = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, u, lqrsol_hf);
 corr = St.LQRCorrMulti(x0_rv_ext_mean, x0_rv_ext_cov, u, u_lf, lqrsol_hf, lqrsol_lf);
 var = var_hf/n_hf * (1 - corr^2);
