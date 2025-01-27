@@ -3,7 +3,8 @@
 % - extend CV to work for any number of levels
 % - make indices consistent when storing U in row vs column (make everything row based)
 % - calculate correlation in cv estimator as it goes along instead of all at once
-% - make U and u consistent in naming
+%  - can delete the individual esimators after this in section F
+% - calculate cost of CV estimators to determine equal cost split
 
 clc; clear; close all force;
 %% A. state space model
@@ -392,13 +393,16 @@ data.cv_fix_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples
 data.hf_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.cv_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.cv_fix_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
+num_rv_samples_actual = zeros(length(num_rv_samples), 3); % 3 bc we have 3 estimators
 for num_samples=num_rv_samples
   fprintf("\n*** RV Samples: %d ***\n", num_samples);
   wait_bar = waitbar(0, "Running estimators with " + num_samples + " samples");
   lf_hf_cost_ratio = 0.2; % TODO get this experimentally for each num_samples
+  % calculate samples given cost ratio and HF=LF
   n_hf = int32(num_samples / (1 + lf_hf_cost_ratio));
   n_lf = n_hf;
   n_total = int32(max(n_lf, num_samples)); % account for weird splits like 0.999
+  num_rv_samples_actual(num_rv_samples == num_samples, :) = [num_samples, n_hf, n_lf];
   for i=1:num_estimator_samples
     waitbar(i/num_estimator_samples, wait_bar);
     % get the RV samples
@@ -438,8 +442,11 @@ for num_samples=num_rv_samples
 end
 
 %% plot costs
+fig = figure;
+fig.Position(3:4) = [1500 500];
+sgtitle("Cost vs iterations");
 for i=1:length(num_rv_samples)
-  fig = figure;
+  subplot(1, length(num_rv_samples), i);
   semilogy(squeeze(data.hf_cost(:, :, i)), 'LineWidth', 1, 'Color', [0 0 1, 0.1]);
   hold on;
   semilogy(squeeze(data.cv_cost(:, :, i)), 'LineWidth', 1, 'Color', [1 0 0, 0.1]);
@@ -448,10 +455,36 @@ for i=1:length(num_rv_samples)
   l{2} = plot(nan, 'r');
   l{3} = plot(nan, 'g');
   
-  title("Cost convergence vs iterations with "+num_rv_samples(i)+" samples");
+  title("Samples: HF="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2)+", CV fix="+num_rv_samples_actual(i, 3));
   xlabel("Iteration");
   ylabel("Cost");
   legend([l{:}], ["MC HF", "CV", "CV with max corr"]);
+  ylim([5e1 1e5]);
+  grid on;
+end
+
+%% plot percentiles
+percentiles = [25 75];
+markers = ["-", "--"];
+data.hf_prct = prctile(data.hf_cost, percentiles, 2);
+data.cv_prct = prctile(data.cv_cost, percentiles, 2);
+data.cv_fix_prct = prctile(data.cv_fix_cost, percentiles, 2);
+fig = figure;
+fig.Position(3:4) = [1500 500];
+sgtitle("Cost Percentiles vs iterations");
+for i=1:length(num_rv_samples)
+  subplot(1, length(num_rv_samples), i);
+  hold on;
+  for j=1:length(percentiles)
+    semilogy(5:max_iters, data.hf_prct(5:end, j, i), 'b', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "MC HF "+percentiles(j)+"%");
+    semilogy(5:max_iters, data.cv_prct(5:end, j, i), 'r', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "CV "+percentiles(j)+"%");
+    semilogy(5:max_iters, data.cv_fix_prct(5:end, j, i), 'g', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "CV with max corr "+percentiles(j)+"%");
+  end
+  title("Samples: HF="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2)+", CV fix="+num_rv_samples_actual(i, 3));
+  xlabel("Iteration");
+  ylabel("Cost");
+  legend show;
+  % ylim([1e2 2e2]);
   grid on;
 end
 
@@ -460,23 +493,27 @@ end
 data.hf_var_st = squeeze(var(data.hf_cost, 0, 2));
 data.cv_var_st = squeeze(var(data.cv_cost, 0, 2));
 data.cv_fix_var_st = squeeze(var(data.cv_fix_cost, 0, 2));
+fig = figure;
+fig.Position(3:4) = [1500 500];
+sgtitle("Variance of cost vs iterations");
 for i=1:length(num_rv_samples)
-  fig = figure;
+  subplot(1, length(num_rv_samples), i);
   semilogy(1:max_iters, data.hf_var_st(:, i), 'b', 'LineWidth', 1, 'DisplayName', 'MC HF');
   hold on;
   semilogy(1:max_iters, data.cv_var_st(:, i), 'r', 'LineWidth', 1, 'DisplayName', 'CV');
   semilogy(1:max_iters, data.cv_fix_var_st(:, i), 'g', 'LineWidth', 1, 'DisplayName', 'CV with max corr');
-  title("Cost variance vs iterations with "+num_rv_samples(i)+" samples");
+  title("Samples: HF="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2)+", CV fix="+num_rv_samples_actual(i, 3));
   xlabel("Iteration");
   ylabel("Variance");
   legend show;
+  ylim([5e0 2e5]);
   grid on;
 end
 
 %% plot convergence in solution
 for i=1:length(num_rv_samples)
   plot_convergence_dist(data.lqrsol{1}.Uopt, squeeze(data.hf_u(:, :, :, i)), squeeze(data.cv_u(:, :, :, i)), squeeze(data.cv_fix_u(:, :, :, i)), ...
-    ["MC HF", "CV", "CV with max corr"], "Convergence distance comparison with " + num_rv_samples(i) + " samples");
+    ["MC HF", "CV", "CV with max corr"], "Convergence distance comparison with " + num_rv_samples(i) + " HF samples");
 end
 
 %% save all data
