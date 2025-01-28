@@ -393,16 +393,15 @@ data.cv_fix_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples
 data.hf_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.cv_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.cv_fix_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
-num_rv_samples_actual = zeros(length(num_rv_samples), 3); % 3 bc we have 3 estimators
+num_rv_samples_actual = zeros(length(num_rv_samples), 2); % 2 bc we have [MC, CV]
 for num_samples=num_rv_samples
   fprintf("\n*** RV Samples: %d ***\n", num_samples);
   wait_bar = waitbar(0, "Running estimators with " + num_samples + " samples");
   lf_hf_cost_ratio = 0.2; % TODO get this experimentally for each num_samples
   % calculate samples given cost ratio and HF=LF
-  n_hf = int32(num_samples / (1 + lf_hf_cost_ratio));
-  n_lf = n_hf;
-  n_total = int32(max(n_lf, num_samples)); % account for weird splits like 0.999
-  num_rv_samples_actual(num_rv_samples == num_samples, :) = [num_samples, n_hf, n_lf];
+  n_cv = int32(num_samples / (1 + lf_hf_cost_ratio));
+  n_total = int32(max(n_cv, num_samples)); % account for weird splits like 0.999
+  num_rv_samples_actual(num_rv_samples == num_samples, :) = [num_samples, n_cv];
   for i=1:num_estimator_samples
     waitbar(i/num_estimator_samples, wait_bar);
     % get the RV samples
@@ -420,16 +419,12 @@ for num_samples=num_rv_samples
     data.hf_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
     
     % for CV estimator
-    num_opt_iters = 0;
-    num_opt_data = zeros(size(Uopt_hf,1), max_iters);
-    num_opt_fvals = zeros(1, max_iters);
-    fun = @(u) CvEst(x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_hf, n_lf, u);
-    Uopt_num = fminunc(fun, u0_num, options);
-    data.cv_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
-    data.cv_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
+    [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, false);
+    data.cv_cost(:, i, num_rv_samples == num_samples) = costs;
+    data.cv_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % for CV estimator with fixed LF solution
-    [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_hf, true);
+    [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, true);
     data.cv_fix_cost(:, i, num_rv_samples == num_samples) = costs;
     data.cv_fix_u(:, :, i, num_rv_samples == num_samples) = Us;
   end
@@ -450,7 +445,7 @@ for i=1:length(num_rv_samples)
   l{2} = plot(nan, 'r');
   l{3} = plot(nan, 'g');
   
-  title("Samples: HF="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2)+", CV fix="+num_rv_samples_actual(i, 3));
+  title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2));
   xlabel("Iteration");
   ylabel("Cost");
   legend([l{:}], ["MC HF", "CV", "CV with max corr"]);
@@ -475,7 +470,7 @@ for i=1:length(num_rv_samples)
     semilogy(5:max_iters, data.cv_prct(5:end, j, i), 'r', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "CV "+percentiles(j)+"%");
     semilogy(5:max_iters, data.cv_fix_prct(5:end, j, i), 'g', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "CV with max corr "+percentiles(j)+"%");
   end
-  title("Samples: HF="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2)+", CV fix="+num_rv_samples_actual(i, 3));
+  title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2));
   xlabel("Iteration");
   ylabel("Cost");
   legend show;
@@ -497,7 +492,7 @@ for i=1:length(num_rv_samples)
   hold on;
   semilogy(1:max_iters, data.cv_var_st(:, i), 'r', 'LineWidth', 1, 'DisplayName', 'CV');
   semilogy(1:max_iters, data.cv_fix_var_st(:, i), 'g', 'LineWidth', 1, 'DisplayName', 'CV with max corr');
-  title("Samples: HF="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2)+", CV fix="+num_rv_samples_actual(i, 3));
+  title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2));
   xlabel("Iteration");
   ylabel("Variance");
   legend show;

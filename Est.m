@@ -22,13 +22,12 @@ classdef Est
 				u_hla = Est.DownsampleAvg(u, 10);
 				cost_lf_all = St.LQRCost(x0_rv_ext(:, 1:n), lqrsol_lf, u_hla);
 				if use_best_U_lf
-                    Us(:, curr_iter) = u; % temporary init so it can be used here
-                    costs_lf(:, curr_iter) = cost_lf_all;
-
+					Us(:, curr_iter) = u; % temporary init so it can be used here
+					costs_lf(:, curr_iter) = cost_lf_all;
+					
 					% TODO: Us should be in rows to prevent transpose
 					corrs = St.CorrMulti2D(cost_hf_all', costs_lf(:, 1:curr_iter)');
 					[~, best_idx] = max(corrs);
-					% fprintf('It: %d, Best idx: %d, Corr: %f\n', curr_iter, best_idx, corrs(best_idx));
 					u_hla = Est.DownsampleAvg(Us(:, best_idx), 10);
 					cost_lf_all = costs_lf(:, best_idx);
 				end
@@ -45,8 +44,8 @@ classdef Est
 			function stop = OutFn(x, optimValues, state)
 				stop = false;
 				if isequal(state, 'iter')
-                    % curr_iter starts at 1, so increment after assignment
-                    Us(:, curr_iter) = x;
+					% curr_iter starts at 1, so increment after assignment
+					Us(:, curr_iter) = x;
 					costs(curr_iter) = optimValues.fval;
 					curr_iter = curr_iter+1;
 				end
