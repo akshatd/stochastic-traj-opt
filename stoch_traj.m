@@ -309,7 +309,7 @@ plot_corr_2d(corr_2d, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})
 
 %% F num opt with CV estimator
 %% F.1 normal CV Estimator
-cv_samples = 500;
+cv_samples = rv_samples/2;
 num_opt_iters = 0;
 num_opt_data = zeros(size(Uopt_hf,1), 100);
 global alpha_mc;
@@ -429,14 +429,9 @@ for num_samples=num_rv_samples
     data.cv_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
     
     % for CV estimator with fixed LF solution
-    u_lf = downsample_avg(num_opt_data(:, it_max_cor), 10); % take from prev
-    num_opt_iters = 0;
-    num_opt_data = zeros(size(Uopt_hf,1), max_iters);
-    num_opt_fvals = zeros(1, max_iters);
-    fun = @(u) CvEst(x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_hf, n_lf, u, u_lf);
-    Uopt_num = fminunc(fun, u0_num, options);
-    data.cv_fix_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
-    data.cv_fix_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
+    [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_hf, true);
+    data.cv_fix_cost(:, i, num_rv_samples == num_samples) = costs;
+    data.cv_fix_u(:, :, i, num_rv_samples == num_samples) = Us;
   end
   close(wait_bar);
 end

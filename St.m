@@ -10,7 +10,7 @@ classdef St
 		end
 		
 		% cost for multiple x0 samples with multiple Us
-		function cost = LQRCostMulti(x0_rv, lqrsol, U)
+		function cost = LQRCostMulti(x0_rv, lqrsol, U) % TODO: U should be in rows
 			items = size(U, 2);
 			cost = zeros(items, size(x0_rv, 2)); % rows are items, cols are samples
 			for i = 1:items
@@ -74,6 +74,7 @@ classdef St
 		
 		% correlation for multiple Us across all pairs given the mean and cov of x0
 		function corr = LQRCorrMulti2D(x0_mean, x0_cov, lqrsol_1, lqrsol_2, U_1, U_2)
+			% TODO: Us should be in rows
 			items = size(U_1, 2);
 			corr = zeros(items, items);
 			for i = 1:items
