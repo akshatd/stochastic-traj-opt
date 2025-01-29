@@ -390,9 +390,13 @@ options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun, "MaxI
 data.hf_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
 data.cv_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
 data.cv_fix_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
+data.acv_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
+data.acv_fix_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
 data.hf_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.cv_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.cv_fix_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
+data.acv_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
+data.acv_fix_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 num_rv_samples_actual = zeros(length(num_rv_samples), 2); % 2 bc we have [MC, CV]
 for num_samples=num_rv_samples
   fprintf("\n*** RV Samples: %d ***\n", num_samples);
@@ -408,7 +412,7 @@ for num_samples=num_rv_samples
     x0_rv = mvnrnd(x0_mean, x0_cov, n_total)';
     x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
     
-    % for just the HF cost fn
+    % MC with HF
     num_opt_iters = 0;
     num_opt_data = zeros(size(Uopt_hf,1), max_iters);
     num_opt_fvals = zeros(1, max_iters);
@@ -418,15 +422,25 @@ for num_samples=num_rv_samples
     data.hf_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
     data.hf_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
     
-    % for CV estimator
+    % CV
     [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, false);
     data.cv_cost(:, i, num_rv_samples == num_samples) = costs;
     data.cv_u(:, :, i, num_rv_samples == num_samples) = Us;
     
-    % for CV estimator with fixed LF solution
+    % CV with fixed LF solution
     [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, true);
     data.cv_fix_cost(:, i, num_rv_samples == num_samples) = costs;
     data.cv_fix_u(:, :, i, num_rv_samples == num_samples) = Us;
+    
+    % ACV
+    [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_cv, false);
+    data.acv_cost(:, i, num_rv_samples == num_samples) = costs;
+    data.acv_u(:, :, i, num_rv_samples == num_samples) = Us;
+    
+    % ACV with fixed LF solution
+    [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_cv, true);
+    data.acv_fix_cost(:, i, num_rv_samples == num_samples) = costs;
+    data.acv_fix_u(:, :, i, num_rv_samples == num_samples) = Us;
   end
   close(wait_bar);
 end
@@ -441,15 +455,19 @@ for i=1:length(num_rv_samples)
   hold on;
   semilogy(squeeze(data.cv_cost(:, :, i)), 'LineWidth', 1, 'Color', [1 0 0, 0.1]);
   semilogy(squeeze(data.cv_fix_cost(:, :, i)), 'LineWidth', 1, 'Color', [0 1 0, 0.1]);
+  semilogy(squeeze(data.acv_cost(:, :, i)), 'LineWidth', 1, 'Color', [1 0 1, 0.1]);
+  semilogy(squeeze(data.acv_fix_cost(:, :, i)), 'LineWidth', 1, 'Color', [0 1 1, 0.1]);
   l{1} = plot(nan, 'b');
   l{2} = plot(nan, 'r');
   l{3} = plot(nan, 'g');
+  l{4} = plot(nan, 'Color', [1 0 1]);
+  l{5} = plot(nan, 'Color', [0 1 1]);
   
-  title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2));
+  title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV/ACV="+num_rv_samples_actual(i, 2));
   xlabel("Iteration");
   ylabel("Cost");
-  legend([l{:}], ["MC HF", "CV", "CV with max corr"]);
-  ylim([5e1 1e5]);
+  legend([l{:}], ["MC HF", "CV", "CV with max corr", "ACV", "ACV with max corr"], 'Location', 'best');
+  % ylim([5e1 1e5]);
   grid on;
 end
 
@@ -459,6 +477,8 @@ markers = ["-", "--"];
 data.hf_prct = prctile(data.hf_cost, percentiles, 2);
 data.cv_prct = prctile(data.cv_cost, percentiles, 2);
 data.cv_fix_prct = prctile(data.cv_fix_cost, percentiles, 2);
+data.acv_prct = prctile(data.acv_cost, percentiles, 2);
+data.acv_fix_prct = prctile(data.acv_fix_cost, percentiles, 2);
 fig = figure;
 fig.Position(3:4) = [1500 500];
 sgtitle("Cost Percentiles vs iterations");
@@ -469,6 +489,8 @@ for i=1:length(num_rv_samples)
     semilogy(5:max_iters, data.hf_prct(5:end, j, i), 'b', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "MC HF "+percentiles(j)+"%");
     semilogy(5:max_iters, data.cv_prct(5:end, j, i), 'r', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "CV "+percentiles(j)+"%");
     semilogy(5:max_iters, data.cv_fix_prct(5:end, j, i), 'g', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "CV with max corr "+percentiles(j)+"%");
+    semilogy(5:max_iters, data.acv_prct(5:end, j, i), 'm', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "ACV "+percentiles(j)+"%");
+    semilogy(5:max_iters, data.acv_fix_prct(5:end, j, i), 'c', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "ACV with max corr "+percentiles(j)+"%");
   end
   title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2));
   xlabel("Iteration");
@@ -483,6 +505,8 @@ end
 data.hf_var_st = squeeze(var(data.hf_cost, 0, 2));
 data.cv_var_st = squeeze(var(data.cv_cost, 0, 2));
 data.cv_fix_var_st = squeeze(var(data.cv_fix_cost, 0, 2));
+data.acv_var_st = squeeze(var(data.acv_cost, 0, 2));
+data.acv_fix_var_st = squeeze(var(data.acv_fix_cost, 0, 2));
 fig = figure;
 fig.Position(3:4) = [1500 500];
 sgtitle("Variance of cost vs iterations");
@@ -492,11 +516,13 @@ for i=1:length(num_rv_samples)
   hold on;
   semilogy(1:max_iters, data.cv_var_st(:, i), 'r', 'LineWidth', 1, 'DisplayName', 'CV');
   semilogy(1:max_iters, data.cv_fix_var_st(:, i), 'g', 'LineWidth', 1, 'DisplayName', 'CV with max corr');
+  semilogy(1:max_iters, data.acv_var_st(:, i), 'm', 'LineWidth', 1, 'DisplayName', 'ACV');
+  semilogy(1:max_iters, data.acv_fix_var_st(:, i), 'c', 'LineWidth', 1, 'DisplayName', 'ACV with max corr');
   title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2));
   xlabel("Iteration");
   ylabel("Variance");
   legend show;
-  ylim([5e0 2e5]);
+  % ylim([5e0 2e5]);
   grid on;
 end
 
