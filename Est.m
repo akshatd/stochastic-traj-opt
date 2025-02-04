@@ -53,33 +53,34 @@ classdef Est
 			end
 		end
 		
-		function [costs, Us] = AcvOpt(u0, max_iters, x0_rv_ext, lqrsol_hf, lqrsol_lf, n, use_best_U_lf)
+		function [costs, Us] = AcvOpt(u0, max_iters, x0_rv_ext, lqrsol_hf, lqrsol_lf, n, m, use_best_U_lf)
 			costs = zeros(max_iters, 1);
 			Us = zeros(size(u0, 1), max_iters);
 			costs_lf = zeros(n, max_iters); % we use only n samples out of all in x0_rv
 			curr_iter = 1;
 			
 			options = optimoptions('fminunc', 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', 1e-12);
-			fminunc(@(u) AcvEst(x0_rv_ext, lqrsol_hf, lqrsol_lf, n, u, use_best_U_lf), u0, options);
+			fminunc(@(u) AcvEst(x0_rv_ext, lqrsol_hf, lqrsol_lf, n, m, u, use_best_U_lf), u0, options);
 			
 			% trim bc it somehow runs for more iterations
 			costs = costs(1:max_iters);
 			Us = Us(:, 1:max_iters);
 			
-			function cost = AcvEst(x0_rv_ext, lqrsol_hf, lqrsol_lf, n, u, use_best_U_lf)
+			function cost = AcvEst(x0_rv_ext, lqrsol_hf, lqrsol_lf, n, m, u, use_best_U_lf)
 				% MC estimator for hf
 				cost_hf_all = St.LQRCost(x0_rv_ext(:, 1:n), lqrsol_hf, u);
 				cost_hf = mean(cost_hf_all);
 				% reuse same samples for LF
 				u_hla = Est.DownsampleAvg(u, 10);
-				cost_lf_full = St.LQRCost(x0_rv_ext, lqrsol_lf, u_hla);
-				cost_lf_all = cost_lf_full(1:n);
+				cost_lf_all = St.LQRCost(x0_rv_ext(:, 1:n), lqrsol_lf, u_hla);
 				if use_best_U_lf
+					Us(:, curr_iter) = u; % temporary init so it can be used here
 					costs_lf(:, curr_iter) = cost_lf_all;
 					
 					% TODO: Us should be in rows to prevent transpose
 					corrs = St.CorrMulti2D(cost_hf_all', costs_lf(:, 1:curr_iter)');
 					[~, best_idx] = max(corrs);
+					u_hla = Est.DownsampleAvg(Us(:, best_idx), 10);
 					cost_lf_all = costs_lf(:, best_idx);
 				end
 				cost_lf = mean(cost_lf_all);
@@ -88,7 +89,7 @@ classdef Est
 				cov_hl = cov(cost_hf_all, cost_lf_all);
 				cov_hl = cov_hl(1, 2); % only off diagonal element
 				alpha = -cov_hl / var_l;
-				exp_l = mean(cost_lf_full);
+				exp_l = mean(St.LQRCost(x0_rv_ext(:, n+1:n+m), lqrsol_lf, u_hla));
 				cost = cost_hf + alpha * (cost_lf - exp_l);
 			end
 			

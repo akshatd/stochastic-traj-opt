@@ -404,7 +404,8 @@ for num_samples=num_rv_samples
   lf_hf_cost_ratio = 0.2; % TODO get this experimentally for each num_samples
   % calculate samples given cost ratio and HF=LF
   n_cv = int32(num_samples / (1 + lf_hf_cost_ratio));
-  n_total = int32(max(n_cv, num_samples)); % account for weird splits like 0.999
+  m_acv = n_cv*2; % change in the future
+  n_total = int32(max(n_cv+m_acv, num_samples)); % account for weird splits like 0.999
   num_rv_samples_actual(num_rv_samples == num_samples, :) = [num_samples, n_cv];
   for i=1:num_estimator_samples
     waitbar(i/num_estimator_samples, wait_bar);
@@ -433,12 +434,12 @@ for num_samples=num_rv_samples
     data.cv_fix_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % ACV
-    [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_cv, false);
+    [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_cv, m_acv, false);
     data.acv_cost(:, i, num_rv_samples == num_samples) = costs;
     data.acv_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % ACV with fixed LF solution
-    [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_cv, true);
+    [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_cv, m_acv, true);
     data.acv_fix_cost(:, i, num_rv_samples == num_samples) = costs;
     data.acv_fix_u(:, :, i, num_rv_samples == num_samples) = Us;
   end
