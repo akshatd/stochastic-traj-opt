@@ -397,16 +397,18 @@ data.cv_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_r
 data.cv_fix_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.acv_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.acv_fix_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
-num_rv_samples_actual = zeros(length(num_rv_samples), 2); % 2 bc we have [MC, CV]
+num_rv_samples_actual = zeros(length(num_rv_samples), 4); % 4 bc we have [MC, CV, n_ACV ,m_ACV]
+acv_exp_sample_factor = 2; % factor to increase samples for ACV Expectation, m
 for num_samples=num_rv_samples
   fprintf("\n*** RV Samples: %d ***\n", num_samples);
   wait_bar = waitbar(0, "Running estimators with " + num_samples + " samples");
   lf_hf_cost_ratio = 0.2; % TODO get this experimentally for each num_samples
   % calculate samples given cost ratio and HF=LF
   n_cv = int32(num_samples / (1 + lf_hf_cost_ratio));
-  m_acv = n_cv*2; % change in the future
-  n_total = int32(max(n_cv+m_acv, num_samples)); % account for weird splits like 0.999
-  num_rv_samples_actual(num_rv_samples == num_samples, :) = [num_samples, n_cv];
+  n_acv = int32(num_samples / (1 + lf_hf_cost_ratio + acv_exp_sample_factor*lf_hf_cost_ratio));
+  m_acv = int32(acv_exp_sample_factor * n_acv);
+  n_total = int32(max(n_cv+n_acv+m_acv, num_samples)); % account for weird splits like 0.999
+  num_rv_samples_actual(num_rv_samples == num_samples, :) = [num_samples, n_cv, n_acv, m_acv];
   for i=1:num_estimator_samples
     waitbar(i/num_estimator_samples, wait_bar);
     % get the RV samples
@@ -423,53 +425,27 @@ for num_samples=num_rv_samples
     data.hf_cost(:, i, num_rv_samples == num_samples) = num_opt_fvals(1:max_iters);
     data.hf_u(:, :, i, num_rv_samples == num_samples) = num_opt_data(:, 1:max_iters);
     
-    % CV
-    [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, false);
-    data.cv_cost(:, i, num_rv_samples == num_samples) = costs;
-    data.cv_u(:, :, i, num_rv_samples == num_samples) = Us;
-    
     % CV with fixed LF solution
     [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, true);
     data.cv_fix_cost(:, i, num_rv_samples == num_samples) = costs;
     data.cv_fix_u(:, :, i, num_rv_samples == num_samples) = Us;
     
-    % ACV
-    [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_cv, m_acv, false);
-    data.acv_cost(:, i, num_rv_samples == num_samples) = costs;
-    data.acv_u(:, :, i, num_rv_samples == num_samples) = Us;
-    
     % ACV with fixed LF solution
-    [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_cv, m_acv, true);
+    [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_acv, m_acv, true);
     data.acv_fix_cost(:, i, num_rv_samples == num_samples) = costs;
     data.acv_fix_u(:, :, i, num_rv_samples == num_samples) = Us;
+    
+    % CV
+    % [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, false);
+    % data.cv_cost(:, i, num_rv_samples == num_samples) = costs;
+    % data.cv_u(:, :, i, num_rv_samples == num_samples) = Us;
+    
+    % ACV
+    % [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_cv, m_acv, false);
+    % data.acv_cost(:, i, num_rv_samples == num_samples) = costs;
+    % data.acv_u(:, :, i, num_rv_samples == num_samples) = Us;
   end
   close(wait_bar);
-end
-
-%% plot costs
-fig = figure;
-fig.Position(3:4) = [1500 500];
-sgtitle("Cost vs iterations");
-for i=1:length(num_rv_samples)
-  subplot(1, length(num_rv_samples), i);
-  semilogy(squeeze(data.hf_cost(:, :, i)), 'LineWidth', 1, 'Color', [0 0 1, 0.1]);
-  hold on;
-  semilogy(squeeze(data.cv_cost(:, :, i)), 'LineWidth', 1, 'Color', [1 0 0, 0.1]);
-  semilogy(squeeze(data.cv_fix_cost(:, :, i)), 'LineWidth', 1, 'Color', [0 1 0, 0.1]);
-  semilogy(squeeze(data.acv_cost(:, :, i)), 'LineWidth', 1, 'Color', [1 0 1, 0.1]);
-  semilogy(squeeze(data.acv_fix_cost(:, :, i)), 'LineWidth', 1, 'Color', [0 1 1, 0.1]);
-  l{1} = plot(nan, 'b');
-  l{2} = plot(nan, 'r');
-  l{3} = plot(nan, 'g');
-  l{4} = plot(nan, 'Color', [1 0 1]);
-  l{5} = plot(nan, 'Color', [0 1 1]);
-  
-  title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV/ACV="+num_rv_samples_actual(i, 2));
-  xlabel("Iteration");
-  ylabel("Cost");
-  legend([l{:}], ["MC HF", "CV", "CV with max corr", "ACV", "ACV with max corr"], 'Location', 'best');
-  % ylim([5e1 1e5]);
-  grid on;
 end
 
 %% plot percentiles
@@ -493,7 +469,8 @@ for i=1:length(num_rv_samples)
     semilogy(5:max_iters, data.acv_prct(5:end, j, i), 'm', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "ACV "+percentiles(j)+"%");
     semilogy(5:max_iters, data.acv_fix_prct(5:end, j, i), 'c', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "ACV with max corr "+percentiles(j)+"%");
   end
-  title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2));
+  
+  title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV n="+num_rv_samples_actual(i, 2)+", ACV n="+num_rv_samples_actual(i, 3)+", m="+num_rv_samples_actual(i, 4));
   xlabel("Iteration");
   ylabel("Cost");
   legend show;
@@ -501,27 +478,40 @@ for i=1:length(num_rv_samples)
   grid on;
 end
 
-%% plot variance
+%% plot variance and box plots
 % 2nd dimension is estimator samples, squeeze to get rid of extra dimension
 data.hf_var_st = squeeze(var(data.hf_cost, 0, 2));
-data.cv_var_st = squeeze(var(data.cv_cost, 0, 2));
 data.cv_fix_var_st = squeeze(var(data.cv_fix_cost, 0, 2));
-data.acv_var_st = squeeze(var(data.acv_cost, 0, 2));
 data.acv_fix_var_st = squeeze(var(data.acv_fix_cost, 0, 2));
+% data.cv_var_st = squeeze(var(data.cv_cost, 0, 2));
+% data.acv_var_st = squeeze(var(data.acv_cost, 0, 2));
 fig = figure;
 fig.Position(3:4) = [1500 500];
 sgtitle("Variance of cost vs iterations");
 for i=1:length(num_rv_samples)
   subplot(1, length(num_rv_samples), i);
-  semilogy(1:max_iters, data.hf_var_st(:, i), 'b', 'LineWidth', 1, 'DisplayName', 'MC HF');
   hold on;
-  semilogy(1:max_iters, data.cv_var_st(:, i), 'r', 'LineWidth', 1, 'DisplayName', 'CV');
-  semilogy(1:max_iters, data.cv_fix_var_st(:, i), 'g', 'LineWidth', 1, 'DisplayName', 'CV with max corr');
-  semilogy(1:max_iters, data.acv_var_st(:, i), 'm', 'LineWidth', 1, 'DisplayName', 'ACV');
-  semilogy(1:max_iters, data.acv_fix_var_st(:, i), 'c', 'LineWidth', 1, 'DisplayName', 'ACV with max corr');
-  title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV="+num_rv_samples_actual(i, 2));
-  xlabel("Iteration");
+
+  yyaxis left;
+  semilogy(1:max_iters, data.hf_var_st(:, i), '-r', 'LineWidth', 1, 'DisplayName', 'MC HF');
+  semilogy(1:max_iters, data.cv_fix_var_st(:, i), '-g', 'LineWidth', 1, 'DisplayName', 'CV with max corr');
+  semilogy(1:max_iters, data.acv_fix_var_st(:, i), '-b', 'LineWidth', 1, 'DisplayName', 'ACV with max corr');
+  % semilogy(1:max_iters, data.cv_var_st(:, i), 'c', 'LineWidth', 1, 'DisplayName', 'CV');
+  % semilogy(1:max_iters, data.acv_var_st(:, i), 'm', 'LineWidth', 1, 'DisplayName', 'ACV');
   ylabel("Variance");
+
+  yyaxis right;
+  boxplot(data.hf_cost(5:max_iters, :, i)', 'Positions', 5:max_iters, 'Colors', 'r', 'Widths', 0.5, 'Whisker', 1);
+  boxplot(data.cv_fix_cost(5:max_iters, :, i)', 'Positions', 5:max_iters, 'Colors', 'g', 'Widths', 1, 'Whisker', 1);
+  boxplot(data.acv_fix_cost(5:max_iters, :, i)', 'Positions', 5:max_iters, 'Colors', 'b', 'Widths', 0.5, 'Whisker', 1);
+  ylabel("Cost/Objective");
+  
+  ax = gca;
+  ax.YAxis(1).Scale ="log";
+  ax.YAxis(2).Scale ="log";
+  ax.XAxis.TickValues = 1:max_iters;
+  title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV n="+num_rv_samples_actual(i, 2)+", ACV n="+num_rv_samples_actual(i, 3)+", m="+num_rv_samples_actual(i, 4));
+  xlabel("Iteration");
   legend show;
   % ylim([5e0 2e5]);
   grid on;
@@ -529,8 +519,8 @@ end
 
 %% plot convergence in solution
 for i=1:length(num_rv_samples)
-  plot_convergence_dist(data.lqrsol{1}.Uopt, squeeze(data.hf_u(:, :, :, i)), squeeze(data.cv_u(:, :, :, i)), squeeze(data.cv_fix_u(:, :, :, i)), ...
-    ["MC HF", "CV", "CV with max corr"], "Convergence distance comparison with " + num_rv_samples(i) + " HF samples");
+  plot_convergence_dist(data.lqrsol{1}.Uopt, squeeze(data.hf_u(:, :, :, i)), squeeze(data.cv_fix_u(:, :, :, i)), squeeze(data.acv_fix_u(:, :, :, i)), ...
+    ["MC HF", "CV with max corr", "ACV with max corr"], "Convergence distance comparison with " + num_rv_samples(i) + " HF samples");
 end
 
 %% save all data
@@ -777,14 +767,14 @@ else
 end
 figure;
 % handle alpha to be min 0.1 and max 1 based on how many lines there are
-semilogy(dist_hf, 'LineWidth', 1, 'Color', [0 0 1, max(0.1, 1/size(dist_hf, 1))]);
+semilogy(dist_hf, 'LineWidth', 1, 'Color', [1 0 0, max(0.1, 1/size(dist_hf, 1))]);
 hold on;
 % plot means with thicker lines
-semilogy(dist_cv, 'LineWidth', 1, 'Color', [1 0 0, max(0.1, 1/size(dist_cv, 1))]);
-semilogy(dist_cv_fix, 'LineWidth', 1, 'Color', [0 1 0, max(0.1, 1/size(dist_cv_fix, 1))]);
-l{1} = semilogy(dist_hf_mean, 'b', "Marker", "x", 'LineWidth', 2);
-l{2} = semilogy(dist_cv_mean, 'r', "Marker", "x", 'LineWidth', 2);
-l{3} = semilogy(dist_cv_fix_mean, 'g', "Marker", "x", 'LineWidth', 2);
+semilogy(dist_cv, 'LineWidth', 1, 'Color', [0 1 0, max(0.1, 1/size(dist_cv, 1))]);
+semilogy(dist_cv_fix, 'LineWidth', 1, 'Color', [0 0 1, max(0.1, 1/size(dist_cv_fix, 1))]);
+l{1} = semilogy(dist_hf_mean, 'r', "Marker", "o", 'LineWidth', 1);
+l{2} = semilogy(dist_cv_mean, 'g', "Marker", "o", 'LineWidth', 1);
+l{3} = semilogy(dist_cv_fix_mean, 'b', "Marker", "o", 'LineWidth', 1);
 title(title_str);
 xlabel("Iteration");
 ylabel("Distance to analytical solution");
