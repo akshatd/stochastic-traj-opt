@@ -1,15 +1,15 @@
 {
-	"runOnSave.commands": [
-		{
-		"match": ".*\\.md$",
-		// "command": "pandoc ${fileDirname}/*.md --resource-path=${fileDirname} -o ${workspaceFolder}/artefacts/${fileBasenameNoExtension}.pdf",
-		"command": "pandoc README.md --resource-path=${fileDirname} -o ${workspaceFolder}/artefacts/notes.pdf",
-		"runningStatusMessage": "Exporting ${fileBasename} to PDF...",
-		"finishStatusMessage": "${fileBasename} exported to PDF",
-		// "runIn": "backend",
-		"runIn": "terminal",
-		// "runIn": "vscode",
-		}
-],
+// 	"runOnSave.commands": [
+// 		{
+// 		"match": ".*\\.md$",
+// 		// "command": "pandoc ${fileDirname}/*.md --resource-path=${fileDirname} -o ${workspaceFolder}/artefacts/${fileBasenameNoExtension}.pdf",
+// 		"command": "pandoc README.md --resource-path=${fileDirname} -o ${workspaceFolder}/artefacts/notes.pdf",
+// 		"runningStatusMessage": "Exporting ${fileBasename} to PDF...",
+// 		"finishStatusMessage": "${fileBasename} exported to PDF",
+// 		// "runIn": "backend",
+// 		"runIn": "terminal",
+// 		// "runIn": "vscode",
+// 		}
+// ],
 
 }

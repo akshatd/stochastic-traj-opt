@@ -543,7 +543,7 @@ Combining these, we get the covariance as
 
 $$
 \begin{aligned}
-   \text{Cov}[J_1(U_1), J_2(U_2)] &= L_1^T \text{Cov}[x_0] L_2 + 2 \mathbb{E}[x_0^T] N_2 \text{Cov}[x_0] L_1 + 2 \mathbb{E}[x_0^T] N_1 \text{Cov}[x_0] L_2 \hdots \\
+   \text{Cov}[J_1(U_1), J_2(U_2)] &= L_1^T \text{Cov}[x_0] L_2 + 2 \mathbb{E}[x_0^T] N_2 \text{Cov}[x_0] L_1 + 2 \mathbb{E}[x_0^T] N_1 \text{Cov}[x_0] L_2 \dots \\
    & \quad + 2 \text{tr}(N_1 \text{Cov}[x_0] N_2 \text{Cov}[x_0]) + 4 \mathbb{E}[x_0^T]N_1\text{Cov}[x_0]N_2\mathbb{E}[x_0]
 \end{aligned}
 $$
@@ -552,8 +552,6 @@ We can verify that the expected value and variance of the random cost function w
 
 ![Distribution of the Cost Function](figs/0.05_cost_dist.svg){width=50%}
 ![Distribution of the Cost Function](figs/0.5_cost_dist.svg){width=50%}
-
-$\pagebreak$
 
 ## Bias for both cases of fidelity (EXTRA)
 
