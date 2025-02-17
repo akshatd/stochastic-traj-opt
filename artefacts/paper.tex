@@ -4,6 +4,8 @@
 \usepackage{amsmath} % Required for some math elements
 \usepackage{hyperref} % Required for hyperlinks
 \usepackage{amssymb} % Required for probability symbols
+\usepackage{algorithm}
+\usepackage{algpseudocode}
 
 \title{MultifidelityTrajectoryOptimization}
 \author{goroda }
@@ -25,9 +27,10 @@ TODO: background
 \section{Problem Formulation}
 This secition describes how the state space model of the dynamics is set up, along with the controller design and cost function for the trajectory optimization problem.
 \subsection{Mass-Spring-Damper System}
-For this paper, a simplified trajectory optimization problem is considered that is easy to understand and analyze.
+For this paper, a simplified trajectory optimization problem is considered for ease of modelling.
 The objective is to solve a reference tracking problem for the position and velocity of a simple mass-spring-damper system.
 The mass-spring-damper system has the following parameters:
+
 \begin{itemize}
   \item $m = 5$ g : Mass
   \item $k = 2$ N/m : Spring constant
@@ -39,19 +42,22 @@ The mass-spring-damper system has the following parameters:
 Given an external force $F$ and the acceleration of the system $\ddot{x}$,
 the dynamics of the system can be written as the equality of forces acting on the mass:
 
-\begin{equation}
-  m\ddot{x} = F - c\dot{x} - kx
-  \implies \ddot{x} = \frac{F}{m} - \frac{c}{m}\dot{x} - \frac{k}{m}x
-\end{equation}
+$$
+\begin{aligned}
+  m\ddot{x} &= F - c\dot{x} - kx \\
+  \implies \ddot{x} &= \frac{F}{m} - \frac{c}{m}\dot{x} - \frac{k}{m}x
+\end{aligned}
+$$
 
-The position $x$ and velocity $\dot{x}$ of the mass-spring-damper system can be changed using the control input $u$,
-which applies the force $F$ on the mass. This yields the following dynamics
+We have the state as $[x \dot{x}]^T$ containing the position and velocity of the mass, both of which are observed.
+The control input $u=F$ is applied to the mass, yielding the following state space model:
 
-\begin{equation}
+$$
+\begin{aligned}
   \begin{bmatrix}
     \dot{x} \\
     \ddot{x}
-  \end{bmatrix} =
+  \end{bmatrix} &=
   \begin{bmatrix}
     0 & 1 \\
     -\frac{k}{m}  -\frac{c}{m}
@@ -63,13 +69,8 @@ which applies the force $F$ on the mass. This yields the following dynamics
   \begin{bmatrix}
     0 \\
     \frac{1}{m}
-  \end{bmatrix} u
-\end{equation}
-
-For a closed-loop system, the output $y$ of the system needs to be observed, which is both the position and velocity in this case.
-
-\begin{equation}
-  y =
+  \end{bmatrix} u \\
+  y &=
   \begin{bmatrix}
     1 & 0 \\
     0 & 1
@@ -78,23 +79,24 @@ For a closed-loop system, the output $y$ of the system needs to be observed, whi
     x \\
     \dot{x}
   \end{bmatrix}
-\end{equation}
+\end{aligned}
+$$
 
-This yields an LTI system in the form of $\dot{x} = Ax + Bu$ and $y = Cx$, where
+Thus, we have a standard continuous-time LTI system $\dot{x} = A_cx + B_cu$ and $y = C_cx$, where
 
 \begin{equation}
   \begin{aligned}
-    A &=
+    A_c &=
     \begin{bmatrix}
       0 & 1 \\
       -\frac{k}{m} & -\frac{c}{m}
     \end{bmatrix} \\
-    B &=
+    B_c &=
     \begin{bmatrix}
       0 \\
       \frac{1}{m}
     \end{bmatrix} \\
-    C &=
+    C_c &=
     \begin{bmatrix}
       1 & 0 \\
       0 & 1
@@ -103,14 +105,23 @@ This yields an LTI system in the form of $\dot{x} = Ax + Bu$ and $y = Cx$, where
 \end{equation}
 
 \subsection{LQR Controller} \label{lqr_ctrl}
+The continuous-time system can be converted to discrete time using such that $x_{k+1} = A x_k + B u_k$ and $y_k = C x_k$ for a chosen sampling time $T_s$.
+The $A$ and $B$ matrices for the discrete time system are then used to formulate the cost function for the LQR problem.
+
 We set up an LQR controller to track the reference position and velocity of the mass-spring-damper system.
 An LQR controller was chosen because it has a quadratic cost function that can be minimized analytically and gives us a
 good reference for the trajectory optimization problem.
 
-To set up the LQR controller, we need to define the cost function of the system, which consists of:
+The LQR controller minimizes the cost function
+
+$$
+\min_{u_0, u_1 ... u_{N-1}}J = \sum_{k=0}^{N-1} (e_k^T Q_e e_k + \Delta u_k^T R \Delta u_k)
+$$
+
+Where
 
 \begin{itemize}
-  \item $u_0, u_1 ... u_{N-1}$ : control inputs at each timestep of the trajectory
+  \item $\Delta u_0, \Delta u_1 ... \Delta u_{N-1}$ : control inputs at each timestep of the trajectory
   \item $J$ : total cost to be minimized
   \item $N$ : time horizon
   \item $x_k$ : state vector at time step $k$
@@ -121,60 +132,204 @@ To set up the LQR controller, we need to define the cost function of the system,
   \item $Q_e$ : error cost matrix
   \item $R$ : control cost matrix
 \end{itemize}
-The LQR controller minimizes the cost function
 
-\begin{equation}
-  \min_{u_0, u_1 ... u_{N-1}}J = \sum_{k=0}^{N-1} (e_k^T Q_e e_k + \Delta u_k^T R \Delta u_k)
-\end{equation}
+Note that we can add a terminal penalty using the DARE solution for the LQR problem, but for simplicity we will not consider it here.
 
-\subsection{Stochastic LQR Controller} \label{stochastic_lqr}
-We will consider the case where the initial state $x_0$ is stochastic, with mean $\mu$ and covariance $\Sigma$.
-The control input vector $U$ is still deterministic.
+To track the error $e_k$, we extend the state vector $x_k$ to include the control input $u_{k-1}$ and the reference output $r_k$.
 
-In this case, the state vector $X$ is stochastic, owing to the the initial condition $x_0$ being a vector of random variables. The state propagation equations are now expectations
+$$
+x_k^{ext} =
+\begin{bmatrix}
+  x_k \\
+  u_{k-1} \\
+  r_k
+\end{bmatrix}
+$$
+
+With the resulting state space model
 
 \begin{equation}
   \begin{aligned}
-    \mathbb{E}[x_1] &= \mathbb{E}[A x_0 + B u_0] = A \mathbb{E}[x_0] + B u_0 \\
-    \mathbb{E}[x_2] &= \mathbb{E}[A x_1 + B u_1] = A \mathbb{E}[x_1] + B u_1 = A^2 \mathbb{E}[x_0] + A B u_0 + B u_1 \\
-    \vdots \\
-    \mathbb{E}[x_N] &= \mathbb{E}[A x_{N-1} + B u_{N-1}] = A \mathbb{E}[x_{N-1}] + B u_{N-1} \\
-    &= A^N \mathbb{E}[x_0] + A^{N-1} B u_0 + A^{N-2} B u_1 + \ldots + B u_{N-1} \\
+    x_{k+1}^{ext} &=
+    \begin{bmatrix}
+      A & B & 0 \\
+      0 & \mathbb{I}_{n_u \times n_u} & 0 \\
+      0 & 0 & \mathbb{I}_{n_r \times n_r}
+    \end{bmatrix}
+    \begin{bmatrix}
+      x_k \\
+      u_{k-1} \\
+      r_k
+    \end{bmatrix} +
+    \begin{bmatrix}
+      B \\
+      \mathbb{I}_{n_u \times n_u} \\
+      0
+    \end{bmatrix} \Delta u_k \\
   \end{aligned}
 \end{equation}
 
-The matrices $S$ and $M$ remain the same, and we have the following expression for the expected value of the state vector $X$
+with
 
-$$
-\mathbb{E}[X] = S U + M \mathbb{E}[x_0]
-$$
-
-The cost matrices $\bar{Q}$ and $\bar{R}$ are also the same. The cost function $J$ is now a random variable,
-with an expected value $\mathbb{E}[J]$ and variance $Var[J]$.
-
-The expected value of the cost function over all possible realizations of the initial conditions is
 $$
 \begin{aligned}
-  \mathbb{E}[J] &= \mathbb{E}[x_N^T P x_N + \sum_{k=0}^{N-1} (x_k^T Q x_k + u_k^T R u_k)] \\
-  &= \mathbb{E}[X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0] \\
-  &= \mathbb{E}[X^T \bar{Q} X] + \mathbb{E}[U^T \bar{R} U] + \mathbb{E}[x_0^T Q x_0] \\
-  &= \mathbb{E}[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + \mathbb{E}[x_0^T Q x_0] \\
-  &= \mathbb{E}[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
-  &= U^T S^T \bar{Q} S U + \mathbb{E}[U^T S^T \bar{Q} M x_0] + \mathbb{E}[x_0^T M^T \bar{Q} S U] + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
-  &= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M \mathbb{E}[x_0] + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
-  &= U^T (S^T \bar{Q} S + \bar{R}) U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} M \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \text{Cov}[x_0]) \hdots \\
-  & \quad + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
-  &= U^T (S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \text{Cov}[x_0]) \\
+  A^{ext} &=
+  \begin{bmatrix}
+    A & B & 0 \\
+    0 & \mathbb{I}_{n_u \times n_u} & 0 \\
+    0 & 0 & \mathbb{I}_{n_r \times n_r}
+  \end{bmatrix} \\
+  B^{ext} &=
+  \begin{bmatrix}
+    B \\
+    \mathbb{I}_{n_u \times n_u} \\
+    0
+  \end{bmatrix}
 \end{aligned}
 $$
 
-Assuming $\mathbb{E}[x_0]$ and $\text{Cov}[x_0]$ is calculated using a Monte Carlo estimator, we can write the cost function as
+Similary, $Qe$ with the extended state $x_k^{ext}$ transforms to $Q$ such that $e_k^T Q_e e_k = x_k^{ext^T} Q x_k^{ext}$.
+
+$$
+\begin{aligned}
+  e_k^T Q_e e_k &= (y_k - r_k)^T Q_e (y_k - r_k) \\
+  &= \left(
+    \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
+    \end{bmatrix}
+    \begin{bmatrix}
+      x_k \\
+      u_{k-1} \\
+      r_k
+  \end{bmatrix}\right)^T Q_e
+  \left(
+    \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
+    \end{bmatrix}
+    \begin{bmatrix}
+      x_k \\
+      u_{k-1} \\
+      r_k
+  \end{bmatrix}\right) \\
+  &= x_k^{ext^T}
+  \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
+  \end{bmatrix}^T Q_e
+  \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
+  \end{bmatrix} x_k^{ext} \\
+\end{aligned}
+$$
+
+\begin{equation}
+  Q =
+  \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
+  \end{bmatrix}^T Q_e
+  \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
+  \end{bmatrix}
+\end{equation}
+
+For simplicity, from now on we refer to $x_k^{ext}$ as $x_k$, $A^{ext}$ as $A$ and $B^{ext}$ as $B$.
+The cost function can now be written as
+
+$$
+J = \sum_{k=0}^{N-1} x_k^T Q x_k + \Delta u_k^T R \Delta u_k
+$$
+
+Using the state transition formula
+
+$$
+\begin{aligned}
+  x_1 &= A x_0 + B u_0 \\
+  x_2 &= A x_1 + B u_1 = A(A x_0 + B u_0) + B u_1 = A^2 x_0 + A B u_0 + B u_1 \\
+  \vdots \\
+  x_N &= A x_{N-1} + B u_{N-1} = A^{N-1} x_0 + A^{N-2} B u_0 + A^{N-3} B u_1 + \ldots + B u_{N-1} \\
+  \implies x_k &= A^k x_0 + \sum_{i=0}^{k-1} A^{k-1-i} B u_i
+\end{aligned}
+$$
+
+We construct the matrices $X$, $U$, $S$ and $M$ such that $X = SU + Mx_0$.
+
+$$
+\begin{aligned}
+  X &=
+  \begin{bmatrix}
+    x_1^{ext} \\
+    x_2^{ext} \\
+    \vdots \\
+    x_N^{ext}
+  \end{bmatrix} & \in \mathbb{R}^{Nn_x \times 1} \\
+  U &=
+  \begin{bmatrix}
+    \Delta u_0 \\
+    \Delta u_1 \\
+    \vdots \\
+    \Delta u_{N-1}
+  \end{bmatrix} & \in \mathbb{R}^{Nn_u \times 1} \\
+  S &=
+  \begin{bmatrix}
+    B & 0 & \ldots & 0 \\
+    AB & B & \ldots & 0 \\
+    \vdots & \vdots & \ddots & \vdots \\
+    A^{N-1} B & A^{N-2} B & \ldots & B
+  \end{bmatrix} & \in \mathbb{R}^{Nn_x \times Nn_u} \\
+  M &=
+  \begin{bmatrix}
+    A \\
+    A^2 \\
+    \vdots \\
+    A^N
+  \end{bmatrix} & \in \mathbb{R}^{Nn_x \times n_x}
+\end{aligned}
+$$
+
+Similarly, the matrices $\bar{Q}$ and $\bar{R}$ are constructed
+
+$$
+\begin{aligned}
+  \bar{Q} &=
+  \begin{bmatrix}
+    Q & 0 & \ldots & 0 \\
+    0 & Q & \ldots & 0 \\
+    \vdots & \vdots & \ddots & \vdots \\
+    0 & 0 & \ldots & 0
+  \end{bmatrix} \text{with size } Nn_x \times Nn_x \\
+  \bar{R} &=
+  \begin{bmatrix}
+    R & 0 & \ldots & 0 \\
+    0 & R & \ldots & 0 \\
+    \vdots & \vdots & \ddots & \vdots \\
+    0 & 0 & \ldots & R
+  \end{bmatrix} \text{with size } Nn_u \times Nn_u
+\end{aligned}
+$$
+
+The cost function can then be written as a quadratic function of the control inputs $U$
+
+\begin{equation}
+  \begin{aligned}
+    J &= \sum_{k=0}^{N-1} x_k^T Q x_k + \Delta u_k^T R \Delta u_k \\
+    % \text{ (extra $x_0$ term because it is not in $X$)} \\
+    &= X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0 \\
+    &= (S U + M x_0)^T \bar{Q} (S U + M x_0) + U^T \bar{R} U + x_0^T Q x_0 \\
+    % & \text{note } (A + B)^T = A^T + B^T \text{ and } (AB)^T = B^T A^T \\
+    &= (U^T S^T + x_0^T M^T) \bar{Q} (S U + M x_0) + U^T \bar{R} U + x_0^T Q x_0 \\
+    % & \text{note } A(B + C) = AB + AC \\
+    &= (U^T S^T + x_0^T M^T) (\bar{Q} S U + \bar{Q} M x_0) + U^T \bar{R} U + x_0^T Q x_0 \\
+    &= U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0 + U^T \bar{R} U + x_0^T Q x_0 \\
+    % & \text{note } \bar{Q} \text{ is symmetric so it doesnt need to be transposed} \\
+    &= U^T S^T \bar{Q} S U + (x_0^T M^T \bar{Q} S U)^T + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0 + U^T \bar{R} U + x_0^T Q x_0 \\
+    % & \text{note } x_0^T M^T \bar{Q} S U \text{ is a scalar(check its dimensions), so its transpose is itself} \\
+    &= U^T S^T \bar{Q} S U + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0 + U^T \bar{R} U + x_0^T Q x_0 \\
+    % & \text{combining all quadratic and repeated terms} \\
+    &= U^T (S^T \bar{Q} S + \bar{R}) U + 2 x_0^T M^T \bar{Q} S U + x_0^T(M^T \bar{Q} M + Q) x_0\\
+  \end{aligned}
+\end{equation}
+
+Let
 
 $$
 \begin{aligned}
   H &= S^T \bar{Q} S + \bar{R} = H^T \\
-  q &= (\mathbb{E}[x_0^T] M^T \bar{Q} S)^T = S^T \bar{Q} M \mathbb{E}[x_0] \\
-  c &= \mathbb{E}[x_0^T] (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \text{Cov}[x_0])
+  &\text{(quadratic multiplication by diagnonal($\bar{Q}$) results in a symmetric, R is symmetric)} \\
+  q &= (x_0^T M^T \bar{Q} S)^T = S^T \bar{Q} M x_0 \\
+  c &= x_0^T (M^T \bar{Q} M + Q) x_0
 \end{aligned}
 $$
 
@@ -187,46 +342,105 @@ $$
 Which has a gradient with respect to $U$ as
 
 $$
-\Delta J = 2 H U + 2 q^T
+\frac{\partial J}{\partial U} = 2 H U + 2 q^T
 $$
 
 Assuming minimum exists, we can set the gradient to zero to get the optimal control input $U^*$
 
+\begin{equation}
+  \begin{aligned}
+    \frac{\partial J}{\partial U} &= 2 H U + 2 q^T = 0 \\
+    \implies U^* &= -H^{-1} q
+  \end{aligned}
+\end{equation}
+
+\subsection{Stochastic LQR Controller} \label{stochastic_lqr}
+
+We consider the case where the initial state $x_0$ is stochastic, with mean $\mu$ and covariance $\Sigma$.
+Hence, the state vector $X$ is stochastic, since it is propagating the randomness of $x_0$ forward.
+The control input vector $U$ is deterministic. The cost function $J$ is now a random variable,
+with an expected value $\mathbb{E}[J]$ and variance $Var[J]$.
+
+\subsubsection{Solution of the Stochastic LQR controller}
+
+The expected value of the cost function over all possible realizations of $x_0$ is
+
+\begin{equation}
+  \begin{aligned}
+    \mathbb{E}[J] &= \mathbb{E}[\sum_{k=0}^{N-1} x_k^T Q x_k + \Delta u_k^T R \Delta u_k] \\
+    &= \mathbb{E}[X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0] \\
+    &= \mathbb{E}[X^T \bar{Q} X] + \mathbb{E}[U^T \bar{R} U] + \mathbb{E}[x_0^T Q x_0] \\
+    &= \mathbb{E}[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + \mathbb{E}[x_0^T Q x_0] \\
+    &= \mathbb{E}[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
+    &= U^T S^T \bar{Q} S U + \mathbb{E}[U^T S^T \bar{Q} M x_0] + \mathbb{E}[x_0^T M^T \bar{Q} S U] + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
+    &= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M \mathbb{E}[x_0] + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
+    &= U^T (S^T \bar{Q} S + \bar{R}) U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} M \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \text{Cov}[x_0]) \dots \\
+    & \quad + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
+    &= U^T (S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \text{Cov}[x_0]) \\
+  \end{aligned}
+\end{equation}
+
+Let
+
 $$
 \begin{aligned}
-  \Delta J &= 2 H U + 2 q^T = 0 \\
-  \implies U^* &= -H^{-1} q
+  H &= S^T \bar{Q} S + \bar{R} = H^T \\
+  q &= (\mathbb{E}[x_0^T] M^T \bar{Q} S)^T = S^T \bar{Q} M \mathbb{E}[x_0] \\
+  c &= \mathbb{E}[x_0^T] (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \text{Cov}[x_0])
 \end{aligned}
 $$
+
+The expectation of cost function can be written as
+
+$$
+\mathbb{E}[J] = U^T H U + 2 q^T U + c
+$$
+
+Which has a gradient with respect to $U$ as
+
+$$
+\frac{\partial \mathbb{E}[J]}{\partial U} = 2 H U + 2 q^T
+$$
+
+Assuming minimum exists, we can set the gradient to zero to get the optimal control input $U^*$ that minimizes the expected value of the cost function
+
+\begin{equation}
+  \begin{aligned}
+    \frac{\partial \mathbb{E}[J]}{\partial U} &= 2 H U + 2 q^T = 0 \\
+    \implies U^* &= -H^{-1} q
+  \end{aligned}
+\end{equation}
+
+\subsubsection{Variance and Covariance of cost function in terms of initial state}
 
 % ref for quadratic form: https://en.wikipedia.org/wiki/Quadratic_form_(statistics)
-
-The cost function can be rewritten as
-
-$$
-\begin{aligned}
-  J &= U^T(S^T \bar{Q} S + \bar{R}) U + 2 x_0^T M^T \bar{Q} S U + x_0^T(M^T \bar{Q} M + Q) x_0 \\
-  \text{Let}& \\
-  K &= U^T(S^T \bar{Q} S + \bar{R}) U \\
-  L &= 2 M^T \bar{Q} S U \\
-  N &= M^T \bar{Q} M + Q = N^T \\
-  &\text{(quadratic multiplication by diagnonal($\bar{Q}$) results in a symmetric, $Q$ is symmetric)} \\
-  \text{Then}& \\
-  J &= K + x_0^T L + x_0^T N x_0 \\
-\end{aligned}
-$$
-
-Then, the expectation and variance of the cost function is as follows. Take note that the random variable here is $x_0$ and $\mathbb{E}[x_0]$ is a scalar.
-
 % ref:
 % - https://www.math.uwaterloo.ca/~hwolkowi/matrixcookbook.pdf
 % - https://math.stackexchange.com/questions/2163694/expectation-of-quartic-form-for-multivariate-gaussian/4247240#4247240
 % - https://math.stackexchange.com/questions/1302882/variance-of-a-quadratic-form
 
+The expected value of the cost function can be rewritten as
+
+$$
+\mathbb{E}[J] = K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] + \text{tr}(N \text{Cov}[x_0]) \\
+$$
+
+Where
+
+$$
+\begin{aligned}
+  x_0 &\sim \mathcal{N}(\mu, \Sigma) \\
+  K &= U^T(S^T \bar{Q} S + \bar{R}) U \\
+  L &= 2 M^T \bar{Q} S U \\
+  N &= M^T \bar{Q} M + Q = N^T \\
+  &\text{(quadratic multiplication by diagnonal($\bar{Q}$) results in a symmetric, $Q$ is symmetric)} \\
+\end{aligned}
+$$
+
+Using this, the variance can be calculated.
+
 \begin{equation}
   \begin{aligned}
-    \mathbb{E}[J] &= \mathbb{E}[K] + \mathbb{E}[x_0^T L] + \mathbb{E}[x_0^T N x_0] \\
-    &= K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] + \text{tr}(N \text{Cov}[x_0]) \\
     Var[J] &= Var[K + x_0^T L + x_0^T N x_0] \\
     &\text{note: $K$ is deterministic, so its variance is 0} \\
     & \text{note: $x_0^T L$ is a scalar, $x_0^T L = L^T x_0$} \\
@@ -282,35 +496,35 @@ the covariance between their costs can be calculated as
 
 Determining the covariance of each component in equation \ref{eq:covariance},
 
-\begin{equation}
-  \begin{aligned}
-    \text{Cov}[x_0^T L_1, x_0^T L_2] &= \text{Cov}[L_1^T x_0, L_2^T x_0] \text{ transpose of a scalar is itself} \\
-    &= L_1^T \text{Cov}[x_0] L_2 \\
-  \end{aligned}
-\end{equation}
+$$
+\begin{aligned}
+  \text{Cov}[x_0^T L_1, x_0^T L_2] &= \text{Cov}[L_1^T x_0, L_2^T x_0] \text{ transpose of a scalar is itself} \\
+  &= L_1^T \text{Cov}[x_0] L_2 \\
+\end{aligned}
+$$
 
-\begin{equation}
-  % - https://www.researchgate.net/publication/243770190_Quadratic_Forms_in_Random_Variables P74, 3.2d.9
-  \begin{aligned}
-    \text{Cov}[x_0^T L_1, x_0^T N_2 x_0] &= \text{Cov}[x_0^T N_2 x_0, L_1^T x_0] \text{ transpose of a scalar is itself} \\
-    &= 2 \mathbb{E}[x_0^T] N_2 \text{Cov}[x_0] L_1 \\
-  \end{aligned}
-\end{equation}
+$$
+% - https://www.researchgate.net/publication/243770190_Quadratic_Forms_in_Random_Variables P74, 3.2d.9
+\begin{aligned}
+  \text{Cov}[x_0^T L_1, x_0^T N_2 x_0] &= \text{Cov}[x_0^T N_2 x_0, L_1^T x_0] \text{ transpose of a scalar is itself} \\
+  &= 2 \mathbb{E}[x_0^T] N_2 \text{Cov}[x_0] L_1 \\
+\end{aligned}
+$$
 
-\begin{equation}
-  % - https://www.researchgate.net/publication/243770190_Quadratic_Forms_in_Random_Variables P74, 3.2d.9
-  \begin{aligned}
-    \text{Cov}[x_0^T N_1 x_0, x_0^T L_2] &= \text{Cov}[x_0^T N_1 x_0, L_2^T x_0] \text{ transpose of a scalar is itself} \\
-    &= 2 \mathbb{E}[x_0^T] N_1 \text{Cov}[x_0] L_2 \\
-  \end{aligned}
-\end{equation}
+$$
+% - https://www.researchgate.net/publication/243770190_Quadratic_Forms_in_Random_Variables P74, 3.2d.9
+\begin{aligned}
+  \text{Cov}[x_0^T N_1 x_0, x_0^T L_2] &= \text{Cov}[x_0^T N_1 x_0, L_2^T x_0] \text{ transpose of a scalar is itself} \\
+  &= 2 \mathbb{E}[x_0^T] N_1 \text{Cov}[x_0] L_2 \\
+\end{aligned}
+$$
 
-\begin{equation}
-  % - https://www.researchgate.net/publication/243770190_Quadratic_Forms_in_Random_Variables P75, 3.2d.12
-  \begin{aligned}
-    \text{Cov}[x_0^T N_1 x_0, x_0^T N_2 x_0] &= 2 \text{tr}(N_1 \text{Cov}[x_0] N_2 \text{Cov}[x_0]) + 4 \mathbb{E}[x_0^T]N_1\text{Cov}[x_0]N_2\mathbb{E}[x_0] \\
-  \end{aligned}
-\end{equation}
+$$
+% - https://www.researchgate.net/publication/243770190_Quadratic_Forms_in_Random_Variables P75, 3.2d.12
+\begin{aligned}
+  \text{Cov}[x_0^T N_1 x_0, x_0^T N_2 x_0] &= 2 \text{tr}(N_1 \text{Cov}[x_0] N_2 \text{Cov}[x_0]) + 4 \mathbb{E}[x_0^T]N_1\text{Cov}[x_0]N_2\mathbb{E}[x_0] \\
+\end{aligned}
+$$
 
 Combining these, we get the covariance as
 
@@ -322,6 +536,7 @@ Combining these, we get the covariance as
 \end{equation}
 
 \section{Monte Carlo with Control Variates}
+TODO: explain why we need control variates
 
 This section formulates the stochastic trajectory optimization problem as a Monte Carlo problem with a low fidelity control variate.
 
@@ -566,9 +781,71 @@ Note that $\text{Cov}(J_h(u_h, x_0), J_l(u_{hla}, x_0))$, $\text{Var}[J_l(u_{hla
 The numerical optimizer was run in 3 different scenarios
 
 \begin{itemize}
-  \item $S_n^{MC}(J_h(u_h, x_0))$: MC estimate of the high fidelity cost function
-  \item $S_n^{CV}(J_h, J_l)$: CV estimate with $u_{hla}$ at the current iteration
-  \item $S_n^{CV_{max}}(J_h, J_l)$:CV estimate with $u_{hla}$ at the iteration with the highest correlation
+  \item $S_n^{MC}(J_h(U_h, x_0))$: MC estimate of the high fidelity cost function
+  \item $S_n^{CV}(J_h(U_h, x_0), J_l(U_{hla}, x_0))$: CV estimate with $u_{hla}$ at the current iteration
+  \item $S_n^{CV_{max}}(J_h(U_h, x_0), J_l(U_{hla}^{max}, x_0))$:CV estimate where $u_{hla}^{max}$ is at the iteration with the highest correlation.
+\end{itemize}
+
+This is how the whole routine works, step-by-step:
+
+Initialization:
+\begin{itemize}
+  \item $U_l^* \gets$ Analytical solution of low fidelity model
+  \item $U_{h_0} \gets T_{lh} U_l^*$
+\end{itemize}
+
+% For $S_n^{CV}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+% \begin{equation}
+%   S_n^{CV}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}, x_0)) - \mathbb{E}[J_l(U_{hla}, x_0)])
+% \end{equation}
+
+% Where
+% \begin{itemize}
+%   \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
+%   \item $U_{hla} = T_{hla} U$
+%   \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0), J_l(U_{hla}, x_0))}{\text{Var}[J_l(U_{hla}, x_0)]}$ is calculated analytically
+%   \item $\mathbb{E}[J_l(U_{hla}, x_0)]$ is calculated analytically
+% \end{itemize}
+
+% For $S_n^{CV_{max}}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+% \begin{equation}
+%   S_n^{CV_{max}}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}^{max}, x_0)) - \mathbb{E}[J_l(U_{hla}^{max}, x_0)])
+% \end{equation}
+
+% Where
+% \begin{itemize}
+%   \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
+%   \item $U_{hla} = T_{hla} U$
+%   \item $U_{hla}^{max} = \underset{U_{hla}(j)}{max} \{\rho(J_h(U(i), x_0^n), J_l(U_{hla}(j), x_0^n))\}_{j=1}^i$
+%   \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0), J_l(U_{hla}^{max}, x_0))}{\text{Var}[J_l(U_{hla}^{max}, x_0)]}$ is calculated analytically
+%   \item $\mathbb{E}[J_l(U_{hla}^{max}, x_0)]$ is calculated analytically
+% \end{itemize}
+
+For $S_{nm}^{ACV}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+\begin{equation}
+  S_{nm}^{ACV}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}, x_0)) - S_m^{MC}(J_l(U_{hla}, x_0)))
+\end{equation}
+
+Where
+\begin{itemize}
+  \item $m$: Total number of samples of $x_0$
+  \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S_m^{MC}(J_h(U, x_0))$ (without considering the cost of $S_m^{MC}(J_l(U_{hla}, x_0))$)
+  \item $U_{hla} = T_{hla} U$
+  \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0^n), J_l(U_{hla}, x_0^n))}{\text{Var}[J_l(U_{hla}, x_0^n)]}$ is calculated statistically with $n$ samples
+\end{itemize}
+
+For $S_{nm}^{ACV_{max}}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+\begin{equation}
+  S_{nm}^{ACV_{max}}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}^{max}, x_0)) - S_m^{MC}(J_l(U_{hla}^{max}, x_0)))
+\end{equation}
+
+Where
+\begin{itemize}
+  \item $m$: Total number of samples of $x_0$
+  \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S_m^{MC}(J_h(U, x_0))$ (without considering the cost of $S_m^{MC}(J_l(U_{hla}, x_0))$)
+  \item $U_{hla} = T_{hla} U$
+  \item $U_{hla}^{max} = \underset{U_{hla}(j)}{max} \{\rho(J_h(U(i), x_0^n), J_l(U_{hla}(j), x_0^n))\}_{j=1}^i$
+  \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0^n), J_l(U_{hla}^{max}, x_0^n))}{\text{Var}[J_l(U_{hla}^{max}, x_0^n)]}$ is calculated statistically with $n$ samples
 \end{itemize}
 
 For these experiments, $n$, the number of samples of $x_0$ used in the MC estimate, was compared between 10, 100, 500 and 1000.
