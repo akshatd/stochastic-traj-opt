@@ -25,20 +25,16 @@ TODO: introduction
 TODO: background
 
 \section{Problem Formulation}
-This secition describes how the state space model of the dynamics is set up, along with the controller design and cost function for the trajectory optimization problem.
+In this paper, we propose a multifidelity approach to stochastic trajectory optimization with sample average approximation.
+The objective is to minimize the expected value of the objective function, which is chosen an an LQR controller for a mass-spring-damper system.
+A mass-spring-damper system is considered for ease of modelling, since the focus is on the multifidelity approach
+and not on the complexity of the system dynamics.
+The LQR controller attempts to find the optimal trajectory for tracking a reference position and velocity of the mass-spring-damper system.
+This section describes how the dynamics for the mass-spring-damper is set up, along with the controller design and objective function for the trajectory optimization problem.
+
 \subsection{Mass-Spring-Damper System}
-For this paper, a simplified trajectory optimization problem is considered for ease of modelling.
-The objective is to solve a reference tracking problem for the position and velocity of a simple mass-spring-damper system.
-The mass-spring-damper system has the following parameters:
-
-\begin{itemize}
-  \item $m = 5$ g : Mass
-  \item $k = 2$ N/m : Spring constant
-  \item $c = 0.5$ Ns/m : Damping coefficient
-    % \item Initial position: $x_0 = 0$ m
-    % \item Initial velocity: $\dot{x}_0 = 0$ m/s
-\end{itemize}
-
+The mass-spring-damper system is a second order system that can be modelled using Newton's second law of motion.
+The system in consideration has a mass $m=5$ g, spring constant $k=2$ N/m and damping coefficient $c=0.5$ Ns/m.
 Given an external force $F$ and the acceleration of the system $\ddot{x}$,
 the dynamics of the system can be written as the equality of forces acting on the mass:
 
@@ -49,8 +45,8 @@ $$
 \end{aligned}
 $$
 
-We have the state as $[x \dot{x}]^T$ containing the position and velocity of the mass, both of which are observed.
-The control input $u=F$ is applied to the mass, yielding the following state space model:
+We have the state $[x \dot{x}]^T$ that contains the position and velocity of the mass, both of which are observed.
+The control input $u=F$ is applied to the mass, yielding the following state-space model:
 
 $$
 \begin{aligned}
@@ -106,34 +102,24 @@ Thus, we have a standard continuous-time LTI system $\dot{x} = A_cx + B_cu$ and 
 
 \subsection{LQR Controller} \label{lqr_ctrl}
 The continuous-time system can be converted to discrete time using such that $x_{k+1} = A x_k + B u_k$ and $y_k = C x_k$ for a chosen sampling time $T_s$.
-The $A$ and $B$ matrices for the discrete time system are then used to formulate the cost function for the LQR problem.
+The $A$ and $B$ matrices for the discrete time system are then used to formulate the objective function for the LQR problem.
 
 We set up an LQR controller to track the reference position and velocity of the mass-spring-damper system.
-An LQR controller was chosen because it has a quadratic cost function that can be minimized analytically and gives us a
+An LQR controller was chosen because it has a quadratic objective function that can be minimized analytically and gives us a
 good reference for the trajectory optimization problem.
 
-The LQR controller minimizes the cost function
+The LQR controller minimizes the objective function.
 
 $$
 \min_{u_0, u_1 ... u_{N-1}}J = \sum_{k=0}^{N-1} (e_k^T Q_e e_k + \Delta u_k^T R \Delta u_k)
 $$
 
-Where
-
-\begin{itemize}
-  \item $\Delta u_0, \Delta u_1 ... \Delta u_{N-1}$ : control inputs at each timestep of the trajectory
-  \item $J$ : total cost to be minimized
-  \item $N$ : time horizon
-  \item $x_k$ : state vector at time step $k$
-  \item $u_k$ : control input vector at time step $k$
-  \item $\Delta u_k = u_k - u_{k-1}$ : change in control input at time step $k$
-  \item $r_k$ : reference output at time step $k$
-  \item $e_k = y_k - r_k = Cx - r_k$ : error in the output at time step $k$
-  \item $Q_e$ : error cost matrix
-  \item $R$ : control cost matrix
-\end{itemize}
-
-Note that we can add a terminal penalty using the DARE solution for the LQR problem, but for simplicity we will not consider it here.
+Where $\Delta u_0, \Delta u_1 ... \Delta u_{N-1}$ are the control inputs at each timestep of the trajectory,
+$J$ is the objective function to be minimized, $N$ is the prediction horizon, $x_k$ is the state vector at time step $k$,
+$u_k$ is the control input vector at time step $k$, $\Delta u_k = u_k - u_{k-1}$ is the change in control input at time step $k$,
+$r_k$ is the reference output at time step $k$, $e_k = y_k - r_k = Cx - r_k$ is the error in the output at time step $k$,
+$Q_e$ is the error penalty matrix and $R$ is the control penalty matrix.
+Note that we can add a terminal penalty using the DARE solution for the LQR problem, but for simplicity, we will not consider it here.
 
 To track the error $e_k$, we extend the state vector $x_k$ to include the control input $u_{k-1}$ and the reference output $r_k$.
 
@@ -146,7 +132,7 @@ x_k^{ext} =
 \end{bmatrix}
 $$
 
-With the resulting state space model
+With the resulting state-space model
 
 \begin{equation}
   \begin{aligned}
@@ -226,7 +212,7 @@ $$
 \end{equation}
 
 For simplicity, from now on we refer to $x_k^{ext}$ as $x_k$, $A^{ext}$ as $A$ and $B^{ext}$ as $B$.
-The cost function can now be written as
+The objective function can now be written as
 
 $$
 J = \sum_{k=0}^{N-1} x_k^T Q x_k + \Delta u_k^T R \Delta u_k
@@ -289,18 +275,18 @@ $$
     0 & Q & \ldots & 0 \\
     \vdots & \vdots & \ddots & \vdots \\
     0 & 0 & \ldots & 0
-  \end{bmatrix} \text{with size } Nn_x \times Nn_x \\
+  \end{bmatrix} & \in \mathbb{R}^{Nn_x \times Nn_x} \\
   \bar{R} &=
   \begin{bmatrix}
     R & 0 & \ldots & 0 \\
     0 & R & \ldots & 0 \\
     \vdots & \vdots & \ddots & \vdots \\
     0 & 0 & \ldots & R
-  \end{bmatrix} \text{with size } Nn_u \times Nn_u
+  \end{bmatrix} & \in \mathbb{R}^{Nn_u \times Nn_u}
 \end{aligned}
 $$
 
-The cost function can then be written as a quadratic function of the control inputs $U$
+The objective function can then be written as a quadratic function of the control inputs $U$
 
 \begin{equation}
   \begin{aligned}
@@ -333,19 +319,19 @@ $$
 \end{aligned}
 $$
 
-The cost function can now be written as a quadratic function of the control inputs $U$
+The objective function can now be written as a quadratic function of the control inputs $U$
 
 $$
 J = U^T H U + 2 q^T U + c
 $$
 
-Which has a gradient with respect to $U$ as
+This has a gradient with respect to $U$ as
 
 $$
 \frac{\partial J}{\partial U} = 2 H U + 2 q^T
 $$
 
-Assuming minimum exists, we can set the gradient to zero to get the optimal control input $U^*$
+Assuming a minimum exists, we can set the gradient to zero to obtain the optimal control input $U^*$
 
 \begin{equation}
   \begin{aligned}
@@ -354,16 +340,16 @@ Assuming minimum exists, we can set the gradient to zero to get the optimal cont
   \end{aligned}
 \end{equation}
 
-\subsection{Stochastic LQR Controller} \label{stochastic_lqr}
+\subsection{Stochastic LQR Controller} \label{lqr_ctrl_stoch}
 
 We consider the case where the initial state $x_0$ is stochastic, with mean $\mu$ and covariance $\Sigma$.
-Hence, the state vector $X$ is stochastic, since it is propagating the randomness of $x_0$ forward.
-The control input vector $U$ is deterministic. The cost function $J$ is now a random variable,
+Hence, the state vector $X$ is stochastic, as it propagates the randomness of $x_0$ forward.
+The control input vector $U$ is deterministic. The objective function $J$ is now a random variable,
 with an expected value $\mathbb{E}[J]$ and variance $Var[J]$.
 
 \subsubsection{Solution of the Stochastic LQR controller}
 
-The expected value of the cost function over all possible realizations of $x_0$ is
+The expected value of the objective function on all possible realizations of $x_0$ is
 
 \begin{equation}
   \begin{aligned}
@@ -390,19 +376,19 @@ $$
 \end{aligned}
 $$
 
-The expectation of cost function can be written as
+The expectation of objective function can be written as
 
 $$
 \mathbb{E}[J] = U^T H U + 2 q^T U + c
 $$
 
-Which has a gradient with respect to $U$ as
+This has a gradient with respect to $U$ as
 
 $$
 \frac{\partial \mathbb{E}[J]}{\partial U} = 2 H U + 2 q^T
 $$
 
-Assuming minimum exists, we can set the gradient to zero to get the optimal control input $U^*$ that minimizes the expected value of the cost function
+Assuming a minimum exists, we can set the gradient to zero to obtain the optimal control input $U^*$ that minimizes the expected value of the objective function.
 
 \begin{equation}
   \begin{aligned}
@@ -411,7 +397,7 @@ Assuming minimum exists, we can set the gradient to zero to get the optimal cont
   \end{aligned}
 \end{equation}
 
-\subsubsection{Variance and Covariance of cost function in terms of initial state}
+\subsubsection{Variance and Covariance of objective function in terms of initial state}
 
 % ref for quadratic form: https://en.wikipedia.org/wiki/Quadratic_form_(statistics)
 % ref:
@@ -419,13 +405,13 @@ Assuming minimum exists, we can set the gradient to zero to get the optimal cont
 % - https://math.stackexchange.com/questions/2163694/expectation-of-quartic-form-for-multivariate-gaussian/4247240#4247240
 % - https://math.stackexchange.com/questions/1302882/variance-of-a-quadratic-form
 
-The expected value of the cost function can be rewritten as
+The expected value of the objective function can be rewritten as
 
 $$
 \mathbb{E}[J] = K + \mathbb{E}[x_0^T] L + \mathbb{E}[x_0^T] N \mathbb{E}[x_0] + \text{tr}(N \text{Cov}[x_0]) \\
 $$
 
-Where
+where
 
 $$
 \begin{aligned}
@@ -449,10 +435,10 @@ Using this, the variance can be calculated.
   \end{aligned}
 \end{equation}
 
-To determine the covariance between the costs of two solutions $U_1$ and $U_2$, in different cost functions
-$J_1$ and $J_2$, we need to first rewrite the cost functions to differentiate between them.
+To determine the covariance between the objectives of two solutions $U_1$ and $U_2$, in different objective functions
+$J_1$ and $J_2$, we need to rewrite the objective functions to differentiate between them.
 
-For $U_1$, the cost function is
+For $U_1$, the objective function is
 
 $$
 \begin{aligned}
@@ -466,7 +452,7 @@ $$
 \end{aligned}
 $$
 
-Similarly, for $U_2$, the cost function is
+Similarly, for $U_2$, the objective function is
 
 $$
 \begin{aligned}
@@ -484,7 +470,7 @@ $$
 % - https://math.stackexchange.com/questions/1302882/variance-of-a-quadratic-form
 % - https://stats.stackexchange.com/questions/303466/prove-that-mathrmcovxtax-xtbx-2-mathrmtra-sigma-b-sigma-4-mu
 % - https://stats.stackexchange.com/questions/35084/covariance-of-a-linear-and-quadratic-form-of-a-multivariate-normal
-the covariance between their costs can be calculated as
+The covariance between their objectives can be calculated as
 
 \begin{equation}\label{eq:covariance}
   \begin{aligned}
@@ -536,322 +522,162 @@ Combining these, we get the covariance as
 \end{equation}
 
 \section{Monte Carlo with Control Variates}
-TODO: explain why we need control variates
 
-This section formulates the stochastic trajectory optimization problem as a Monte Carlo problem with a low fidelity control variate.
+The objective of this paper is to reduce the variance of the objective function estimation under sample average approximation.
+A Monte Carlo(MC) simulation can be used to estimate the expected value of the objective function, but a control variate(CV) approach
+would reduce the variance with the same computational cost. In the absence of an analytical expression of the expected value of the
+objective function, an approximate control variate(ACV) approach is also proposed. The CV estimator will also serve as
+the benchmark for the ACV estimator, since it is the best possible variance reduction that can be achieved with the ACV estimator.
 
-\subsection{Comparing optimums of high and low fidelity models} \label{comp_opt}
+In order to formulate the CV and ACV approaches, we need a low-fidelity(LF) model of the system that correlates well
+with the high-fidelity(HF) model. The LF model should be computationally cheaper to evaluate than the
+HF model, and hence can be used as a control variate to reduce the variance of the objective function
+estimation.
 
-To determine if the low fidelity model can be used as a control variate, we need to determine if it correlates with the high fidelity model.
+For this paper, the HF model is the LQR controller described in section \ref{lqr_ctrl_stoch}, with a time
+discrectization of 0.05s and the LF model is the same LQR controller but with a time discrectization of 0.5s.
+The solution for the LQR controller with the LF model contains fewer elements than the HF model due to there being
+fewer time steps for the same prediction horizon. For CV/ACV construction, we need to be able to use the same
+HF control input in the LF model for the estimators to be effective.
 
-System Setup:
-\begin{itemize}
-  \item $J_h(u, x_0)$: High fidelity model/cost function
-  \item $J_l(u, x_0)$: Low fidelity model/cost function
-  \item $u_h$: Control input in high fidelity model, $n_{u_h} \times 1$
-  \item $u_l$: Control input in low fidelity model, $n_{u_l} \times 1$
-  \item $x_0$: Random initial state
-  \item $u_h^*$: High fidelity optimum
-  \item $u_l^*$: Low fidelity optimum
-\end{itemize}
+Hence, it is necessary to downsample the HF solution if we want to use it with the LF model in the CV/ACV estimators.
 
-$u_h$ and $u_l$ do not have the same dimensions, so to compare them we need to scale them to the same dimensions.
+To downsample $U_h \rightarrow U_l$, we can either restrict the dimensions of $U_h$ to match $U_l$ or average the elements of $U_h$ to match the dimensions of $U_l$.
+In case of restriction, $U_{hlr} = T_{hlr} U_h$ while in case of averaging, $U_{hla} = T_{hla} U_h$.
+$T_{hlr}$, $T_{hla} \in \mathbb{R}^{n_{U_l} \times n_{U_h}}$.
 
-To upsample $u_l \rightarrow u_h$, we repeat the elements of $u_l$ to match the dimensions of $u_h$.
-This can be seen as multiplying $u_l$ with a matrix $T_{lh}$ of size $n_{u_h} \times n_{u_l}$:
+$$
+T_{hlr} =
+\begin{bmatrix}
+  1 & 0 & \ldots & 0 & 0 \\
+  0 & \ldots & 1 & \ldots & 0 \\
+  \vdots & \ddots & \vdots & \ddots & \vdots \\
+  0 & 0 & \ldots & 0 & 1 \\
+\end{bmatrix}
+$$
 
-\begin{equation}
-  T_{lh} =
-  \begin{bmatrix}
-    1 & 0 & \ldots & 0 \\
-    1 & 0 & \ldots & 0 \\
-    \vdots & \vdots & \ddots & \vdots \\
-    0 & 1 & \ldots & 0 \\
-    0 & 1 & \ldots & 0 \\
-    \vdots & \vdots & \ddots & \vdots \\
-    0 & 0 & \ldots & 1 \\
-    0 & 0 & \ldots & 1 \\
-    \vdots & \vdots & \ddots & \vdots \\
-  \end{bmatrix}
-\end{equation}
+Where the number of columns after which the next one is selected is determined by the ratio $r_{hl} = n_{U_h} / n_{U_l}$.
 
-where the number of repeating ones in each column is determined by the ratio $r_{hl} = n_{u_h} / n_{u_l}$.
-This gives us $u_{lh} = T_{lh} u_l$, which can be compared with $u_h$.
+$$
+T_{hla} =
+\begin{bmatrix}
+  r_{lh} & \ldots & 0 & 0 & 0 \\
+  0 & \ldots & r_{lh} & \ldots & 0 \\
+  \vdots & \ddots & \vdots & \vdots & \vdots \\
+  0 & 0 & 0 & r_{lh} & \ldots \\
+\end{bmatrix}
+$$
 
-To downsample $u_h \rightarrow u_l$, we can either restrict the dimensions of $u_h$ to match $u_l$ or average the elements of $u_h$ to match the dimensions of $u_l$.
+Where $r_{lh} = n_{U_l} / n_{U_h}$ is repeated $r_{hl}$ times in each row.
 
-In case of restriction, we can multiply $u_h$ with a matrix $T_{hlr}$ of size $n_{u_l} \times n_{u_h}$:
-
-\begin{equation}
-  T_{hlr} =
-  \begin{bmatrix}
-    1 & 0 & \ldots & 0 & 0 \\
-    0 & \ldots & 1 & \ldots & 0 \\
-    \vdots & \ddots & \vdots & \ddots & \vdots \\
-    0 & 0 & \ldots & 0 & 1 \\
-  \end{bmatrix}
-\end{equation}
-
-Where the number of columns after which the next one is selected is determined by the ratio $r_{hl} = n_{u_h} / n_{u_l}$.
-This gives us $u_{hlr} = T_{hlr} u_h$, which can be compared with $u_l$.
-
-To downsample $u_h$ to $u_l$ by averaging, we need the ratio $r_{lh} = n_{u_h} / n_{u_l}$.
-We can then multiply $u_h$ with a matrix $T_{hla}$ of size $n_{u_l} \times n_{u_h}$:
+Let $J_h$ and $J_l$ be the objective functions of the HF and LF models respectively. Then, for us to construct a
+CV/ACV estimator, we need to consider the correlation between them. With a higher correlation, we get a greater variance reduction
+We calculate the Pearson correlation coefficient $\rho$ using the covariance of the objectives
+as described in section \ref{lqr_ctrl_stoch}.
 
 \begin{equation}
-  T_{hla} =
-  \begin{bmatrix}
-    r_{lh} & \ldots & 0 & 0 & 0 \\
-    0 & \ldots & r_{lh} & \ldots & 0 \\
-    \vdots & \ddots & \vdots & \vdots & \vdots \\
-    0 & 0 & 0 & r_{lh} & \ldots \\
-  \end{bmatrix}
+  \rho(J(U_h), J(U_l)) = \frac{\text{Cov}(J(U_h), J(U_l))}{\sigma_h \sigma_l}
 \end{equation}
 
-Where $r_{lh}$ is repeated $r_{hl}$ times in each row.
-This gives us $u_{hla} = T_{hla} u_h$, which can be compared with $u_l$.
+\subsection{CV and ACV Construction}
 
-\subsection{Correlation between high and low fidelity models}
+First, we define the Monte Carlo estimator $S_n^{MC}(J_h(U_h, x_0))$ for the HF objective as a baseline.
 
-$u_h$ and $u_l$ each have $n_{u_h}$ and $n_{u_l}$ dimensions respectively, which represent the time steps of the simulation.
-After converting them to the same dimensions as done in section \ref{comp_opt},
-the cost for some realizations of the initial state $x_0$ can be computed.
-Hence, a set of costs of both high and low fidelity control inputs can be computed for a certain model/cost function.
-The correlation coefficient $\rho$ can then be computed between the distribution of the cost function values.
-To illustrate this, assume there are $N$ realizations of the initial state $x_0$, and $J$ is the cost function.
-$u_h$ and $u_l$ are the control inputs for the high and low fidelity models respectively, where the dimensions have been
-converted to the same number as described in section \ref{comp_opt}. $\mu_h$ and $\mu_l$ are the mean costs
-of the high and low fidelity control inputs respectively, and $\sigma_h$ and $\sigma_l$ are the standard deviations of
-the costs of the high and low fidelity control inputs respectively.
+$$
+S_n^{MC}(J_h(U_h, x_0)) = \frac{1}{n} \sum_{i=1}^{n} J_h(U_h, x_0^{(i)})
+$$
 
-\begin{equation}
-  \rho(J(u_h), J(u_l)) = \frac{1}{N-1} \sum_{i=1}^{N} \left( \frac{J(u_h, x_0^i) - \mu_h}{\sigma_h} \right) \left( \frac{J(u_l, x_0^i) - \mu_l}{\sigma_l} \right)
-\end{equation}
+Where $n$ is the number of samples of $x_0$ used in the MC estimate.
 
-This can be simplified to:
+The CV estimator $S_{n_{cv}}^{CV}(J_h, J_l)$ is constructed using both the HF and LF objectives, and the
+analytical expectation of the LF objective function.
 
-\begin{equation}
-  \rho(J(u_h), J(u_l)) = \frac{\text{Cov}(J(u_h), J(u_l))}{\sigma_h \sigma_l}
-\end{equation}
+$$
+S_{n_{cv}}^{CV}(J_h, J_l) = S_{n_{cv}}^{MC}(J_h(U_h, x_0)) + \alpha (S_{n_{cv}}^{MC}(J_l(U_{hla}, x_0)) - \mathbb{E}[J_l(U_{hla}, x_0)])
+$$
 
-This correlation coefficient $\rho$ can be calculated using the MATLAB function \href{https://www.mathworks.com/help/matlab/ref/corrcoef.html#bunkaln}{\texttt{corrcoef}}.
+Choosing $n_{cv}$ samples of $x_0$ to equal the cost of $S_n^{MC}(J_h(U_h, x_0))$ and reusing the same samples for the HF and LF objectives.
+The control variate coefficient $\alpha$ can be calculated analytically using the actual mean and covariance of $x_0$
+and the equations in section \ref{lqr_ctrl_stoch}.
 
-The correlation can also be calculated analytically using the covariance of the costs in the high fidelity objective function and the low fidelity objective function.
-Let
+$$
+\alpha = -\frac{\text{Cov}(J_h(U_h, x_0), J_l(U_{hla}, x_0))}{\text{Var}[J_l(U_{hla}, x_0)]}
+$$
 
-\begin{itemize}
-  \item $J_h$: high fidelity cost function
-  \item $J_l$: low fidelity cost function
-  \item $U_1$: high fidelity control input
-  \item $U_2$: downsampled high fidelity control input $= T_{hlr} U_1$ or $T_{hla} U_1$
-  \item $J_1 = J_h(U_1, x_0)$
-  \item $J_2 = J_l(U_2, x_0)$
-  \item $\sigma_1$: standard deviation of $J_1$, $=\sqrt{\text{Var}[J_1]}$
-  \item $\sigma_2$: standard deviation of $J_2$, $=\sqrt{\text{Var}[J_2]}$
-\end{itemize}
+Finally, the ACV estimator $S_{n_{acv},m_{acv}}^{ACV}(J_h, J_l)$ is constructed using both the HF and LF objectives but with
+a statistical estimate of the expectation of the LF objective function.
 
-Then correlation coefficient between $J_1$ and $J_2$ is
+$$
+S_{n_{acv},m_{acv}}^{ACV}(J_h, J_l) = S_{n_{acv}}^{MC}(J_h(U_h, x_0)) + \alpha (S_{n_{acv}}^{MC}(J_l(U_{hla}, x_0)) - S_{m_{acv}}^{MC}(J_l(U_{hla}, x_0)))
+$$
 
-\begin{equation}
-  \begin{aligned}
-    \rho(J_1, J_2) &= \frac{\text{Cov}(J_1, J_2)}{\sigma_1 \sigma_2} \\
-    &= \frac{\text{Cov}(J_1, J_2)}{\sqrt{\text{Var}[J_1]} \sqrt{\text{Var}[J_2]}}
-  \end{aligned}
-\end{equation}
+Choosing $n_{acv} + m_{acv}$ samples of $x_0$ to equal the cost of $S_n^{MC}(J_h(U_h, x_0))$ and reusing the same samples
+for the HF and LF objectives in the first two terms. The coefficient $\alpha$ can be calculated statistically with $n_{acv}$ samples of $x_0$.
 
-Where $\text{Cov}(J_1, J_2)$, $\text{Var}[J_1]$ and $\text{Var}[J_2]$ can be calculated using the equations in section \ref{lqr_ctrl}.
+We expect the CV estimator to have a lower variance than the MC estimator. Howevever, since it is not possible
+to have an analytical expression for the expected value of most objective functions used for trajectory optimization,
+especially with constraints, the CV estimator is not always possible to construct. The ACV estimator is a compromise
+that converges to the variance of the CV estimator as $m_{acv} \rightarrow \infty$.
 
-\subsection{Correlation Experiments}
+\subsection{Numerical optimization}
 
-We conducted experiments to check the correlation in 2 scenarios:
-\begin{itemize}
-  \item Perturbation in the direction of steepest ascent
-  \item Along the path of a numerical optimizer
-\end{itemize}
+To optimize trajectory using LQR, to obtain the optimal control inputs $U_h^*$ under stochastic initial conditions $x_0$,
+we need to minimize the expected value of the objective function $\mathbb{E}[J_h(U_h, x_0)]$. We do this using off-the-shelf
+numerical optimization algorithms present in MATLAB, such as fmincon, fminunc, etc. An important point to consider
+is that the variance of the objective function estimation depends on the number of samples of $x_0$ used as well as
+the correlation between the HF and LF objectives. We exploit the fact that as the numerical optimizer iterates, it computes
+$U_h$ at every iteration and for us to achieve the maximum correlation between the HF and LF objectives, we can use
+choose a $U_h$ which when downsampled to $U_l$ gives us the highest corelation $\rho(J_h(U_h, x_0), J_l(U_{hla}, x_0))$.
+Hence, at each iteration of the CV/ACV estimators we use the $U_h$ at the current iteration while we use $U_{hla}$ from
+the iteration with the highest correlation. This $U_{hla}$ at the iteration with the highest correlation is
+$U_{hla}^{max}$. The LF objective is then calculated using this $U_{hla}^{max}$ to be used in the CV/ACV estimators to get the maximum variance reduction.
 
-\subsubsection{Perturbation in the direction of steepest ascent}
+For numerical optimization using the CV estimator, we save the $U_{hla}^{(k)}$ for every iteration $k$ in an array
+so that they can be used to calculate the correlation in all future iterations.
 
-Since the solution of the cost function is determined analytically, we cannot use it to determine the direction of steepest ascent.
-The gradient at the solution will be 0. To get the direction of steepest ascent, the solution was perturbed slightly in random directions and the direction with the highest gradient
-was chosen as the direction of steepest ascent.
+\begin{algorithm}
+  \caption{Numerical optimization with CV estimator}
+  \begin{algorithmic}
+    \Require $J_h, J_l, n_{cv}, U_0, x_0 \mu, \Sigma, k_{max}$
+    \State $k \gets 0$ (iteration counter)
+    \State $U \gets U_0$ initialize the numerical optimizer
+    \While{numerical optimizer has not converged $\wedge$ $k < k_{max}$}
+    \State $U_h \gets$ $U$ from the numerical optimizer
+    \State $U_{hla}^{(k)} \gets T_{hla} U_h$
+    \State $U_{hla}^{max} \gets \underset{U_{hla}(j)} \max \{\rho(J_h(U_h, x_0), J_l(U_{hla}^{(j)}, x_0))\}_{j=1}^k$
+    \State $\text{Cov}_{hl} \gets \text{Cov}(J_h(U_h, x_0), J_l(U_{hla}^{max}, x_0))$ calculated analytically using $\mu, \Sigma$
+    \State $\text{Var}_l \gets \text{Var}[J_l(U_{hla}^{max}, x_0)]$ calculated analytically using $\mu, \Sigma$
+    \State $\alpha \gets -\frac{\text{Cov}_{hl}}{\text{Var}_l}$
+    \State $\mathbb{E}[J_l(U_{hla}^{max}, x_0)] \gets$ calculated analytically using $\mu, \Sigma$
+    \State $S_{n_{cv}}^{CV}(J_h, J_l) \gets S_{n_{cv}}^{MC}(J_h(U_h, x_0)) + \alpha (S_{n_{cv}}^{MC}(J_l(U_{hla}^{max}, x_0)) - \mathbb{E}[J_l(U_{hla}^{max}, x_0)])$
+    \State $k \gets k + 1$
+    \State $S_{n_{cv}}^{CV}(J_h, J_l)$ is passed to the numerical optimizer for computing gradients for the next iteration
+    \EndWhile
+  \end{algorithmic}
+\end{algorithm}
 
-\textbf{Perturbation in the high fidelity model/cost function}
+Numerical optimization using ACV is similar to CV, but all the terms are calculated statistically using $n_{acv}$ and separate
+$m_{acv}$ samples of $x_0$.
 
-When perturbing in the high fidelity model/cost function, the perturbed high fidelity solution was downsampled to low fidelity
-dimensions by either restricting or averaging as described in section \ref{comp_opt}.
+\begin{algorithm}
+  \caption{Numerical optimization with ACV estimator}
+  \begin{algorithmic}
+    \Require $J_h, J_l, n_{acv}, m_{acv}, U_0, x_0, k_{max}$
+    \State $k \gets 0$ (iteration counter)
+    \State $U \gets U_0$ initialize the numerical optimizer
+    \While{numerical optimizer has not converged $\wedge$ $k < k_{max}$}
+    \State $U_h \gets$ $U$ from the numerical optimizer
+    \State $U_{hla}^{(k)} \gets T_{hla} U_h$
+    \State $U_{hla}^{max} \gets \underset{U_{hla}(j)} \max \{\rho(J_h(U_h, x_0), J_l(U_{hla}^{(j)}, x_0))\}_{j=1}^k$
+    \State $\text{Cov}_{hl} \gets \text{Cov}(J_h(U_h, x_0), J_l(U_{hla}^{max}, x_0))$ calculated statistically using $n_{acv}$ samples
+    \State $\text{Var}_l \gets \text{Var}[J_l(U_{hla}^{max}, x_0)]$ calculated statistically using $n_{acv}$ samples
+    \State $\alpha \gets -\frac{m_{acv}}{m_{acv} + n_{acv}} \frac{\text{Cov}_{hl}}{\text{Var}_l}$ calculated statistically using $n_{acv}$ samples
+    \State $\mathbb{E}[J_l(U_{hla}^{max}, x_0)] \gets \frac{1}{m_{acv}} \sum_{i=n_{acv}}^{n_{acv}+m_{acv}} J_l(U_{hla}^{max}, x_0^{(i)})$
+    \State $S_{n_{acv},m_{acv}}^{ACV}(J_h, J_l) \gets S_{n_{acv}}^{MC}(J_h(U_h, x_0)) + \alpha (S_{n_{acv}}^{MC}(J_l(U_{hla}^{max}, x_0)) - S_{m_{acv}}^{MC}(J_l(U_{hla}^{max}, x_0)))$
+    \State $k \gets k + 1$
+    \State $S_{n_{acv},m_{acv}}^{ACV}(J_h, J_l)$ is passed to the numerical optimizer for computing gradients for the next iteration
+    \EndWhile
+  \end{algorithmic}
+\end{algorithm}
 
-Hence, we have the following important variables:
-
-\begin{itemize}
-  \item $J_h$: High fidelity model/cost function
-  \item $J_l$: Low fidelity model/cost function
-  \item $u_h^*$: High fidelity optimum
-  \item $p_h$: High fidelity perturbation
-  \item $u_h = u_h^* + p_h$: Perturbed high fidelity solution
-  \item $u_{hlr} = T_{hlr} u_h$: Perturbed high fidelity solution downsampled using restriction:
-  \item $u_{hla} = T_{hla} u_h$: Perturbed high fidelity solution downsampled using averaging
-\end{itemize}
-
-Comparing $J_h(u_h, x_0)$ and $J_l(u_{hlr}, x_0)$
-
-Comparing $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$
-
-\textbf{Perturbation in the low fidelity model/cost function}
-
-When perturbing in the low fidelity model/cost function, the perturbed high fidelity solution was determined
-by converting the low fidelity perturbation to high fidelity dimensions as described in section \ref{comp_opt}.
-
-Hence, we have the following important variables:
-
-\begin{itemize}
-  \item $J_h$: High fidelity model/cost function
-  \item $J_l$: Low fidelity model/cost function
-  \item $u_l^*$: Low fidelity optimum
-  \item $p_l$: Low fidelity perturbation
-  \item $u_l = u_l^* + p_l$: Perturbed low fidelity solution
-  \item $u_{lh} = T_{lh} u_l$: Perturbed high fidelity solution upsampled
-\end{itemize}
-
-Comparing $J_h(u_{lh}, x_0)$ and $J_l(u_l, x_0)$
-
-\subsubsection{Along the path of a numerical optimizer}
-
-Since in a realistic scenario, one would be optimizing using a numerical optimizer, and desire to reach the high fidelity optimum,
-we conducted experiments to check the correlation along the path of a numerical optimizer in the high fidelity model/cost function.
-
-Here, we warm start with the low fidelity optimum, and check the correlation by downsampling the high fidelity solution using averaging.
-
-Hence, we have the following important variables:
-
-\begin{itemize}
-  \item $J_h$: High fidelity model/cost function
-  \item $J_l$: Low fidelity model/cost function
-  \item $u_h$: High fidelity solution
-  \item $u_{hlr} = T_{hlr} u_h$: High fidelity solution downsampled using restriction
-  \item $u_{hla} = T_{hla} u_h$: High fidelity solution downsampled using averaging
-\end{itemize}
-
-Comparing $J_h(u_h, x_0)$ and $J_h(u_{hlr}, x_0)$
-
-Comparing $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$
-
-It is also possible to compute the correlation between $J_h(u_h, x_0)$ and $J_l(u_{hlr}, x_0)$ for every iteration of the numerical optimizer.
-This helps us determine if there is a certain iteration of $J_l(u_{hlr}, x_0)$ that correlates well with all iterations of $J_h(u_h, x_0)$.
-The same comparison can be made with $J_l(u_{hla}, x_0)$.
-
-Comparing correlation between $J_h(u_h, x_0)$ and $J_h(u_{hlr}, x_0)$ across all iterations
-
-Comparing correlation between $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$ across all iterations
-
-\subsection{Control Variate Construction}
-
-The control variate is constructed using the low fidelity model/cost function, since we have found that there is some correlation between $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$.
-Here we are only using the averaged downsampled high fidelity solution $u_{hla}$ as the control variate.
-The important variables for constructing the control variate are:
-
-\begin{itemize}
-  \item $x_0$: Random initial state
-  \item $J_h$: High fidelity model/cost function
-  \item $J_l$: Low fidelity model/cost function
-  \item $u_h$: High fidelity solution
-  \item $u_{hla} = T_{hla} u_h$: High fidelity solution downsampled using averaging
-  \item $S_n^{MC}(J_h(u_h, x_0))$: Monte Carlo estimate of the high fidelity cost function
-  \item $S_n^{MC}(J_l(u_{hla}, x_0))$: Monte Carlo estimate of the low fidelity cost function
-  \item $\alpha$: Control variate coefficient
-\end{itemize}
-
-The control variate coefficient $\alpha$ can be calculated as
-
-\begin{equation}
-  \alpha = -\frac{\text{Cov}(J_h(u_h, x_0), J_l(u_{hla}, x_0))}{\text{Var}[J_l(u_{hla}, x_0)]}
-\end{equation}
-
-Hence, the control variate is
-
-\begin{equation}
-  S_n^{CV}(J_h, J_l) = S_n^{MC}(J_h(u_h, x_0)) + \alpha (S_n^{MC}(J_l(u_{hla}, x_0)) - \mathbb{E}[J_l(u_{hla}, x_0)])
-\end{equation}
-
-Where the samples of $x_0$ used in $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$ are the same.
-
-Note that $\text{Cov}(J_h(u_h, x_0), J_l(u_{hla}, x_0))$, $\text{Var}[J_l(u_{hla}, x_0)]$ and $\mathbb{E}[J_l(u_{hla}, x_0)]$ are calculated analytically using the equations in section \ref{stochastic_lqr}.
-
-\subsection{Numerical optimizer using Control Variate}
-
-The numerical optimizer was run in 3 different scenarios
-
-\begin{itemize}
-  \item $S_n^{MC}(J_h(U_h, x_0))$: MC estimate of the high fidelity cost function
-  \item $S_n^{CV}(J_h(U_h, x_0), J_l(U_{hla}, x_0))$: CV estimate with $u_{hla}$ at the current iteration
-  \item $S_n^{CV_{max}}(J_h(U_h, x_0), J_l(U_{hla}^{max}, x_0))$:CV estimate where $u_{hla}^{max}$ is at the iteration with the highest correlation.
-\end{itemize}
-
-This is how the whole routine works, step-by-step:
-
-Initialization:
-\begin{itemize}
-  \item $U_l^* \gets$ Analytical solution of low fidelity model
-  \item $U_{h_0} \gets T_{lh} U_l^*$
-\end{itemize}
-
-% For $S_n^{CV}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
-% \begin{equation}
-%   S_n^{CV}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}, x_0)) - \mathbb{E}[J_l(U_{hla}, x_0)])
-% \end{equation}
-
-% Where
-% \begin{itemize}
-%   \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
-%   \item $U_{hla} = T_{hla} U$
-%   \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0), J_l(U_{hla}, x_0))}{\text{Var}[J_l(U_{hla}, x_0)]}$ is calculated analytically
-%   \item $\mathbb{E}[J_l(U_{hla}, x_0)]$ is calculated analytically
-% \end{itemize}
-
-% For $S_n^{CV_{max}}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
-% \begin{equation}
-%   S_n^{CV_{max}}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}^{max}, x_0)) - \mathbb{E}[J_l(U_{hla}^{max}, x_0)])
-% \end{equation}
-
-% Where
-% \begin{itemize}
-%   \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
-%   \item $U_{hla} = T_{hla} U$
-%   \item $U_{hla}^{max} = \underset{U_{hla}(j)}{max} \{\rho(J_h(U(i), x_0^n), J_l(U_{hla}(j), x_0^n))\}_{j=1}^i$
-%   \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0), J_l(U_{hla}^{max}, x_0))}{\text{Var}[J_l(U_{hla}^{max}, x_0)]}$ is calculated analytically
-%   \item $\mathbb{E}[J_l(U_{hla}^{max}, x_0)]$ is calculated analytically
-% \end{itemize}
-
-For $S_{nm}^{ACV}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
-\begin{equation}
-  S_{nm}^{ACV}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}, x_0)) - S_m^{MC}(J_l(U_{hla}, x_0)))
-\end{equation}
-
-Where
-\begin{itemize}
-  \item $m$: Total number of samples of $x_0$
-  \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S_m^{MC}(J_h(U, x_0))$ (without considering the cost of $S_m^{MC}(J_l(U_{hla}, x_0))$)
-  \item $U_{hla} = T_{hla} U$
-  \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0^n), J_l(U_{hla}, x_0^n))}{\text{Var}[J_l(U_{hla}, x_0^n)]}$ is calculated statistically with $n$ samples
-\end{itemize}
-
-For $S_{nm}^{ACV_{max}}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
-\begin{equation}
-  S_{nm}^{ACV_{max}}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}^{max}, x_0)) - S_m^{MC}(J_l(U_{hla}^{max}, x_0)))
-\end{equation}
-
-Where
-\begin{itemize}
-  \item $m$: Total number of samples of $x_0$
-  \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S_m^{MC}(J_h(U, x_0))$ (without considering the cost of $S_m^{MC}(J_l(U_{hla}, x_0))$)
-  \item $U_{hla} = T_{hla} U$
-  \item $U_{hla}^{max} = \underset{U_{hla}(j)}{max} \{\rho(J_h(U(i), x_0^n), J_l(U_{hla}(j), x_0^n))\}_{j=1}^i$
-  \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0^n), J_l(U_{hla}^{max}, x_0^n))}{\text{Var}[J_l(U_{hla}^{max}, x_0^n)]}$ is calculated statistically with $n$ samples
-\end{itemize}
-
-For these experiments, $n$, the number of samples of $x_0$ used in the MC estimate, was compared between 10, 100, 500 and 1000.
-The comparison is done between $S_n^{MC}(J_h(u_h, x_0))$ vs $S_{\frac{n}{2}}^{CV}(J_h, J_l)$ and $S_{\frac{n}{2}}^{CV_{max}}(J_h, J_l)$ to keep the number of cost function evaluations the same with the control variate estimators having a lower computational cost due to half the sammples being used in the low fidelity cost function.
-
-To compare the variance, we ran a numerical optimizer with n random samples of $x_0$ and calculated the variance for each iteration.
-
-The variance was also calculated analytically for each control variate
 \end{document}
