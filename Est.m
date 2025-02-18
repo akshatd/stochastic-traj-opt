@@ -88,7 +88,7 @@ classdef Est
 				var_l = var(cost_lf_all);
 				cov_hl = cov(cost_hf_all, cost_lf_all);
 				cov_hl = cov_hl(1, 2); % only off diagonal element
-				alpha = -cov_hl / var_l;
+				alpha = -m/(m+n) * cov_hl / var_l;
 				exp_l = mean(St.LQRCost(x0_rv_ext(:, n+1:n+m), lqrsol_lf, u_hla));
 				cost = cost_hf + alpha * (cost_lf - exp_l);
 			end
