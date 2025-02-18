@@ -600,78 +600,321 @@ $$
 
 ## MLMC Optimization
 
-### Correlation under perturbation in the direction of steepest ascent
+The objective of this paper is to reduce the variance of the objective function estimation under sample average approximation.
+A Monte Carlo(MC) simulation can be used to estimate the expected value of the objective function, but a control variate(CV) approach
+would reduce the variance with the same computational cost. In the absence of an analytical expression of the expected value of the
+objective function, an approximate control variate(ACV) approach is also proposed.
 
-We also need to make sure that the estimators have some correlation, so we need to check if
+In order to formulate the CV and ACV approaches, we need a low-fidelity(LF) model of the system that correlates well
+with the high-fidelity(HF) model. The LF model should be computationally cheaper to evaluate than the
+HF model, and hence can be used as a control variate to reduce the variance of the objective function
+estimation.
 
-- extending the low fidelity solution by repeating it over the finer timesteps of the high fidelity simulation and running it in the high fidelity simulation
-- downsampling the high fidelity solution to the coarser timesteps of the low fidelity simulation and running it in the low fidelity simulation
+For this paper, the HF model is the LQR controller described in section \ref{lqr_controller}, with a time
+discrectization of 0.05s and the LF model is the same LQR controller but with a time discrectization of 0.5s.
+The solution for the LQR controller with the LF model contains fewer elements than the HF model due to there being
+fewer time steps for the same control horizon. Hence, it is necessary to downsample the HF solution if we want to
+compare it with the LF solution.
 
-gives results that correlate with the original solutions in each of the simulations.
+### Comparing optimums of high and low fidelity models
 
-To do this, the optimal solutions are perturbed by a small amount and the cost function is plotted for each of the perturbed solutions. Plotting the cost function after perturbing the optimal control input solutions in both fidelities and using it in the both fidelities' cost function.
+To determine if the low fidelity model can be used as a control variate, we need to determine if it correlates with the high fidelity model.
 
-To make perturbed control inputs, we can do the following
+System Setup:
 
-1. Start with 1000 samples of the initial state $x_0$.
-2. Use the sample mean to calculate the optimal control inputs $U_l^*$ and $U_h^*$ for the low and high fidelity simulations respectively.
-3. At the optimum, perturb the solution by a small amount (0.1) in 1000 different directions and compute the gradient for each of these perturbations.
-   - We cannot take the gradient at the optimum directly since the optimum is calculated analytically and has a gradient of 0.
-4. Take the direction with the maximum gradient as the perturbation direction.
-5. Perturb the optimal control inputs in the range $[-0.25, 6]$ with a step of $0.25$, so it produces a range of control inputs that increase the cost in the direction of the steepest ascent.
+- $J_h(u, x_0)$: HF model/objective function
+- $J_l(u, x_0)$: LF model/objective function
+- $u_h$: Control input in HF model, $n_{u_h} \times 1$
+- $u_l$: Control input in LF model, $n_{u_l} \times 1$
+- $x_0$: Random initial state
+- $u_h^*$: HF optimum
+- $u_l^*$: LF optimum
 
-To compute the correlation in the high fidelity simulation,
+To upsample $u_l \rightarrow u_h$, we repeat the elements of $u_l$ to match the dimensions of $u_h$.
+This can be seen as multiplying $u_l$ with a matrix $T_{lh}$ of size $n_{u_h} \times n_{u_l}$:
 
-1. Use the perturbed $U_h^*$ as it is.
-2. Average the perturbation to downsample it to the length of $U_l^*$, add it to $U_l^*$, and repeat the perturbed $U_l^*$ over the timesteps of the high fidelity simulation to make it the same length as $U_h^*$.
-3. For a single perturbation, calculate the cost for each of the 1000 random samples of $x_0$ by plugging in $U_h^*$ and repeated $U_l^*$ into the high fidelity cost function.
-4. This way, we will have 1000 samples of the high fidelity cost function for each of $U_h^*$ and repeated $U_l^*$ for a single perturbation.
-5. Calculate the correlation coefficient between the cost samples obtained using $U_h^*$ and repeated $U_l^*$ using the `corrcoef` function.
-6. We will have a symmetric $2\times2$ matrix, where the off-diagonal elements are the correlation coefficients between the two sets of 1000 samples.
-7. These off diagonal elements are then used as the data point for a single perturbation.
+$$
+T\_{lh} =
+\begin{bmatrix}
+1 & 0 & \ldots & 0 \\
+1 & 0 & \ldots & 0 \\
+\vdots & \vdots & \ddots & \vdots \\
+0 & 1 & \ldots & 0 \\
+0 & 1 & \ldots & 0 \\
+\vdots & \vdots & \ddots & \vdots \\
+0 & 0 & \ldots & 1 \\
+0 & 0 & \ldots & 1 \\
+\vdots & \vdots & \ddots & \vdots \\
+\end{bmatrix}
+$$
 
-This is repeated for all the perturbations to get the graph of correlation in high fidelity simulation.
+where the number of repeating ones in each column is determined by the ratio $r_{hl} = n_{u_h} / n_{u_l}$.
+This gives us $u_{lh} = T_{lh} u_l$, which can be compared with $u_h$.
 
-To compute the correlation in the low fidelity simulation,
+To downsample $u_h \rightarrow u_l$, we can either restrict the dimensions of $u_h$ to match $u_l$ or average the elements of $u_h$ to match the dimensions of $u_l$.
 
-1. Use the perturbed $U_l^*$ as it is.
-2. Downsample the perturbed $U_h^*$ by averaging values around times that coincide with the times in $U_l^*$ to make it the same length as $U_l^*$.
-3. For a single perturbation, calculate the cost for each of the 1000 random samples of $x_0$ by plugging in downsampled $U_h^*$ and $U_l^*$ into the low fidelity cost function.
-4. This way, we will have 1000 samples of the low fidelity cost function for each of downsampled $U_h^*$ and $U_l^*$ for a single perturbation.
-5. Calculate the correlation coefficient between the cost samples obtained using downsampled $U_h^*$ and $U_l^*$ using the `corrcoef` function.
-6. We will have a symmetric $2\times2$ matrix, where the off-diagonal elements are the correlation coefficients between the two sets of 1000 samples.
-7. These off diagonal elements are then used as the data point for a single perturbation.
+In case of restriction, we can multiply $u_h$ with a matrix $T_{hlr}$ of size $n_{u_l} \times n_{u_h}$:
 
-This is repeated for all the perturbations to get the graph of correlation in low fidelity simulation.
+$$
+T\_{hlr} =
+\begin{bmatrix}
+1 & 0 & \ldots & 0 & 0 \\
+0 & \ldots & 1 & \ldots & 0 \\
+\vdots & \ddots & \vdots & \ddots & \vdots \\
+0 & 0 & \ldots & 0 & 1 \\
+\end{bmatrix}
+$$
 
-![High fidelity simulation with perturbations](figs/perturb_comp_hf.svg){width=50%}
-![Low fidelity simulation with perturbations](figs/perturb_comp_lf.svg){width=50%}
+Where the number of columns after which the next one is selected is determined by the ratio $r_{hl} = n_{u_h} / n_{u_l}$.
+This gives us $u_{hlr} = T_{hlr} u_h$, which can be compared with $u_l$.
 
-### Correlation along the optimization path of a numerical optimizer
+To downsample $u_h$ to $u_l$ by averaging, we need the ratio $r_{lh} = n_{u_h} / n_{u_l}$.
+We can then multiply $u_h$ with a matrix $T_{hla}$ of size $n_{u_l} \times n_{u_h}$:
 
-A numerical optimizer can be easily set up to optimize the cost function for the high fidelity simulation. The optimizer can be set up to use the gradient of the cost function with respect to the control inputs to find the optimal control inputs. The optimizer can be set up to use the `fminunc` function in MATLAB.
+$$
+T*{hla} =
+\begin{bmatrix}
+r*{lh} & \ldots & 0 & 0 & 0 \\
+0 & \ldots & r*{lh} & \ldots & 0 \\
+\vdots & \ddots & \vdots & \vdots & \vdots \\
+0 & 0 & 0 & r*{lh} & \ldots \\
+\end{bmatrix}
+$$
 
-### Constructing the MLMC estimator
+Where $r_{lh}$ is repeated $r_{hl}$ times in each row.
+This gives us $u_{hla} = T_{hla} u_h$, which can be compared with $u_l$.
 
-First, we need an MLMC estimator, $S_n^{MLMC}$ which combines both the low ($S_n^l$) and high fidelity ($S_n^h$) estimators
+### Correlation between high and low fidelity models
+
+$u_h$ and $u_l$ each have $n_{u_h}$ and $n_{u_l}$ dimensions respectively, which represent the time steps of the simulation.
+After converting them to the same dimensions as done in section \ref{comp_opt},
+the objective for some realizations of the initial state $x_0$ can be computed.
+Hence, a set of objectives of both high and low fidelity control inputs can be computed for a certain model/objective function.
+The correlation coefficient $\rho$ can then be computed between the distribution of the objective function values.
+To illustrate this, assume there are $N$ realizations of the initial state $x_0$, and $J$ is the objective function.
+$u_h$ and $u_l$ are the control inputs for the high and low fidelity models respectively, where the dimensions have been
+converted to the same number as described in section \ref{comp_opt}. $\mu_h$ and $\mu_l$ are the mean objectives
+of the high and low fidelity control inputs respectively, and $\sigma_h$ and $\sigma_l$ are the standard deviations of
+the objectives of the high and low fidelity control inputs respectively.
+
+$$
+\rho(J(u*h), J(u_l)) = \frac{1}{N-1} \sum*{i=1}^{N} \left( \frac{J(u_h, x_0^i) - \mu_h}{\sigma_h} \right) \left( \frac{J(u_l, x_0^i) - \mu_l}{\sigma_l} \right)
+$$
+
+This can be simplified to:
+
+$$
+\rho(J(u_h), J(u_l)) = \frac{\text{Cov}(J(u_h), J(u_l))}{\sigma_h \sigma_l}
+$$
+
+This correlation coefficient $\rho$ can be calculated using the MATLAB function \href{https://www.mathworks.com/help/matlab/ref/corrcoef.html#bunkaln}{\texttt{corrcoef}}.
+
+The correlation can also be calculated analytically using the covariance of the objectives in the high fidelity objective function and the low fidelity objective function.
+Let
+
+- $J_h$: high fidelity objective function
+- $J_l$: low fidelity objective function
+- $U_1$: high fidelity control input
+- $U_2$: downsampled high fidelity control input $= T_{hlr} U_1$ or $T_{hla} U_1$
+- $J_1 = J_h(U_1, x_0)$
+- $J_2 = J_l(U_2, x_0)$
+- $\sigma_1$: standard deviation of $J_1$, $=\sqrt{\text{Var}[J_1]}$
+- $\sigma_2$: standard deviation of $J_2$, $=\sqrt{\text{Var}[J_2]}$
+
+Then correlation coefficient between $J_1$ and $J_2$ is
 
 $$
 \begin{aligned}
-S_n^{MLMC} &= S_n^h + \alpha (S_n^l - \mathbb{E}[J_l]) \\
+\rho(J_1, J_2) &= \frac{\text{Cov}(J_1, J_2)}{\sigma_1 \sigma_2} \\
+&= \frac{\text{Cov}(J_1, J_2)}{\sqrt{\text{Var}[J_1]} \sqrt{\text{Var}[J_2]}}
 \end{aligned}
 $$
 
-For getting a convergence plot with the MLMC estimator
+Where $\text{Cov}(J_1, J_2)$, $\text{Var}[J_1]$ and $\text{Var}[J_2]$ can be calculated using the equations in section \ref{lqr_ctrl}.
 
-- Start with a cost of 1 for the low fidelity, and a cost of 10 for the high fidelity simulation
-- Current method of minimizing the Expectation of the MLMC estimator
-- Start with a point U0
-- Compute the Expectation of the MLMC estimator with different sample allocation in range 0.00:0.05:1.00
-- Keep the best sample allocation that minimizes the variance
-- Compute gradient using finite difference
-- Move in the negative direction of the gradient
+### Correlation Experiments
 
-Here we use a simple Monte Carlo estimator to estimate the expected value of the cost function over some realizations of the initial conditions. The variance of this cost function is varies with the number of samples used in the Monte Carlo estimator.
+We conducted experiments to check the correlation in 2 scenarios:
+
+- Perturbation in the direction of steepest ascent
+- Along the path of a numerical optimizer
+
+### Perturbation in the direction of steepest ascent
+
+Since the solution of the objective function is determined analytically, we cannot use it to determine the direction of steepest ascent.
+The gradient at the solution will be 0. To get the direction of steepest ascent, the solution was perturbed slightly in random directions and the direction with the highest gradient
+was chosen as the direction of steepest ascent.
+
+#### Perturbation in the high fidelity model/objective function
+
+When perturbing in the high fidelity model/objective function, the perturbed high fidelity solution was downsampled to low fidelity
+dimensions by either restricting or averaging as described in section \ref{comp_opt}.
+
+Hence, we have the following important variables:
+
+- $J_h$: High fidelity model/objective function
+- $J_l$: Low fidelity model/objective function
+- $u_h^*$: High fidelity optimum
+- $p_h$: High fidelity perturbation
+- $u_h = u_h^* + p_h$: Perturbed high fidelity solution
+- $u_{hlr} = T_{hlr} u_h$: Perturbed high fidelity solution downsampled using restriction:
+- $u_{hla} = T_{hla} u_h$: Perturbed high fidelity solution downsampled using averaging
+
+Comparing $J_h(u_h, x_0)$ and $J_l(u_{hlr}, x_0)$
+
+Comparing $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$
+
+#### Perturbation in the low fidelity model/objective function}
+
+When perturbing in the low fidelity model/objective function, the perturbed high fidelity solution was determined
+by converting the low fidelity perturbation to high fidelity dimensions as described in section \ref{comp_opt}.
+
+Hence, we have the following important variables:
+
+- $J_h$: High fidelity model/objective function
+- $J_l$: Low fidelity model/objective function
+- $u_l^*$: Low fidelity optimum
+- $p_l$: Low fidelity perturbation
+- $u_l = u_l^* + p_l$: Perturbed low fidelity solution
+- $u_{lh} = T_{lh} u_l$: Perturbed high fidelity solution upsampled
+
+Comparing $J_h(u_{lh}, x_0)$ and $J_l(u_l, x_0)$
+
+#### Along the path of a numerical optimizer
+
+Since in a realistic scenario, one would be optimizing using a numerical optimizer, and desire to reach the high fidelity optimum,
+we conducted experiments to check the correlation along the path of a numerical optimizer in the high fidelity model/objective function.
+
+Here, we warm start with the low fidelity optimum, and check the correlation by downsampling the high fidelity solution using averaging.
+
+Hence, we have the following important variables:
+
+- $J_h$: High fidelity model/objective function
+- $J_l$: Low fidelity model/objective function
+- $u_h$: High fidelity solution
+- $u_{hlr} = T_{hlr} u_h$: High fidelity solution downsampled using restriction
+- $u_{hla} = T_{hla} u_h$: High fidelity solution downsampled using averaging
+
+Comparing $J_h(u_h, x_0)$ and $J_h(u_{hlr}, x_0)$
+
+Comparing $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$
+
+It is also possible to compute the correlation between $J_h(u_h, x_0)$ and $J_l(u_{hlr}, x_0)$ for every iteration of the numerical optimizer.
+This helps us determine if there is a certain iteration of $J_l(u_{hlr}, x_0)$ that correlates well with all iterations of $J_h(u_h, x_0)$.
+The same comparison can be made with $J_l(u_{hla}, x_0)$.
+
+Comparing correlation between $J_h(u_h, x_0)$ and $J_h(u_{hlr}, x_0)$ across all iterations
+
+Comparing correlation between $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$ across all iterations
+
+### Control Variate Construction
+
+The control variate is constructed using the low fidelity model/objective function, since we have found that there is some correlation between $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$.
+Here we are only using the averaged downsampled high fidelity solution $u_{hla}$ as the control variate.
+The important variables for constructing the control variate are:
+
+- $x_0$: Random initial state
+- $J_h$: High fidelity model/objective function
+- $J_l$: Low fidelity model/objective function
+- $u_h$: High fidelity solution
+- $u_{hla} = T_{hla} u_h$: High fidelity solution downsampled using averaging
+- $S_n^{MC}(J_h(u_h, x_0))$: Monte Carlo estimate of the high fidelity objective function
+- $S_n^{MC}(J_l(u_{hla}, x_0))$: Monte Carlo estimate of the low fidelity objective function
+- $\alpha$: Control variate coefficient
+
+The control variate coefficient $\alpha$ can be calculated as
+
+$$
+\alpha = -\frac{\text{Cov}(J*h(u_h, x_0), J_l(u*{hla}, x*0))}{\text{Var}[J_l(u*{hla}, x_0)]}
+$$
+
+Hence, the control variate is
+
+$$
+S*n^{CV}(J_h, J_l) = S_n^{MC}(J_h(u_h, x_0)) + \alpha (S_n^{MC}(J_l(u*{hla}, x*0)) - \mathbb{E}[J_l(u*{hla}, x_0)])
+$$
+
+Where the samples of $x_0$ used in $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$ are the same.
+
+Note that $\text{Cov}(J_h(u_h, x_0), J_l(u_{hla}, x_0))$, $\text{Var}[J_l(u_{hla}, x_0)]$ and $\mathbb{E}[J_l(u_{hla}, x_0)]$ are calculated analytically using the equations in section \ref{stochastic_lqr}.
+
+### Numerical optimizer using Control Variate
+
+The numerical optimizer was run in 3 different scenarios
+
+- $S_n^{MC}(J_h(U_h, x_0))$: MC estimate of the high fidelity objective function
+- $S_n^{CV}(J_h(U_h, x_0), J_l(U_{hla}, x_0))$: CV estimate with $u_{hla}$ at the current iteration
+- $S_n^{CV_{max}}(J_h(U_h, x_0), J_l(U_{hla}^{max}, x_0))$:CV estimate where $u_{hla}^{max}$ is at the iteration with the highest correlation.
+
+This is how the whole routine works, step-by-step:
+
+Initialization:
+
+- $U_l^* \gets$ Analytical solution of low fidelity model
+- $U_{h_0} \gets T_{lh} U_l^*$
+
+% For $S_n^{CV}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+% $$
+% S*n^{CV}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U*{hla}, x*0)) - \mathbb{E}[J_l(U*{hla}, x_0)])
+% $$
+
+% Where
+%
+% \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
+% \item $U_{hla} = T_{hla} U$
+% \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0), J_l(U_{hla}, x_0))}{\text{Var}[J_l(U_{hla}, x_0)]}$ is calculated analytically
+% \item $\mathbb{E}[J_l(U_{hla}, x_0)]$ is calculated analytically
+%
+
+% For $S_n^{CV_{max}}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+% $$
+% S*n^{CV*{max}}(J*h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U*{hla}^{max}, x*0)) - \mathbb{E}[J_l(U*{hla}^{max}, x_0)])
+% $$
+
+% Where
+%
+% \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
+% \item $U_{hla} = T_{hla} U$
+% \item $U_{hla}^{max} = \underset{U_{hla}(j)}{max} \{\rho(J_h(U(i), x_0^n), J_l(U_{hla}(j), x_0^n))\}_{j=1}^i$
+% \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0), J_l(U_{hla}^{max}, x_0))}{\text{Var}[J_l(U_{hla}^{max}, x_0)]}$ is calculated analytically
+% \item $\mathbb{E}[J_l(U_{hla}^{max}, x_0)]$ is calculated analytically
+%
+
+For $S_{nm}^{ACV}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+
+$$
+S*{nm}^{ACV}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U*{hla}, x*0)) - S_m^{MC}(J_l(U*{hla}, x_0)))
+$$
+
+Where
+
+- $m$: Total number of samples of $x_0$
+- $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S_m^{MC}(J_h(U, x_0))$ (without considering the cost of $S_m^{MC}(J_l(U_{hla}, x_0))$)
+- $U_{hla} = T_{hla} U$
+- $\alpha = -\frac{\text{Cov}(J_h(U, x_0^n), J_l(U_{hla}, x_0^n))}{\text{Var}[J_l(U_{hla}, x_0^n)]}$ is calculated statistically with $n$ samples
+
+For $S_{nm}^{ACV_{max}}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+
+$$
+S*{nm}^{ACV*{max}}(J*h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U*{hla}^{max}, x*0)) - S_m^{MC}(J_l(U*{hla}^{max}, x_0)))
+$$
+
+Where
+
+- $m$: Total number of samples of $x_0$
+- $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S_m^{MC}(J_h(U, x_0))$ (without considering the cost of $S_m^{MC}(J_l(U_{hla}, x_0))$)
+- $U_{hla} = T_{hla} U$
+- $U_{hla}^{max} = \underset{U_{hla}(j)}{max} \{\rho(J_h(U(i), x_0^n), J_l(U_{hla}(j), x_0^n))\}_{j=1}^i$
+- $\alpha = -\frac{\text{Cov}(J_h(U, x_0^n), J_l(U_{hla}^{max}, x_0^n))}{\text{Var}[J_l(U_{hla}^{max}, x_0^n)]}$ is calculated statistically with $n$ samples
+
+For these experiments, $n$, the number of samples of $x_0$ used in the MC estimate, was compared between 10, 100, 500 and 1000.
+The comparison is done between $S_n^{MC}(J_h(u_h, x_0))$ vs $S_{\frac{n}{2}}^{CV}(J_h, J_l)$ and $S_{\frac{n}{2}}^{CV_{max}}(J_h, J_l)$
+to keep the number of objective function evaluations the same with the control variate estimators having a lower computational cost
+due to half the sammples being used in the low fidelity objective function.
+
+To compare the variance, we ran a numerical optimizer with n random samples of $x_0$ and calculated the variance for each iteration.
+
+The variance was also calculated analytically for each control variate
 
 ![Variance of the Cost Function with Number of Samples](figs/0.05_mc_variance.svg){width=50%}
 ![Variance of the Cost Function with Number of Samples](figs/0.5_mc_variance.svg){width=50%}
