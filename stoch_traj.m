@@ -459,10 +459,10 @@ for num_samples=num_rv_samples
   wait_bar = waitbar(0, "Running estimators with " + num_samples + " samples");
   lf_hf_cost_ratio = 0.2; % TODO get this experimentally for each num_samples
   % calculate samples given cost ratio and HF=LF
-  n_cv = int32(num_samples / (1 + lf_hf_cost_ratio));
-  n_acv = int32(num_samples / (1 + lf_hf_cost_ratio + acv_exp_sample_factor*lf_hf_cost_ratio));
-  m_acv = int32(acv_exp_sample_factor * n_acv);
-  n_total = int32(max(n_cv+n_acv+m_acv, num_samples)); % account for weird splits like 0.999
+  n_cv = round(num_samples / (1 + lf_hf_cost_ratio));
+  n_acv = round(num_samples / (1 + lf_hf_cost_ratio + acv_exp_sample_factor*lf_hf_cost_ratio));
+  m_acv = round(acv_exp_sample_factor * n_acv);
+  n_total = round(max(n_cv+n_acv+m_acv, num_samples)); % account for weird splits like 0.999
   num_rv_samples_actual(num_rv_samples == num_samples, :) = [num_samples, n_cv, n_acv, m_acv];
   for i=1:num_estimator_samples
     waitbar(i/num_estimator_samples, wait_bar);
