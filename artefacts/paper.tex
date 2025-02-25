@@ -35,17 +35,8 @@ This section describes how the dynamics for the mass-spring-damper is set up, al
 \subsection{Mass-Spring-Damper System}
 The mass-spring-damper system is a second order system that can be modelled using Newton's second law of motion.
 The system in consideration has a mass $m=5$ g, spring constant $k=2$ N/m and damping coefficient $c=0.5$ Ns/m.
-Given an external force $F$ and the acceleration of the system $\ddot{x}$,
-the dynamics of the system can be written as the equality of forces acting on the mass:
-
-$$
-\begin{aligned}
-  m\ddot{x} &= F - c\dot{x} - kx \\
-  \implies \ddot{x} &= \frac{F}{m} - \frac{c}{m}\dot{x} - \frac{k}{m}x
-\end{aligned}
-$$
-
-We have the state $[x \dot{x}]^T$ that contains the position and velocity of the mass, both of which are observed.
+Given an external force $F$ and the acceleration of the system $\ddot{x}$, we have the state $[x \dot{x}]^T$
+that contains the position and velocity of the mass, both of which are observed.
 The control input $u=F$ is applied to the mass, yielding the following state-space model:
 
 $$
@@ -78,27 +69,9 @@ $$
 \end{aligned}
 $$
 
-Thus, we have a standard continuous-time LTI system $\dot{x} = A_cx + B_cu$ and $y = C_cx$, where
-
-\begin{equation}
-  \begin{aligned}
-    A_c &=
-    \begin{bmatrix}
-      0 & 1 \\
-      -\frac{k}{m} & -\frac{c}{m}
-    \end{bmatrix} \\
-    B_c &=
-    \begin{bmatrix}
-      0 \\
-      \frac{1}{m}
-    \end{bmatrix} \\
-    C_c &=
-    \begin{bmatrix}
-      1 & 0 \\
-      0 & 1
-    \end{bmatrix}
-  \end{aligned}
-\end{equation}
+Thus, we have a standard continuous-time LTI system $\dot{x} = A_cx + B_cu$ and $y = C_cx$, which can be discretized
+into a discrete-time LTI system $x_{k+1} = Ax_k + Bu_k$ and $y_k = Cx_k$ using a sampling time $T_s$. We can now use
+this discrete-time system to set up the LQR controller.
 
 \subsection{LQR Controller} \label{lqr_ctrl}
 The continuous-time system can be converted to discrete time using such that $x_{k+1} = A x_k + B u_k$ and $y_k = C x_k$ for a chosen sampling time $T_s$.
@@ -132,84 +105,27 @@ x_k^{ext} =
 \end{bmatrix}
 $$
 
-With the resulting state-space model
-
-\begin{equation}
-  \begin{aligned}
-    x_{k+1}^{ext} &=
-    \begin{bmatrix}
-      A & B & 0 \\
-      0 & \mathbb{I}_{n_u \times n_u} & 0 \\
-      0 & 0 & \mathbb{I}_{n_r \times n_r}
-    \end{bmatrix}
-    \begin{bmatrix}
-      x_k \\
-      u_{k-1} \\
-      r_k
-    \end{bmatrix} +
-    \begin{bmatrix}
-      B \\
-      \mathbb{I}_{n_u \times n_u} \\
-      0
-    \end{bmatrix} \Delta u_k \\
-  \end{aligned}
-\end{equation}
-
-with
+And stack the state vectors $x_k^{ext}$ for all time steps $k$ to get the extended state vector $X$.
+The control input is also stacked to get the control input vector $U$.
 
 $$
-\begin{aligned}
-  A^{ext} &=
-  \begin{bmatrix}
-    A & B & 0 \\
-    0 & \mathbb{I}_{n_u \times n_u} & 0 \\
-    0 & 0 & \mathbb{I}_{n_r \times n_r}
-  \end{bmatrix} \\
-  B^{ext} &=
-  \begin{bmatrix}
-    B \\
-    \mathbb{I}_{n_u \times n_u} \\
-    0
-  \end{bmatrix}
-\end{aligned}
+X =
+\begin{bmatrix}
+  x_1^{ext} \\
+  x_2^{ext} \\
+  \vdots \\
+  x_N^{ext}
+\end{bmatrix}  \in \mathbb{R}^{Nn_x \times 1}, \quad
+U =
+\begin{bmatrix}
+  \Delta u_0 \\
+  \Delta u_1 \\
+  \vdots \\
+  \Delta u_{N-1}
+\end{bmatrix}  \in \mathbb{R}^{Nn_u \times 1}
 $$
 
 Similary, $Qe$ with the extended state $x_k^{ext}$ transforms to $Q$ such that $e_k^T Q_e e_k = x_k^{ext^T} Q x_k^{ext}$.
-
-$$
-\begin{aligned}
-  e_k^T Q_e e_k &= (y_k - r_k)^T Q_e (y_k - r_k) \\
-  &= \left(
-    \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
-    \end{bmatrix}
-    \begin{bmatrix}
-      x_k \\
-      u_{k-1} \\
-      r_k
-  \end{bmatrix}\right)^T Q_e
-  \left(
-    \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
-    \end{bmatrix}
-    \begin{bmatrix}
-      x_k \\
-      u_{k-1} \\
-      r_k
-  \end{bmatrix}\right) \\
-  &= x_k^{ext^T}
-  \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
-  \end{bmatrix}^T Q_e
-  \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
-  \end{bmatrix} x_k^{ext} \\
-\end{aligned}
-$$
-
-\begin{equation}
-  Q =
-  \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
-  \end{bmatrix}^T Q_e
-  \begin{bmatrix} C & 0 & -\mathbb{I}_{n_r \times n_r}
-  \end{bmatrix}
-\end{equation}
 
 For simplicity, from now on we refer to $x_k^{ext}$ as $x_k$, $A^{ext}$ as $A$ and $B^{ext}$ as $B$.
 The objective function can now be written as
@@ -218,75 +134,11 @@ $$
 J = \sum_{k=0}^{N-1} x_k^T Q x_k + \Delta u_k^T R \Delta u_k
 $$
 
-Using the state transition formula
-
-$$
-\begin{aligned}
-  x_1 &= A x_0 + B u_0 \\
-  x_2 &= A x_1 + B u_1 = A(A x_0 + B u_0) + B u_1 = A^2 x_0 + A B u_0 + B u_1 \\
-  \vdots \\
-  x_N &= A x_{N-1} + B u_{N-1} = A^{N-1} x_0 + A^{N-2} B u_0 + A^{N-3} B u_1 + \ldots + B u_{N-1} \\
-  \implies x_k &= A^k x_0 + \sum_{i=0}^{k-1} A^{k-1-i} B u_i
-\end{aligned}
-$$
-
-We construct the matrices $X$, $U$, $S$ and $M$ such that $X = SU + Mx_0$.
-
-$$
-\begin{aligned}
-  X &=
-  \begin{bmatrix}
-    x_1^{ext} \\
-    x_2^{ext} \\
-    \vdots \\
-    x_N^{ext}
-  \end{bmatrix} & \in \mathbb{R}^{Nn_x \times 1} \\
-  U &=
-  \begin{bmatrix}
-    \Delta u_0 \\
-    \Delta u_1 \\
-    \vdots \\
-    \Delta u_{N-1}
-  \end{bmatrix} & \in \mathbb{R}^{Nn_u \times 1} \\
-  S &=
-  \begin{bmatrix}
-    B & 0 & \ldots & 0 \\
-    AB & B & \ldots & 0 \\
-    \vdots & \vdots & \ddots & \vdots \\
-    A^{N-1} B & A^{N-2} B & \ldots & B
-  \end{bmatrix} & \in \mathbb{R}^{Nn_x \times Nn_u} \\
-  M &=
-  \begin{bmatrix}
-    A \\
-    A^2 \\
-    \vdots \\
-    A^N
-  \end{bmatrix} & \in \mathbb{R}^{Nn_x \times n_x}
-\end{aligned}
-$$
-
-Similarly, the matrices $\bar{Q}$ and $\bar{R}$ are constructed
-
-$$
-\begin{aligned}
-  \bar{Q} &=
-  \begin{bmatrix}
-    Q & 0 & \ldots & 0 \\
-    0 & Q & \ldots & 0 \\
-    \vdots & \vdots & \ddots & \vdots \\
-    0 & 0 & \ldots & 0
-  \end{bmatrix} & \in \mathbb{R}^{Nn_x \times Nn_x} \\
-  \bar{R} &=
-  \begin{bmatrix}
-    R & 0 & \ldots & 0 \\
-    0 & R & \ldots & 0 \\
-    \vdots & \vdots & \ddots & \vdots \\
-    0 & 0 & \ldots & R
-  \end{bmatrix} & \in \mathbb{R}^{Nn_u \times Nn_u}
-\end{aligned}
-$$
-
-The objective function can then be written as a quadratic function of the control inputs $U$
+Using the state transition formula, we can write the stacked state vector $X$ as $X = SU + Mx_0$.
+Here $S \in \mathbb{R}^{Nn_x \times Nn_u}$ and $M \in \mathbb{R}^{Nn_x \times n_x}$ are matrices that depend on the
+state transition matrices $A$ and $B$.
+Similarly, the matrices $\bar{Q} \in \mathbb{R}^{Nn_x \times Nn_x}$ and $\bar{R} \in \mathbb{R}^{Nn_u \times Nn_u}$
+are constructed using the penalty matrices $Q$ and $R$. The objective function then can then be written as a quadratic function of the control inputs $U$
 
 \begin{equation}
   \begin{aligned}
@@ -354,14 +206,6 @@ The expected value of the objective function on all possible realizations of $x_
 \begin{equation}
   \begin{aligned}
     \mathbb{E}[J] &= \mathbb{E}[\sum_{k=0}^{N-1} x_k^T Q x_k + \Delta u_k^T R \Delta u_k] \\
-    &= \mathbb{E}[X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0] \\
-    &= \mathbb{E}[X^T \bar{Q} X] + \mathbb{E}[U^T \bar{R} U] + \mathbb{E}[x_0^T Q x_0] \\
-    &= \mathbb{E}[(S U + M x_0)^T \bar{Q} (S U + M x_0)] + U^T \bar{R} U + \mathbb{E}[x_0^T Q x_0] \\
-    &= \mathbb{E}[U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
-    &= U^T S^T \bar{Q} S U + \mathbb{E}[U^T S^T \bar{Q} M x_0] + \mathbb{E}[x_0^T M^T \bar{Q} S U] + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + U^T \bar{R} U + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
-    &= U^T (S^T \bar{Q} S + \bar{R}) U + U^T S^T \bar{Q} M \mathbb{E}[x_0] + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T M^T \bar{Q} M x_0] + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
-    &= U^T (S^T \bar{Q} S + \bar{R}) U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] M^T \bar{Q} M \mathbb{E}[x_0] + \text{tr}(M^T \bar{Q} M \text{Cov}[x_0]) \dots \\
-    & \quad + \mathbb{E}[x_0^T] Q \mathbb{E}[x_0] + \text{tr}(Q \text{Cov}[x_0]) \\
     &= U^T (S^T \bar{Q} S + \bar{R}) U + 2 \mathbb{E}[x_0^T] M^T \bar{Q} S U + \mathbb{E}[x_0^T] (M^T \bar{Q} M + Q) \mathbb{E}[x_0] + \text{tr}((M^T \bar{Q} M + Q) \text{Cov}[x_0]) \\
   \end{aligned}
 \end{equation}
@@ -529,9 +373,29 @@ would reduce the variance with the same computational cost. In the absence of an
 objective function, an approximate control variate(ACV) approach is also proposed. The CV estimator will also serve as
 the benchmark for the ACV estimator, since it is the best possible variance reduction that can be achieved with the ACV estimator.
 
+The solution to the stochastic LQR controller, $U^*$ can be written as a function of the initial state $x_0$.
+
+$$
+\begin{aligned}
+  U^* &= -H^{-1} q \\
+  \mathbb{E}[U^*] &= \mathbb{E}[-H^{-1} q] \\
+  &= -H^{-1} \mathbb{E}[q] \text{ ($H$ is deterministic)} \\
+  &= -H^{-1} \mathbb{E}[S^T \bar{Q} M x_0] \\
+  &= -H^{-1} S^T \bar{Q} M \mathbb{E}[x_0] \\
+  \text{Cov}[U^*] &= \text{Cov}[-H^{-1} q] \\
+  &= H^{-1} \text{Cov}[q] H^{-1} \text{ ($H$ is symmetric)} \\
+  &= H^{-1} \text{Cov}[S^T \bar{Q} M x_0] H^{-1} \\
+  &= H^{-1} S^T \bar{Q} M \text{Cov}[x_0] M^T \bar{Q} S H^{-1} \text{($\bar{Q}$ is symmetric)} \\
+\end{aligned}
+$$
+
+Thus, we aim to reduce the variance of the objective function estimate thereby reducing the covariance of the
+solution $U^*$ given a finite cost of computation.
+
 In order to formulate the CV and ACV approaches, we need a low-fidelity(LF) model of the system that correlates well
 with the high-fidelity(HF) model. The LF model should be computationally cheaper to evaluate than the
-HF model, and hence can be used as a control variate to reduce the variance of the objective function
+HF model, and hence can be evaluated with a lot more samples of $x_0$ than the HF model for the same cost.
+Thus, we use the LF model as a control variate to reduce the variance of the objective function
 estimation.
 
 For this paper, the HF model is the LQR controller described in section \ref{lqr_ctrl_stoch}, with a time
@@ -672,7 +536,7 @@ $m_{acv}$ samples of $x_0$.
     \State $\text{Cov}_{hl} \gets \text{Cov}(J_h(U_h, x_0), J_l(U_{hla}^{max}, x_0))$ calculated statistically using $n_{acv}$ samples
     \State $\text{Var}_l \gets \text{Var}[J_l(U_{hla}^{max}, x_0)]$ calculated statistically using $n_{acv}$ samples
     \State $\alpha \gets -\frac{m_{acv}}{m_{acv} + n_{acv}} \frac{\text{Cov}_{hl}}{\text{Var}_l}$ calculated statistically using $n_{acv}$ samples
-    \State $\mathbb{E}[J_l(U_{hla}^{max}, x_0)] \gets \frac{1}{m_{acv}} \sum_{i=n_{acv}}^{n_{acv}+m_{acv}} J_l(U_{hla}^{max}, x_0^{(i)})$
+    \State $S_{m_{acv}}^{MC}(J_l(U_{hla}^{max}, x_0)) \gets \frac{1}{m_{acv}} \sum_{i=n_{acv}}^{n_{acv}+m_{acv}} J_l(U_{hla}^{max}, x_0^{(i)})$
     \State $S_{n_{acv},m_{acv}}^{ACV}(J_h, J_l) \gets S_{n_{acv}}^{MC}(J_h(U_h, x_0)) + \alpha (S_{n_{acv}}^{MC}(J_l(U_{hla}^{max}, x_0)) - S_{m_{acv}}^{MC}(J_l(U_{hla}^{max}, x_0)))$
     \State $k \gets k + 1$
     \State $S_{n_{acv},m_{acv}}^{ACV}(J_h, J_l)$ is passed to the numerical optimizer for computing gradients for the next iteration
