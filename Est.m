@@ -2,6 +2,56 @@
 
 classdef Est
 	methods(Static)
+		function cost = CvEstA(x0_rv_ext, x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, n, u)
+			% MC estimator for hf
+			cost_hf = mean(St.LQRCost(x0_rv_ext(:, 1:n), lqrsol_hf, u));
+			% reuse same samples for LF
+			u_hla = Est.DownsampleAvg(u, 10);
+			cost_lf = mean(St.LQRCost(x0_rv_ext(:, 1:n), lqrsol_lf, u_hla));
+			% calculate optimal alpha using actual mean, cov
+			var_l = St.LQRVar(x0_mean, x0_cov, lqrsol_lf, u_hla);
+			cov_hl = St.LQRCov(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, u, u_hla);
+			alpha = -cov_hl / var_l;
+			
+			exp_l = St.LQRExp(x0_mean, x0_cov, lqrsol_lf, u_hla);
+			cost = cost_hf + alpha * (cost_lf - exp_l);
+		end
+		
+		% function cost = AcvEstA(x0_rv_ext, lqrsol_hf, lqrsol_lf, n, m, u)
+		function cost = AcvEstA(x0_rv_ext, lqrsol_hf, lqrsol_lf, n, m, u, x0_mean, x0_cov)
+			
+			% MC estimator for hf
+			cost_hf_all = St.LQRCost(x0_rv_ext(:, 1:n), lqrsol_hf, u);
+			cost_hf = mean(cost_hf_all);
+			% reuse same samples for LF
+			u_hla = Est.DownsampleAvg(u, 10);
+			cost_lf_all = St.LQRCost(x0_rv_ext(:, 1:n), lqrsol_lf, u_hla);
+			cost_lf = mean(cost_lf_all);
+			var_l = St.LQRVar(x0_mean, x0_cov, lqrsol_lf, u_hla);
+			cov_hl = St.LQRCov(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, u, u_hla);
+			% calculate optimal alpha using statistical mean
+			% var_l = var(cost_lf_all);
+			% cov_hl = cov(cost_hf_all, cost_lf_all);
+			% cov_hl = cov_hl(1, 2); % only off diagonal element
+			alpha = -m/(m+n) * cov_hl / var_l;
+			exp_l = mean(St.LQRCost(x0_rv_ext(:, n+1:n+m), lqrsol_lf, u_hla));
+			cost = cost_hf + alpha * (cost_lf - exp_l);
+		end
+		
+		function var = AcvVar(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, n, m, u)
+			var_h = St.LQRVar(x0_mean, x0_cov, lqrsol_hf, u);
+			u_lf = Est.DownsampleAvg(u, 10);
+			corr_hl = St.LQRCorr(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, u, u_lf);
+			var = var_h/n * (1 - m/(m+n) * corr_hl^2);
+		end
+		
+		function var = CvVar(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, n, u)
+			var_h = St.LQRVar(x0_mean, x0_cov, lqrsol_hf, u);
+			u_lf = Est.DownsampleAvg(u, 10);
+			corr_hl = St.LQRCorr(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, u, u_lf);
+			var = var_h/n * (1 - corr_hl^2);
+		end
+		
 		function [costs, Us] = CvOpt(u0, max_iters, x0_rv_ext, x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, n, use_best_U_lf)
 			costs = zeros(max_iters, 1);
 			Us = zeros(size(u0, 1), max_iters);

@@ -381,6 +381,156 @@ grid on;
 %% plot convergence distance comparison
 plot_convergence_dist(data.lqrsol{1}.Uopt, U_num_hf, U_num_cv, U_num_cv_fix, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
 
+%% check variance of CV vs ACV across different ratios of HF/LF cost
+acv_ratios = 1:0.2:5;
+num_rv_samples = 500;
+num_estimator_samples = 100;
+var_data_cv = zeros(length(acv_ratios), num_estimator_samples);
+var_data_acv = zeros(length(acv_ratios), num_estimator_samples);
+lf_hf_cost_ratio = 0.2;
+for i=1:length(acv_ratios)
+  fprintf("\n*** ACV Ratio: %f ***\n", acv_ratios(i));
+  n_cv = round(num_rv_samples / (1 + lf_hf_cost_ratio));
+  n_acv = round(num_rv_samples / (1 + lf_hf_cost_ratio + acv_ratios(i)*lf_hf_cost_ratio));
+  m_acv = round(acv_ratios(i) * n_acv);
+  n_total = round(max(n_cv+n_acv+m_acv, num_rv_samples)); % account for weird splits like 0.999
+  for j=1:num_estimator_samples
+    % get the RV samples
+    x0_rv = mvnrnd(x0_mean, x0_cov, n_total)';
+    x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
+    var_data_cv(i, j) = Est.CvEstA(x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, u0_num);
+    var_data_acv(i, j) = Est.AcvEstA(x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_acv, m_acv, u0_num, x0_ext_mean, x0_ext_cov);
+  end
+end
+
+var_acv = var(var_data_acv, 0, 2);
+var_cv = var(var_data_cv, 0, 2);
+
+figure;
+hold on;
+plot(acv_ratios, var_acv, 'b', 'LineWidth', 2, 'DisplayName', 'ACV');
+plot(acv_ratios, var_cv, 'r', 'LineWidth', 2, 'DisplayName', 'CV');
+xlabel("ACV Ratio");
+ylabel("Variance");
+title("Variance of CV and ACV estimators with different ACV Ratios");
+legend show;
+grid on;
+
+%% plot variance of CV vs ACV with n_acv fixed and increasing m_acv
+m_acvs = 100:100:2000;
+num_rv_samples = 500;
+num_estimator_samples = 500;
+var_data_cv = zeros(length(m_acvs), num_estimator_samples);
+var_data_acv = zeros(length(m_acvs), num_estimator_samples);
+lf_hf_cost_ratio = 0.2;
+n_cv = round(num_rv_samples / (1 + lf_hf_cost_ratio));
+n_acv = n_cv;
+for i=1:length(m_acvs)
+  fprintf("\n*** ACV m: %d ***\n", m_acvs(i));
+  n_total = round(max(n_cv+n_acv+m_acvs(i), num_rv_samples)); % account for weird splits like 0.999
+  for j=1:num_estimator_samples
+    % get the RV samples
+    x0_rv = mvnrnd(x0_mean, x0_cov, n_total)';
+    x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
+    var_data_cv(i, j) = Est.CvEstA(x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, u0_num);
+    var_data_acv(i, j) = Est.AcvEstA(x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_acv, m_acvs(i), u0_num, x0_ext_mean, x0_ext_cov);
+  end
+end
+
+var_acv = var(var_data_acv, 0, 2);
+var_cv = var(var_data_cv, 0, 2);
+var_diff = var_acv - var_cv ;
+%%
+figure;
+hold on;
+% plot(m_acvs, var_acv, 'b', 'LineWidth', 2, 'DisplayName', 'ACV');
+plot(m_acvs, var_diff, 'r', 'LineWidth', 2, 'DisplayName', 'var ACV - var CV');
+xlabel("ACV m");
+ylabel("Variance");
+title("Variance difference CV and ACV estimators with different m");
+legend show;
+grid on;
+
+%% plot variance of CV vs ACV with equal cost ratio but alpha is analytically calculated
+num_rv_samples = 100:100:2000;
+num_estimator_samples = 500;
+var_data_cv = zeros(length(num_rv_samples), num_estimator_samples);
+var_data_acv = zeros(length(num_rv_samples), num_estimator_samples);
+lf_hf_cost_ratio = 0.2;
+acv_ratio  = 4;
+for i=1:length(num_rv_samples)
+  fprintf("\n*** RV Samples: %d ***\n", num_rv_samples(i));
+  n_cv = round(num_rv_samples(i) / (1 + lf_hf_cost_ratio));
+  n_acv = round(num_rv_samples(i) / (1 + lf_hf_cost_ratio + acv_ratio*lf_hf_cost_ratio));
+  m_acv = round(acv_ratio * n_acv);
+  n_total = round(max(n_cv+n_acv+m_acv, num_rv_samples(i)));
+  for j=1:num_estimator_samples
+    % get the RV samples
+    x0_rv = mvnrnd(x0_mean, x0_cov, n_total)';
+    x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
+    var_data_cv(i, j) = Est.CvEstA(x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, u0_num);
+    var_data_acv(i, j) = Est.AcvEstA(x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_acv, m_acv, u0_num, x0_ext_mean, x0_ext_cov);
+  end
+end
+
+var_acv = var(var_data_acv, 0, 2);
+var_cv = var(var_data_cv, 0, 2);
+var_diff = var_acv - var_cv;
+%% plot
+figure;
+hold on;
+% plot(num_rv_samples, var_cv, 'g', 'LineWidth', 2, 'DisplayName', 'CV');
+% plot(num_rv_samples, var_acv, 'r', 'LineWidth', 2, 'DisplayName', 'ACV');
+plot(num_rv_samples, var_diff, 'b', 'LineWidth', 2, 'DisplayName', 'var ACV - var CV');
+xlabel("RV Samples");
+ylabel("Variance");
+title("Variance difference equal cost CV and ACV with analytical alpha");
+legend show;
+grid on;
+
+%% plot variance of ACV vs analyitical
+num_rv_samples = 500;
+num_estimator_samples = 100:100:2000;
+var_data_cv = zeros(length(num_estimator_samples), 1);
+var_data_acv = zeros(length(num_estimator_samples), 1);
+lf_hf_cost_ratio = 0.2;
+acv_ratio  = 4;
+n_cv = round(num_rv_samples / (1 + lf_hf_cost_ratio));
+n_acv = round(num_rv_samples / (1 + lf_hf_cost_ratio + acv_ratio*lf_hf_cost_ratio));
+m_acv = round(acv_ratio * n_acv);
+n_total = round(max(n_acv+m_acv, num_rv_samples));
+for i=1:length(num_estimator_samples)
+  est_samples = num_estimator_samples(i);
+  fprintf("\n*** Est Samples: %d ***\n", est_samples);
+  temp_data_cv = zeros(est_samples, 1);
+  temp_data_acv = zeros(est_samples, 1);
+  for j=1:est_samples
+    % get the RV samples
+    x0_rv = mvnrnd(x0_mean, x0_cov, n_total)';
+    x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
+    temp_data_cv(j) = Est.CvEstA(x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, u0_num);
+    temp_data_acv(j) = Est.AcvEstA(x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_acv, m_acv, u0_num, x0_ext_mean, x0_ext_cov);
+  end
+  var_data_cv(i) = var(temp_data_cv);
+  var_data_acv(i) = var(temp_data_acv);
+end
+
+%% plot
+var_cv_an = Est.CvVar(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, u0_num);
+var_acv_an = Est.AcvVar(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_acv, m_acv, u0_num);
+se_cv = abs(var_data_cv - var_cv_an);
+se_acv = abs(var_data_acv - var_acv_an);
+figure;
+hold on;
+semilogy(num_estimator_samples, se_cv, 'g', 'LineWidth', 2, 'DisplayName', 'CV Var squared error');
+semilogy(num_estimator_samples, se_acv, 'r', 'LineWidth', 2, 'DisplayName', 'ACV Var squared error');
+xlabel("Estimator Samples");
+ylabel("Variance");
+title("Variance with different Estimator samples");
+legend show;
+grid on;
+
+
 %% G Convergence and variance with various optimizers and sample sizes
 num_rv_samples = [10 100 500];
 num_estimator_samples = 50;
