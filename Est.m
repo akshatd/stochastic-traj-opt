@@ -2,12 +2,39 @@
 
 classdef Est
 	methods(Static)
-		function cost = CvEstA(x0_rv_ext, x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, n, u)
-			% MC estimator for hf
-			cost_hf = mean(St.LQRCost(x0_rv_ext(:, 1:n), lqrsol_hf, u));
+		function cost = CvEst(x0_rv_ext, x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, n, u, use_best_U_lf, reset)
+			persistent Us costs_lf idx;
+			if isempty(Us)
+				Us = [];
+				costs_lf = [];
+				idx = 1;
+			end
+			if reset
+				Us = [];
+				costs_lf = [];
+				idx = 1;
+				return;
+			end
+			
+			cost_hf_all = St.LQRCost(x0_rv_ext(:, 1:n), lqrsol_hf, u);
 			% reuse same samples for LF
 			u_hla = Est.DownsampleAvg(u, 10);
-			cost_lf = mean(St.LQRCost(x0_rv_ext(:, 1:n), lqrsol_lf, u_hla));
+			cost_lf_all = St.LQRCost(x0_rv_ext(:, 1:n), lqrsol_lf, u_hla);
+			if use_best_U_lf
+				Us(:, idx) = u; % temporary init so it can be used here
+				costs_lf(:, idx) = cost_lf_all;
+				
+				% TODO: Us should be in rows to prevent transpose
+				corrs = St.CorrMulti2D(cost_hf_all', costs_lf(:, 1:idx)');
+				[~, best_idx] = max(corrs);
+				
+				u_hla = Est.DownsampleAvg(Us(:, best_idx), 10);
+				cost_lf_all = costs_lf(:, best_idx);
+                idx = idx + 1;
+			end
+			cost_hf = mean(cost_hf_all);
+			cost_lf = mean(cost_lf_all);
+			
 			% calculate optimal alpha using actual mean, cov
 			var_l = St.LQRVar(x0_mean, x0_cov, lqrsol_lf, u_hla);
 			cov_hl = St.LQRCov(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, u, u_hla);
