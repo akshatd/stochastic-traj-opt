@@ -504,12 +504,14 @@ grid on;
 
 
 %% G Convergence and variance with various optimizers and sample sizes
-num_rv_samples = [10 100 500];
+num_rv_samples = [10];
 num_estimator_samples = 50;
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 max_iters = 30;
+tol = 1e-12;
 options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun, "MaxIterations", max_iters, "OptimalityTolerance", 1e-12);
 
+%%
 data.hf_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
 data.hf_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 for num_samples=num_rv_samples
@@ -554,7 +556,8 @@ for num_samples=num_rv_samples
     x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
     
     % CV with fixed LF solution
-    [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, true);
+    % [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, true);
+    [costs, Us, ~] = cv.opt(u0_num, max_iters, tol, x0_rv_ext, n_cv, true);
     data.cv_fix_cost(:, i, num_rv_samples == num_samples) = costs;
     data.cv_fix_u(:, :, i, num_rv_samples == num_samples) = Us;
     
