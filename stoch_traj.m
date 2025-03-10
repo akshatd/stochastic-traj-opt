@@ -308,15 +308,10 @@ plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, 
 plot_corr_2d(corr_2d, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_avg");
 
 %% F num opt with CV estimator
+cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
 %% F.1 normal CV Estimator
 cv_samples = rv_samples/2;
-num_opt_iters = 0;
-num_opt_data = zeros(size(Uopt_hf,1), 100);
-Est.CvEst([], [], [], [], [], [], [], false, true); % reset the persistent vars
-fun = @(u) Est.CvEst(x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, cv_samples, u, false, false);
-options = optimoptions('fminunc', 'Display', 'iter', 'OutputFcn', @outfun); % finite diff
-Uopt_num = fminunc(fun, u0_num, options);
-U_hf = num_opt_data(:, 1:num_opt_iters);
+[~, U_hf] = cv.opt(u0_num, -1, -1, x0_rv_ext, cv_samples, false);
 U_num_cv = U_hf; % save for plotting later
 U_lf = Est.DownsampleAvg(U_hf, 10);
 % U_lf = Est.DownsampleAvg(U_hf, 10, true); % uncomment to visualize
@@ -332,7 +327,7 @@ corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol
 % plot correlation
 title_str = ["$J_h$ and $J_l$", "$S_{" + cv_samples + "}^{CV}$"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
-plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
+plot_multifid_costs(1:cv.idx, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
 plot_corr_2d(corr_2d, "$S_{" + cv_samples + "}^{CV}$ opt Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_cv");
 
 %% F.2 CV Estimator with fixed LF solution
