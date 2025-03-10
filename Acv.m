@@ -1,4 +1,4 @@
-classdef Cv < handle
+classdef Acv < handle
 	properties
 		Us = [];
 		U_hlas = [];
@@ -11,14 +11,14 @@ classdef Cv < handle
 	end
 	
 	methods
-		function obj = Cv(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf)
+		function obj = Acv(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf)
 			obj.x0_mean = x0_mean;
 			obj.x0_cov = x0_cov;
 			obj.lqrsol_hf = lqrsol_hf;
 			obj.lqrsol_lf = lqrsol_lf;
 		end
 		
-		function cost = est(obj, x0_rv_ext, n, u, use_best_U_lf)
+		function cost = est(obj, x0_rv_ext, n, m, u, use_best_U_lf, a_type, e_type)
 			% ONLY set use_best_U_lf if insider optimizer and idx is set outside
 			cost_hf_all = St.LQRCost(x0_rv_ext(:, 1:n), obj.lqrsol_hf, u);
 			u_hla = Est.DownsampleAvg(u, 10);
@@ -35,14 +35,28 @@ classdef Cv < handle
 			obj.U_hlas(:, obj.idx) = u_hla; % save bc used for plotting
 			cost_hf = mean(cost_hf_all);
 			cost_lf = mean(cost_lf_all);
-			var_l = St.LQRVar(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla); % analytical
-			cov_hl = St.LQRCov(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, obj.lqrsol_lf, u, u_hla); % analytical
-			exp_l = St.LQRExp(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla);
+			if strcmp(a_type, 'anly')
+				var_l = St.LQRVar(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla); % analytical
+				cov_hl = St.LQRCov(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, obj.lqrsol_lf, u, u_hla); % analytical
+			elseif strcmp(a_type, 'stat')
+				var_l = var(cost_lf_all);
+				cov_hl = cov(cost_hf_all, cost_lf_all);
+				cov_hl = cov_hl(1, 2); % only off diagonal element
+			elseif strcmp(a_type, '-1')
+				% set alpha to -1
+				var_l = 1;
+				cov_hl = 1;
+			end
 			alpha = -cov_hl / var_l;
+			if strcmp(e_type, 'anly')
+				exp_l = St.LQRExp(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla);
+			elseif strcmp(e_type, 'stat')
+				exp_l = mean(St.LQRCost(x0_rv_ext(:, n+1:n+m), obj.lqrsol_lf, u_hla));
+			end
 			cost = cost_hf + alpha * (cost_lf - exp_l);
 		end
 		
-		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, use_best_U_lf)
+		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, m, use_best_U_lf, a_type, e_type)
 			costs = zeros(max_iters, 1);
 			obj.Us = zeros(size(u0, 1), max_iters);
 			obj.U_hlas = zeros(size(u0, 1)/10, max_iters);
@@ -54,7 +68,7 @@ classdef Cv < handle
 			else
 				options = optimoptions('fminunc', 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol);
 			end
-			fminunc(@(u) obj.est(x0_rv_ext, n, u, use_best_U_lf), u0, options);
+			fminunc(@(u) obj.est(x0_rv_ext, n, m, u, use_best_U_lf, a_type, e_type), u0, options);
 			
 			% trim to match iters
 			obj.idx = obj.idx-1; % remove last iteration that stopped it
@@ -80,13 +94,12 @@ classdef Cv < handle
 			U_hlas = obj.U_hlas;
 		end
 		
-		function var = var(n, u)
+		function var = var(n, m, u)
 			var_h = St.LQRVar(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, u);
 			u_lf = Est.DownsampleAvg(u, 10);
 			corr_hl = St.LQRCorr(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, obj.lqrsol_lf, u, u_lf);
-			var = var_h/n * (1 - corr_hl^2);
+			var = var_h/n * (1 - m/(m+n) * corr_hl^2);
 		end
-		
 		
 	end
 	

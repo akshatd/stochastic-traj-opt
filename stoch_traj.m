@@ -309,6 +309,7 @@ plot_corr_2d(corr_2d, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})
 
 %% F num opt with CV estimator
 cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
+acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
 %% F.1 normal CV Estimator
 cv_samples = rv_samples/2;
 [~, U_hf, U_lf] = cv.opt(u0_num, -1, -1, x0_rv_ext, cv_samples, false);
@@ -556,13 +557,12 @@ for num_samples=num_rv_samples
     x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
     
     % CV with fixed LF solution
-    % [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, true);
     [costs, Us, ~] = cv.opt(u0_num, max_iters, tol, x0_rv_ext, n_cv, true);
     data.cv_fix_cost(:, i, num_rv_samples == num_samples) = costs;
     data.cv_fix_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % CV
-    % [costs, Us] = Est.CvOpt(u0_num, max_iters, x0_rv_ext, x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, n_cv, false);
+    % [costs, Us, ~] = cv.opt(u0_num, max_iters, tol, x0_rv_ext, n_cv, false);
     % data.cv_cost(:, i, num_rv_samples == num_samples) = costs;
     % data.cv_u(:, :, i, num_rv_samples == num_samples) = Us;
     
@@ -596,12 +596,12 @@ for num_samples=num_rv_samples
     x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
     
     % ACV with fixed LF solution
-    [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_acv, m_acv, true);
+    [costs, Us, ~] = acv.opt(u0_num, max_iters, tol, x0_rv_ext, n_acv, m_acv, true, '-1', 'stat');
     data.acv_fix_cost(:, i, num_rv_samples == num_samples) = costs;
     data.acv_fix_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % ACV
-    % [costs, Us] = Est.AcvOpt(u0_num, max_iters, x0_rv_ext, data.lqrsol{1}, data.lqrsol{2}, n_cv, m_acv, false);
+    % [costs, Us, ~] = acv.opt(u0_num, max_iters, tol, x0_rv_ext, n_acv, m_acv, false, '-1', 'stat');
     % data.acv_cost(:, i, num_rv_samples == num_samples) = costs;
     % data.acv_u(:, :, i, num_rv_samples == num_samples) = Us;
   end
