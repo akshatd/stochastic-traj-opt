@@ -367,12 +367,18 @@ Combining these, we get the covariance as
 
 \section{Monte Carlo with Control Variates}
 
-The objective of this paper is to reduce the variance of the objective function estimation under sample average approximation.
-A Monte Carlo(MC) simulation can be used to estimate the expected value of the objective function, but a control variate(CV) approach
-would reduce the variance with the same computational cost. In the absence of an analytical expression of the expected value of the
-objective function, an approximate control variate(ACV) approach is also proposed. The CV estimator will also serve as
-the benchmark for the ACV estimator, since it is the best possible variance reduction that can be achieved with the ACV estimator.
+For optimizing the trajectory of system under uncertainty, a common approach is to compute the expectation of the objective
+function of a trajectory is by doing sample average approximation, where we propagate the trajectory with multiples samples
+of the random variable, and take the average of all samples in a numerical optimizer to determine the optimal control inputs.
+The most straighforward way to compute the expectation of the trajectory's objective function is to use Monte Carlo (MC) estimator.
+When using a MC estimator, the variance of the estimated trajectory objective is related to the variance of the trajectory's
+objective function in the following way.
 
+$$
+\text{Var}[S_n^{MC}(J)] = \frac{\text{Var}[J]}{n}
+$$
+
+Where $S_n^{MC}(J)$ is the MC estimator of the objective function $J$ with $n$ samples of the random variable.
 The solution to the stochastic LQR controller, $U^*$ can be written as a function of the initial state $x_0$.
 
 $$
@@ -389,8 +395,30 @@ $$
 \end{aligned}
 $$
 
-Thus, we aim to reduce the variance of the objective function estimate thereby reducing the covariance of the
-solution $U^*$ given a finite cost of computation.
+The objective of this paper is to reduce the variance of the objective function estimation under sample average approximation,
+thus, thereby reducing the covariance of the solution $U^*$ given a finite cost of computation.
+
+A control variate (CV) estimator is a variance reduction technique that uses the correlation between the objective function
+and another function to reduce the variance of the objective function estimation. Its variance has the form
+
+$$
+\text{Var}[S_{n_{cv}}^{CV}(J_h, J_l)] = \text{Var}[J_h] (1 - \rho^2)
+$$
+
+Where $J_h$ and $J_l$ are the high and low fidelity models of the objective function, $\rho$ is the Pearson correlation
+coefficient between the high and low fidelity models, and $S_{n_{cv}}^{CV}(J_h, J_l)$ is the CV estimator of the objective
+function $J_h$ using the low fidelity model $J_l$.
+
+The CV estimator requires the analytical expectation of the expectation of the low fidelity model, and the covariance between
+the high and low fidelity models. This might not be available in practice, and hence, an alternative is the approximate
+control variate (ACV) estimator. The ACV estimator uses the statistical estimate of the expectation and covariance
+of the low fidelity model, and has the variance
+
+$$
+\text{Var}[S_{n_{acv},m_{acv}}^{ACV}(J_h, J_l)] = \text{Var}[J_h] (1 - \frac{m_{acv}}{m_{acv} + n_{acv}} \rho^2)
+$$
+
+Where $m_{acv}$ and $n_{acv}$ are the number of samples used to estimate the expectation and covariance of the low fidelity model,
 
 In order to formulate the CV and ACV approaches, we need a low-fidelity(LF) model of the system that correlates well
 with the high-fidelity(HF) model. The LF model should be computationally cheaper to evaluate than the
@@ -541,6 +569,54 @@ $m_{acv}$ samples of $x_0$.
     \State $k \gets k + 1$
     \State $S_{n_{acv},m_{acv}}^{ACV}(J_h, J_l)$ is passed to the numerical optimizer for computing gradients for the next iteration
     \EndWhile
+  \end{algorithmic}
+\end{algorithm}
+
+\section{Extra}
+To test the estimators, we set up a couple of experiments.
+
+We fixed $\alpha = -1$ for the ACV estimator and increased the ratio $m:n$ for the ACV estimator
+to see what the optimal sample allocation is
+\begin{algorithm}
+  \caption{ACV sample allocation experiment}
+  \begin{algorithmic}
+    \Require $J_h, J_l, x_0, e_s, ratio_{cost}, MC_{cost}, ratio_{mn}$
+    \State $x_{0,samples} \gets \text{generate samples of } x_0 \text{ for all } e_s$
+    \For{$r$ in $ratio_{mn}$}
+    \State $n_{acv} \gets MC_{cost} / (1 + ratio_{cost} + r * ratio_{cost})$
+    \State $m_{acv} \gets r * n_{acv}$
+    \For{$x_0^{(i)}$ in $x_{0,samples}$}
+    \State $O^{(i)} \gets S_{n_{acv},m_{acv}}^{ACV}(J_h, J_l, x_0^{(i)})$
+    \EndFor
+    \State $\text{Var}^{(r)} \gets \text{Var}[O]$
+    \EndFor
+  \end{algorithmic}
+\end{algorithm}
+
+$e_s$ is the number of estimator samples
+
+$ratio_{cost}$ is the ratio of the cost of $J_l$ to $J_h$
+
+$MC_{cost}$ is the equivalent cost of the MC estimator
+
+Then we fixed $n$ for the ACV estimator and increased $m$ to see if it converges to the CV estimator variance
+\begin{algorithm}
+  \caption{ACV convergence experiment}
+  \begin{algorithmic}
+    \Require $J_h, J_l, x_0, e_s, ratio_{cost}, MC_{cost}, ms_{acv}$
+    \State $x_{0,samples} \gets \text{generate samples of } x_0 \text{ for all } e_s$
+    \State $n_{cv} \gets MC_{cost} / (1 + ratio_{cost})$
+    \State $n_{acv} \gets MC_{cost} / (1 + ratio_{cost})$ (same as CV)
+    \For{$m$ in $ms_{acv}$}
+    \State $m_{acv} \gets m$
+    \For{$x_0^{(i)}$ in $x_{0,samples}$}
+    \State $O_{cv}^{(i)} \gets S_{n_{cv}}^{CV}(J_h, J_l, x_0^{(i)})$
+    \State $O_{acv}^{(i)} \gets S_{n_{acv},m_{acv}}^{ACV}(J_h, J_l, x_0^{(i)})$
+    \EndFor
+    \State $\text{Var}_{cv}^{(m)} \gets \text{Var}[O_{cv}]$
+    \State $\text{Var}_{acv}^{(m)} \gets \text{Var}[O_{acv}]$
+    \State $\text{Var}^{(m)} \gets (\text{Var}_{acv}^{(m)} - \text{Var}_{cv}^{(m)})^2$
+    \EndFor
   \end{algorithmic}
 \end{algorithm}
 
