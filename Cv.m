@@ -1,6 +1,7 @@
 classdef Cv < handle
 	properties
 		Us = [];
+		U_hlas = [];
 		costs_lf = [];
 		idx = 1;
 		x0_mean = [];
@@ -31,6 +32,7 @@ classdef Cv < handle
 				u_hla = Est.DownsampleAvg(obj.Us(:, best_idx), 10);
 				cost_lf_all = obj.costs_lf(:, best_idx);
 			end
+			obj.U_hlas(:, obj.idx) = u_hla; % save bc used for plotting
 			cost_hf = mean(cost_hf_all);
 			cost_lf = mean(cost_lf_all);
 			var_l = St.LQRVar(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla); % analytical
@@ -40,9 +42,10 @@ classdef Cv < handle
 			cost = cost_hf + alpha * (cost_lf - exp_l);
 		end
 		
-		function [costs, Us] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, use_best_U_lf)
+		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, use_best_U_lf)
 			costs = zeros(max_iters, 1);
 			obj.Us = zeros(size(u0, 1), max_iters);
+			obj.U_hlas = zeros(size(u0, 1)/10, max_iters);
 			obj.costs_lf = zeros(n, max_iters); % we use only n samples out of all in x0_rv
 			obj.idx = 1;
 			
@@ -62,6 +65,7 @@ classdef Cv < handle
 			end
 			costs = costs(1:iters);
 			obj.Us = obj.Us(:, 1:iters);
+			obj.U_hlas = obj.U_hlas(:, 1:iters);
 			
 			function stop = OutFn(x, optimValues, state)
 				stop = false;
@@ -73,6 +77,7 @@ classdef Cv < handle
 				end
 			end
 			Us = obj.Us;
+			U_hlas = obj.U_hlas;
 		end
 		
 	end
