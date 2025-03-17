@@ -1,9 +1,6 @@
 % TODOS:
 % - we are assuming u0 to be 0, might not be true in general so might need to add u0 to cumsum
-% - extend CV to work for any number of levels
 % - make indices consistent when storing U in row vs column (make everything row based)
-% - calculate correlation in cv estimator as it goes along instead of all at once
-%  - can delete the individual esimators after this in section F
 % - calculate cost of CV estimators to determine equal cost split
 
 clc; clear; close all force;
@@ -37,7 +34,7 @@ x0 = [1;0];
 x0_mean = x0;
 x0_cov = eye(nx)* 0.1;
 ref = [2; 0]; % reference state [pos, vel]
-u0 = 0; % initial control effort
+u0 = 0; % initial control effort !=0 to prevent repmat warnings
 x0_ext = [x0; u0; ref]; % extended state
 x0_ext_mean = [x0_mean; u0; ref];
 x0_ext_cov = blkdiag(x0_cov, zeros(length(u0), length(u0)), zeros(length(ref), length(ref)));
@@ -209,145 +206,140 @@ end
 
 %% E.1.1 perturbation in HF objective fn
 perturbation = get_perturb_max_grad(data.lqrsol{1}, perturb_dir_samples, perturb_dir_mag, perturb_range);
-Uopt_hf = data.lqrsol{1}.Uopt + perturbation; % perturb hf sol
+U_h = data.lqrsol{1}.Uopt + perturbation; % perturb hf sol
 
 %% E.1.1.1 restriction
-Uopt_lf = Uopt_hf(1:10:end, :); % pick every 10th elem
-% Uopt_lf_vis = repelem(Uopt_lf, 10, 1); % uncomment to visualize
-% vis_sols(Uopt_hf, Uopt_lf_vis, data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
+U_l = U_h(1:10:end, :); % pick every 10th elem
+% U_l_vis = repelem(U_l, 10, 1); % uncomment to visualize
+% vis_sols(U_h, U_l_vis , data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
 
 % calculate costs and correlation for HF/LF sols for each perturbation
-cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, Uopt_hf);
-cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, Uopt_lf);
-corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
+cost_h = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_h);
+cost_l = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_l);
+corr_st = St.CorrMulti(cost_h, cost_l);
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_h, U_l);
 % plot costs
 title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
-plot_multifid_costs(perturb_range, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Perturbation");
+plot_multifid_costs(perturb_range, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, title_str, costs_str, "Perturbation");
 
 %% E.1.1.2 averaging
-Uopt_lf = Est.DownsampleAvg(Uopt_hf, 10); % get HF in LF by avg every 10 values of HF
+U_l = Est.DownsampleAvg(U_h, 10); % get HF in LF by avg every 10 values of HF
 % Uopt_lf = Est.DownsampleAvg(Uopt_hf, 10, true); % uncomment to visualize
 % vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
 % calculate costs and correlation for HF/LF sols for each perturbation
-cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, Uopt_hf);
-cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, Uopt_lf);
-corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
+cost_h = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_h);
+cost_l = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_l);
+corr_st = St.CorrMulti(cost_h, cost_l);
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_h, U_l);
 % plot costs
 title_str = ["$J_h$ and $J_l$", "$J_h (averaging)$"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
-plot_multifid_costs(perturb_range, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Perturbation");
+plot_multifid_costs(perturb_range, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, title_str, costs_str, "Perturbation");
 
 
 %% E.1.2 perturbation in LF objective fn
 perturbation = get_perturb_max_grad(data.lqrsol{2}, perturb_dir_samples, perturb_dir_mag, perturb_range);
-Uopt_lf = data.lqrsol{2}.Uopt + perturbation;
+U_l = data.lqrsol{2}.Uopt + perturbation;
 % vis_sols(Uopt_hf, Uopt_lf, data.lqrsol{2}.times, "LF obj (restriction)", perturb_range, "Perturbation");
-Uopt_hf = repelem(Uopt_lf, 10, 1); % repeat the LF sol to match HF sol
+U_h = repelem(U_l, 10, 1); % repeat the LF sol to match HF sol
 % calculate costs and correlation for both high and low fidelity, for each perturbation
-cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, Uopt_hf);
-cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, Uopt_lf);
-corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, Uopt_hf, Uopt_lf);
+cost_h = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_h);
+cost_l = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_l);
+corr_st = St.CorrMulti(cost_h, cost_l);
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_h, U_l);
 % plot costs
 title_str = ["$J_h$ and $J_l$", "$J_l$"];
 costs_str = ["$J_h(u_lh)$", "$J_l(u_l)$"];
-plot_multifid_costs(perturb_range, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Perturbation");
+plot_multifid_costs(perturb_range, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, title_str, costs_str, "Perturbation");
 
 %% *** E.2 correlation at different points in a numerical optimizer
 %% E.2.1 num opt with HF objective fn
-Uopt_hf = data.lqrsol{1}.Uopt;
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
-% u0_num = zeros(size(Uopt_hf)); % zero start
-% u0_num = randn(size(Uopt_hf)); % random start
-global num_opt_iters num_opt_data num_opt_fvals;
-num_opt_iters = 0;
-num_opt_data = zeros(size(Uopt_hf,1), 100);
 fun = @(u) St.LQRCostwGrad(data.lqrsol{1}.x0_ext, data.lqrsol{1}, u);
-options = optimoptions('fminunc', 'Display', 'iter', 'Algorithm', 'quasi-newton', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
-Uopt_num = fminunc(fun, u0_num, options);
-uopt_diff = sqrt(sum((Uopt_hf - Uopt_num).^2));
+U_num = fminuncWHistory(fun, u0_num);
+Uopt_h_num = U_num(:, end);
+iters = size(U_num, 2);
 
-U_hf = num_opt_data(:, 1:num_opt_iters);
-U_num_hf = U_hf; % save for plotting later
+uopt_diff = mean((data.lqrsol{1}.Uopt - Uopt_h_num).^2);
+
 % this is just to get the costs for the averaged HF solution in LF sim as the CV estimator would
 %% E.2.1.1 correlation with restriction
-U_lf = U_hf(1:10:end, :);
+U_h = U_num;
+U_l = U_h(1:10:end, :);
 % U_lf = repelem(U_lf, 10, 1); % uncomment to visualize
-% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
-cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_hf);
-cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_lf);
-corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
-corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
+cost_h = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_h);
+cost_l = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_l);
+corr_st = St.CorrMulti(cost_h, cost_l);
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_h, U_l);
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_h, U_l);
 
 % plot correlation
 title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
-plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
+plot_multifid_costs(1:iters, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, title_str, costs_str, "Iteration");
 plot_corr_2d(corr_2d, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hlr})$", costs_str, "num_iters_res");
 
 %% E.2.1.2 correlation with averaging
-U_lf = Est.DownsampleAvg(U_hf, 10); % get LF by avg every 10 values of HF
+U_l = Est.DownsampleAvg(U_h, 10); % get LF by avg every 10 values of HF
 % U_lf = Est.DownsampleAvg(U_hf, 10, true); % uncomment to visualize
-% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
-cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_hf);
-cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_lf);
-corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
-corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
+cost_h = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_h);
+cost_l = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_l);
+corr_st = St.CorrMulti(cost_h, cost_l);
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_h, U_l);
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_h, U_l);
 
 % plot correlation
 title_str = ["$J_h$ and $J_l$", "$J_h$ (averaging)"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
-plot_multifid_costs(1:num_opt_iters, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
+plot_multifid_costs(1:iters, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, title_str, costs_str, "Iteration");
 plot_corr_2d(corr_2d, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_avg");
 
 %% F num opt with CV estimator
 cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
 %% F.1 normal CV Estimator
 cv_samples = rv_samples/2;
-[~, U_hf, U_lf] = cv.opt(u0_num, -1, -1, x0_rv_ext, cv_samples, false);
-U_num_cv = U_hf; % save for plotting later
+[~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, cv_samples, false);
+U_num_cv = U_h; % save for plotting later
 
 % U_lf = repelem(U_hla, 10, cv.idx); % uncomment to visualize
-% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
+% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
 
-cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_hf);
-cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_lf);
-corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
-corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+cost_h = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_h);
+cost_l = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_l);
+corr_st = St.CorrMulti(cost_h, cost_l);
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_h, U_l);
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_h, U_l);
 
 % plot correlation
 title_str = ["$J_h$ and $J_l$", "$S_{" + cv_samples + "}^{CV}$"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
-plot_multifid_costs(1:cv.idx, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
+plot_multifid_costs(1:cv.idx, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, title_str, costs_str, "Iteration");
 plot_corr_2d(corr_2d, "$S_{" + cv_samples + "}^{CV}$ opt Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla})$", costs_str, "num_iters_cv");
 
 %% F.2 CV Estimator with fixed LF solution
-[~, U_hf, U_lf] = cv.opt(u0_num, -1, -1, x0_rv_ext, cv_samples, true);
-U_num_cv_fix = U_hf; % save for plotting later
+[~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, cv_samples, true);
+U_num_cv_fix = U_h; % save for plotting later
 
 % U_lf = repelem(U_hla, 10, cv.idx);
-% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:num_opt_iters, "Iteration");
+% vis_sols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
 
-cost_hf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_hf);
-cost_lf = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_lf);
-corr_st = St.CorrMulti(cost_hf, cost_lf);
-corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
-corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_hf, U_lf);
+cost_h = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_h);
+cost_l = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_l);
+corr_st = St.CorrMulti(cost_h, cost_l);
+corr_an = St.LQRCorrMulti(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_h, U_l);
+corr_2d = St.LQRCorrMulti2D(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, U_h, U_l);
 
 % plot correlation
 title_str = ["$J_h$ and $J_l$ at max correlation", "$S_{" + cv_samples + "}^{CV}$"];
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla}^{max})$"];
-plot_multifid_costs(1:cv.idx, mean(cost_hf,2), mean(cost_lf,2), corr_st, corr_an, title_str, costs_str, "Iteration");
+plot_multifid_costs(1:cv.idx, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, title_str, costs_str, "Iteration");
 plot_corr_2d(corr_2d, "$S_{" + cv_samples + "}^{CV}$ opt Correlation between costs in $J_h(u_h)$ and $J_l(u_{hla}^{max})$", costs_str, "num_iters_cv_max_corr");
 
 %% plot convergence distance comparison
-plot_convergence_dist(data.lqrsol{1}.Uopt, U_num_hf, U_num_cv, U_num_cv_fix, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
+plot_convergence_dist(data.lqrsol{1}.Uopt, U_num, U_num_cv, U_num_cv_fix, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
 
 %% G verify ACV estimator
 cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
@@ -636,15 +628,19 @@ function xdot = msd(~, x, u, A, B)
 xdot = A * x + B * u;
 end
 
-function stop = outfun(x, optimValues, state)
-% this is for capturing intermediate values of the optimization
-stop = false;
-global num_opt_iters num_opt_data num_opt_fvals;
-if isequal(state, 'iter')
-  num_opt_iters = num_opt_iters + 1;
-  num_opt_data(:, num_opt_iters) = x;
-  num_opt_fvals(num_opt_iters) = optimValues.fval;
-end
+function x_history = fminuncWHistory(fun, x0)
+% this is a wrapper around fminunc that returns the history of the optimization
+x_history = [];
+options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
+fminunc(fun, x0, options);
+
+  function stop = outfun(x, ~, state)
+    % this is for capturing intermediate values of the optimization
+    stop = false;
+    if isequal(state, 'iter')
+      x_history = [x_history x];
+    end
+  end
 end
 
 function x = sim_closed_loop(Tsim, Tfid, Ts, x0, u0, U, A, B, dyn)
