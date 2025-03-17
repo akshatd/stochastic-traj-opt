@@ -38,16 +38,15 @@ classdef Acv < handle
 			if strcmp(a_type, 'anly')
 				var_l = St.LQRVar(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla); % analytical
 				cov_hl = St.LQRCov(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, obj.lqrsol_lf, u, u_hla); % analytical
+				alpha = -m/(m+n) * cov_hl / var_l;
 			elseif strcmp(a_type, 'stat')
 				var_l = var(cost_lf_all);
 				cov_hl = cov(cost_hf_all, cost_lf_all);
 				cov_hl = cov_hl(1, 2); % only off diagonal element
+				alpha = -m/(m+n) * cov_hl / var_l;
 			elseif strcmp(a_type, '-1')
-				% set alpha to -1
-				var_l = 1;
-				cov_hl = 1;
+				alpha = -1;
 			end
-			alpha = -cov_hl / var_l;
 			if strcmp(e_type, 'anly')
 				exp_l = St.LQRExp(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla);
 			elseif strcmp(e_type, 'stat')
@@ -94,7 +93,7 @@ classdef Acv < handle
 			U_hlas = obj.U_hlas;
 		end
 		
-		function var = var(n, m, u)
+        function var = variance(obj, n, m, u)
 			var_h = St.LQRVar(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, u);
 			u_lf = Est.DownsampleAvg(u, 10);
 			corr_hl = St.LQRCorr(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, obj.lqrsol_lf, u, u_lf);

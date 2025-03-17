@@ -80,7 +80,7 @@ classdef Cv < handle
 			U_hlas = obj.U_hlas;
 		end
 		
-		function var = var(n, u)
+        function var = variance(obj, n, u)
 			var_h = St.LQRVar(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, u);
 			u_lf = Est.DownsampleAvg(u, 10);
 			corr_hl = St.LQRCorr(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, obj.lqrsol_lf, u, u_lf);
