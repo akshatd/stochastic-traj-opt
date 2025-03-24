@@ -764,7 +764,7 @@ Comparing $J_h(u_h, x_0)$ and $J_l(u_{hlr}, x_0)$
 
 Comparing $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$
 
-#### Perturbation in the low fidelity model/objective function}
+#### Perturbation in the low fidelity model/objective function
 
 When perturbing in the low fidelity model/objective function, the perturbed high fidelity solution was determined
 by converting the low fidelity perturbation to high fidelity dimensions as described in section \ref{comp_opt}.

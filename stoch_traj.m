@@ -211,79 +211,79 @@ U_l = U_h(1:10:end, :); % pick every 10th elem
 % U_l_vis = repelem(U_l, 10, 1); % uncomment to visualize
 % visSols(U_h, U_l_vis , data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
 
-title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
+title_str = "(restriction)";
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, perturb_range, ...
-  title_str, costs_str, "perturb", false);
+  title_str, costs_str, "Perturbation", "ptb_res", false);
 
 %% E.1.2 averaging
 U_l = St.DownsampleAvg(U_h, 10); % get HF in LF by avg every 10 values of HF
 % Uopt_lf = St.DownsampleAvg(Uopt_hf, 10, true); % uncomment to visualize
 % visSols(Uopt_hf, Uopt_lf, data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
 
-title_str = ["$J_h$ and $J_l$", "$J_h (averaging)$"];
+title_str = "(averaging)";
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, perturb_range, ...
-  title_str, costs_str, "perturb", false);
+  title_str, costs_str, "Perturbation", "ptb_avg", false);
 
 %% E.2 correlation at different points in a numerical optimizer
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 fun = @(u) St.LQRCostwGrad(data.lqrsol{1}.x0_ext, data.lqrsol{1}, u);
-U_num = fminuncWHistory(fun, u0_num);
-Uopt_h_num = U_num(:, end);
-iters = size(U_num, 2);
+Uopt_num = fminuncWHistory(fun, u0_num);
+Uopt_h_num = Uopt_num(:, end);
+iters = size(Uopt_num, 2);
 
 uopt_diff = mean((data.lqrsol{1}.Uopt - Uopt_h_num).^2);
 
 % this is just to get the costs for the averaged HF solution in LF sim as the CV estimator would
 %% E.2.1 restriction
-U_h = U_num;
+U_h = Uopt_num;
 U_l = U_h(1:10:end, :);
 % U_lf = repelem(U_lf, 10, 1); % uncomment to visualize
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
 
-title_str = ["$J_h$ and $J_l$", "$J_h$ (restriction)"];
+title_str = "(restriction)";
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, 1:iters, ...
-  title_str, costs_str, "iter", true);
+  title_str, costs_str, "Iteration", "num_opt_res", true);
 
 %% E.2.2  averaging
 U_l = St.DownsampleAvg(U_h, 10); % get LF by avg every 10 values of HF
 % U_lf = St.DownsampleAvg(U_hf, 10, true); % uncomment to visualize
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
 
-title_str = ["$J_h$ and $J_l$", "$J_h$ (averaging)"];
+title_str = "(averaging)";
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, 1:iters, ...
-  title_str, costs_str, "iter", true);
+  title_str, costs_str, "Iteration", "num_opt_avg", true);
 
 %% F num opt with CV estimator
 cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
 %% F.1 normal CV Estimator
 n_cv = rv_samples/2;
 [~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, false);
-U_num_cv = U_h; % save for plotting later
+Uopt_cv = U_h; % save for plotting later
 % U_lf = repelem(U_hla, 10, cv.idx); % uncomment to visualize
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
 
-title_str = ["$J_h$ and $J_l$", "$S_{" + n_cv + "}^{CV}$"];
+title_str = "$S_{" + n_cv + "}^{CV}$";
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, 1:cv.idx, ...
-  title_str, costs_str, "iter", true);
+  title_str, costs_str, "Iteration", "cv_opt", true);
 
 %% F.2 CV Estimator with fixed LF solution
 [~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, true);
-U_num_cv_fix = U_h; % save for plotting later
+Uopt_cv_max = U_h; % save for plotting later
 % U_lf = repelem(U_hla, 10, cv.idx);
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
 
-title_str = ["$J_h$ and $J_l$ at max correlation", "$S_{" + n_cv + "}^{CV}$"];
+title_str = "$S_{" + n_cv + "}^{CV}$";
 costs_str = ["$J_h(u_h)$", "$J_l(u_{hla}^{max})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, 1:cv.idx, ...
-  title_str, costs_str, "iter", true);
+  title_str, costs_str, "Iteration", "cv_opt_max", true);
 
 %% plot convergence distance comparison
-plotConvergence(data.lqrsol{1}.Uopt, U_num, U_num_cv, U_num_cv_fix, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
+plotConvergence(data.lqrsol{1}.Uopt, Uopt_num, Uopt_cv, Uopt_cv_max, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
 
 %% G verify ACV estimator
 cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
@@ -594,43 +594,42 @@ perturb_dir_max = perturb_dirs(:, max_grad_idx)./ perturb_dir_mag; % length 1 so
 perturbation = perturb_dir_max * perturb_range;
 end
 
-function analyzeUs(Uh, Ul, lqrsol_h, lqrsol_l, x0_rv, x0_mean, x0_cov, xaxis, title_str, costs_str, save_str, is_2d)
+function analyzeUs(Uh, Ul, lqrsol_h, lqrsol_l, x0_rv, x0_mean, x0_cov, xaxis, title_str, obj_str, xaxis_str, save_str, is_2d)
 cost_h = St.LQRCostMulti(x0_rv, lqrsol_h, Uh);
 cost_l = St.LQRCostMulti(x0_rv, lqrsol_l, Ul);
 corr_st = St.CorrMulti(cost_h, cost_l);
 corr_an = St.LQRCorrMulti(x0_mean, x0_cov, lqrsol_h, lqrsol_l, Uh, Ul);
-plotMultifidCost(xaxis, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, title_str, costs_str, "Iteration");
+plotMultifidCost(xaxis, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, title_str, obj_str, xaxis_str, save_str);
 
 if is_2d
   corr_2d = St.LQRCorrMulti2D(x0_mean, x0_cov, lqrsol_h, lqrsol_l, Uh, Ul);
-  plotCorr2d(corr_2d, "Correlation between " + join(costs_str, " and "), ...
-    costs_str, save_str + "_2d");
+  plotCorr2d(corr_2d, title_str, obj_str, xaxis_str, save_str + "_2d");
 end
 end
 
-function plotMultifidCost(perturb_range, cost_hf, cost_lf, corr_st, corr_an, title_str, costs_str, xaxis_str)
+function plotMultifidCost(range, cost_h, cost_l, corr_st, corr_an, title_str, obj_str, xaxis_str, save_str)
 fig = figure;
-sgtitle("Mean cost in " + title_str(1) + " vs " + xaxis_str + " in " + title_str(2), 'Interpreter', 'latex')
+sgtitle("Mean objective "+join(obj_str,' vs ')+' '+title_str, 'Interpreter', 'latex')
 
 subplot(2,1,1);
-title("Mean cost");
+title("Mean objective");
 xlabel(xaxis_str);
 ax = gca;
 yyaxis left % have to do this to be able to specify colors on both axes
-semilogy(perturb_range, cost_hf, 'b', 'LineWidth', 2, 'DisplayName', costs_str(1));
-ylabel(costs_str(1) + " cost", "Interpreter", "latex", "FontSize", 14);
+semilogy(range, cost_h, 'b', 'LineWidth', 2, 'DisplayName', obj_str(1));
+ylabel(obj_str(1), "Interpreter", "latex", "FontSize", 14);
 ax.YColor = 'b';
 yyaxis right;
-semilogy(perturb_range, cost_lf, 'r', 'LineWidth', 2, 'DisplayName', costs_str(2));
-ylabel(costs_str(2) + " cost", "Interpreter", "latex", "FontSize", 14);
+semilogy(range, cost_l, 'r', 'LineWidth', 2, 'DisplayName', obj_str(2));
+ylabel(obj_str(2), "Interpreter", "latex", "FontSize", 14);
 ax.YColor = 'r';
 legend('Interpreter', 'latex', 'Location', 'best', "FontSize", 12);
 grid on;
 
 subplot(2,1,2);
-plot(perturb_range, corr_an, 'LineWidth', 2, 'DisplayName', 'Analytical');
+plot(range, corr_an, 'LineWidth', 2, 'DisplayName', 'Analytical');
 hold on;
-plot(perturb_range, corr_st, '--', 'LineWidth', 2, 'DisplayName', 'Statistical');
+plot(range, corr_st, '--', 'LineWidth', 2, 'DisplayName', 'Statistical');
 title("Correlation");
 xlabel(xaxis_str);
 ylabel('Pearson Correlation coefficient');
@@ -638,28 +637,28 @@ legend show;
 grid on;
 
 fig.Position(3:4) = [500, 900];
-saveas(fig, "figs/perturb_comp_" + lower(title_str(1)) + "_" + title_str(2) + ".svg");
+saveas(fig, "figs/" + save_str + ".svg");
 
 end
 
-function plotCorr2d(corr, title_str, sols_str, save_str)
+function plotCorr2d(corr, title_str, obj_str, xaxis_str, save_str)
 fig = figure;
-sgtitle(title_str, 'Interpreter', 'latex');
+sgtitle("Correlation "+join(obj_str,' vs ')+' '+title_str, 'Interpreter', 'latex');
 
 subplot(1,2,1);
 imagesc(corr);
 set(gca, 'YDir', 'normal');
 title("Heatmap");
-ylabel(sols_str(1) + " at iteration", "Interpreter", "latex", "FontSize", 14);
-xlabel(sols_str(2) + " at iteration", "Interpreter", "latex", "FontSize", 14);
+ylabel(obj_str(1)+" "+xaxis_str, "Interpreter", "latex", "FontSize", 14);
+xlabel(obj_str(2)+" "+xaxis_str, "Interpreter", "latex", "FontSize", 14);
 colorbar;
 grid on;
 
 subplot(1,2,2);
 surf(corr);
 title("3D plot");
-ylabel(sols_str(1) + " at iteration", "Interpreter", "latex", "FontSize", 14);
-xlabel(sols_str(2) + " at iteration", "Interpreter", "latex", "FontSize", 14);
+ylabel(obj_str(1)+" "+xaxis_str, "Interpreter", "latex", "FontSize", 14);
+xlabel(obj_str(2)+ " iteration", "Interpreter", "latex", "FontSize", 14);
 zlabel("Correlation");
 view(3);
 grid on;
