@@ -53,6 +53,9 @@ classdef Acv < handle
 				exp_l = St.LQRExp(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla);
 			elseif strcmp(e_type, 'stat')
 				exp_l = mean(St.LQRObj(x0_rv_ext(:, n+1:n+m), obj.lqrsol_lf, u_hla));
+			elseif strcmp(e_type, 'share')
+				exp_l = St.LQRObj(x0_rv_ext(:, n+1:n+m), obj.lqrsol_lf, u_hla);
+				exp_l = mean([exp_l; cost_lf_all]);
 			end
 			cost = cost_hf + alpha * (cost_lf - exp_l);
 		end
