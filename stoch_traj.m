@@ -122,8 +122,8 @@ for idx = 1:length(TsList)
   [A_ext, B_ext, Q, R, P] = extendState(c2d(msd_sys, Ts), Qe, Re, Pe);
   [Kopt, S, M, Qbar, Rbar] = solveLQR(N, A_ext, B_ext, Q, R, P);
   Uopt = Kopt * x0_ext;
-  cost_det = St.LQRCost(x0_ext, struct('Q', Q, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar), Uopt);
-  fprintf("Deterministic LQR cost: %f\n", cost_det);
+  obj_det = St.LQRObj(x0_ext, struct('Q', Q, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar), Uopt);
+  fprintf("Deterministic LQR objective: %f\n", obj_det);
   
   %% simulate closed loop dynamics
   data.x_cl = simCL(Tsim, Tfid, Ts, x0, u0, Uopt, A_msd, B_msd, @msd);
@@ -152,7 +152,7 @@ for idx = 1:length(TsList)
   Uopt = Kopt * x0_rv_ext_mean;
   data.lqrsol{idx} = struct('x0_ext', x0_rv_ext_mean, 'Uopt', Uopt, 'Q', Q, 'S', S, 'M', M, 'Qbar', Qbar, 'Rbar', Rbar, 'times', times);
   x_cl_stoch = zeros(nx, Tsim/Tfid + 1, rv_samples);
-  data.cost_lqr = St.LQRCost(x0_rv_ext, data.lqrsol{idx}, Uopt);
+  data.obj_lqr = St.LQRObj(x0_rv_ext, data.lqrsol{idx}, Uopt);
   parfor i = 1:rv_samples
     x_cl_stoch(:,:,i) = simCL(Tsim, Tfid, Ts, x0_rv(:, i), u0, Uopt, A_msd, B_msd, @msd);
   end
@@ -180,25 +180,25 @@ for idx = 1:length(TsList)
   saveas(fig, "figs/"+Ts+"_cl_stoch_init.svg");
   
   
-  %% D.3 cost distribution
-  cost_lqr_exp = St.LQRExp(x0_rv_ext_mean, x0_rv_ext_cov, data.lqrsol{idx}, Uopt);
-  fprintf("Expectaion of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_exp, mean(data.cost_lqr));
-  cost_lqr_var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, data.lqrsol{idx}, Uopt);
-  fprintf("Variance of Stochastic LQR cost\n- Analytical: %f\n- Experimental: %f\n", cost_lqr_var, var(data.cost_lqr));
+  %% D.3 Objective value distribution
+  obj_lqr_exp = St.LQRExp(x0_rv_ext_mean, x0_rv_ext_cov, data.lqrsol{idx}, Uopt);
+  fprintf("Expectaion of Stochastic LQR objective\n- Analytical: %f\n- Experimental: %f\n", obj_lqr_exp, mean(data.obj_lqr));
+  obj_lqr_var = St.LQRVar(x0_rv_ext_mean, x0_rv_ext_cov, data.lqrsol{idx}, Uopt);
+  fprintf("Variance of Stochastic LQR objective\n- Analytical: %f\n- Experimental: %f\n", obj_lqr_var, var(data.obj_lqr));
   
-  % plot cost distribution
+  % plot objective value distribution
   fig = figure;
   hold on;
-  histogram(data.cost_lqr, 10, 'Normalization', 'pdf', 'FaceColor', 'b', 'EdgeColor', 'k', 'DisplayName', 'Cost Distribution');
-  xline(cost_det, 'k', 'LineWidth', 2, 'DisplayName', 'Deterministic Cost');
-  xline(cost_lqr_exp, 'g', 'LineWidth', 2, 'DisplayName', "Analytical Mean"+newline+"Var: "+cost_lqr_var);
-  xline(mean(data.cost_lqr), '--r', 'LineWidth', 2, 'DisplayName', "Statistical Mean"+newline+"Var: "+var(data.cost_lqr));
+  histogram(data.obj_lqr, 10, 'Normalization', 'pdf', 'FaceColor', 'b', 'EdgeColor', 'k', 'DisplayName', 'Objective Distribution');
+  xline(obj_det, 'k', 'LineWidth', 2, 'DisplayName', 'Deterministic Objective');
+  xline(obj_lqr_exp, 'g', 'LineWidth', 2, 'DisplayName', "Analytical Mean"+newline+"Var: "+obj_lqr_var);
+  xline(mean(data.obj_lqr), '--r', 'LineWidth', 2, 'DisplayName', "Statistical Mean"+newline+"Var: "+var(data.obj_lqr));
   ylabel('Probability Density');
-  title("(Ts:"+Ts+") Cost distribution of stochastic LQR ("+rv_samples+" samples)");
-  xlabel('Cost');
+  title("(Ts:"+Ts+") Objective distribution of stochastic LQR ("+rv_samples+" samples)");
+  xlabel('Objective Value');
   legend show;
   grid on;
-  saveas(fig, "figs/"+Ts+"_cost_dist.svg");
+  saveas(fig, "figs/"+Ts+"_obj_dist.svg");
 end
 
 % *** E. correlation check for CV
@@ -212,9 +212,9 @@ U_l = U_h(1:10:end, :); % pick every 10th elem
 % visSols(U_h, U_l_vis , data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
 
 title_str = "(restriction)";
-costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
+obj_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, perturb_range, ...
-  title_str, costs_str, "Perturbation", "ptb_res", false);
+  title_str, obj_str, "Perturbation", "ptb_res", false);
 
 %% E.1.2 averaging
 U_l = St.DownsampleAvg(U_h, 10); % get HF in LF by avg every 10 values of HF
@@ -222,20 +222,20 @@ U_l = St.DownsampleAvg(U_h, 10); % get HF in LF by avg every 10 values of HF
 % visSols(Uopt_hf, Uopt_lf, data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
 
 title_str = "(averaging)";
-costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
+obj_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, perturb_range, ...
-  title_str, costs_str, "Perturbation", "ptb_avg", false);
+  title_str, obj_str, "Perturbation", "ptb_avg", false);
 
 %% E.2 correlation at different points in a numerical optimizer
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
-fun = @(u) St.LQRCostwGrad(data.lqrsol{1}.x0_ext, data.lqrsol{1}, u);
+fun = @(u) St.LQRObjwGrad(data.lqrsol{1}.x0_ext, data.lqrsol{1}, u);
 Uopt_num = fminuncWHistory(fun, u0_num);
 Uopt_h_num = Uopt_num(:, end);
 iters = size(Uopt_num, 2);
 
 uopt_diff = mean((data.lqrsol{1}.Uopt - Uopt_h_num).^2);
 
-% this is just to get the costs for the averaged HF solution in LF sim as the CV estimator would
+% this is just to get the objectives for the averaged HF solution in LF sim as the CV estimator would
 %% E.2.1 restriction
 U_h = Uopt_num;
 U_l = U_h(1:10:end, :);
@@ -243,9 +243,9 @@ U_l = U_h(1:10:end, :);
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
 
 title_str = "(restriction)";
-costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
+obj_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, 1:iters, ...
-  title_str, costs_str, "Iteration", "num_opt_res", true);
+  title_str, obj_str, "Iteration", "num_opt_res", true);
 
 %% E.2.2  averaging
 U_l = St.DownsampleAvg(U_h, 10); % get LF by avg every 10 values of HF
@@ -253,13 +253,13 @@ U_l = St.DownsampleAvg(U_h, 10); % get LF by avg every 10 values of HF
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
 
 title_str = "(averaging)";
-costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
+obj_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, 1:iters, ...
-  title_str, costs_str, "Iteration", "num_opt_avg", true);
+  title_str, obj_str, "Iteration", "num_opt_avg", true);
 
-%% F num opt with CV estimator
+%% F num opt with estimators
 cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
-%% F.1 normal CV Estimator
+%% F.1 normal CV
 n_cv = rv_samples/2;
 [~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, false);
 Uopt_cv = U_h; % save for plotting later
@@ -267,20 +267,20 @@ Uopt_cv = U_h; % save for plotting later
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
 
 title_str = "$S_{" + n_cv + "}^{CV}$";
-costs_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
+obj_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, 1:cv.idx, ...
-  title_str, costs_str, "Iteration", "cv_opt", true);
+  title_str, obj_str, "Iteration", "cv_opt", true);
 
-%% F.2 CV Estimator with fixed LF solution
+%% F.2 CV with LF solution at max corr
 [~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, true);
 Uopt_cv_max = U_h; % save for plotting later
 % U_lf = repelem(U_hla, 10, cv.idx);
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
 
 title_str = "$S_{" + n_cv + "}^{CV}$";
-costs_str = ["$J_h(u_h)$", "$J_l(u_{hla}^{max})$"];
+obj_str = ["$J_h(u_h)$", "$J_l(u_{hla}^{max})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, 1:cv.idx, ...
-  title_str, costs_str, "Iteration", "cv_opt_max", true);
+  title_str, obj_str, "Iteration", "cv_opt_max", true);
 
 %% plot convergence distance comparison
 plotConvergence(data.lqrsol{1}.Uopt, Uopt_num, Uopt_cv, Uopt_cv_max, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
@@ -289,7 +289,7 @@ plotConvergence(data.lqrsol{1}.Uopt, Uopt_num, Uopt_cv, Uopt_cv_max, ["HF", "CV"
 cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
 acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
 
-%% check variance of ACV across different ratios of HF/LF cost
+%% check variance of ACV across different ratios of HF/LF evaluations
 acv_ratios = 0.1:0.1:2;
 num_rv_samples = 2000; % large enough to give samples to acv
 num_estimator_samples = 500;
@@ -300,11 +300,11 @@ for i=1:num_estimator_samples
 end
 
 n_mc = 500;
-lf_hf_cost_ratio = 0.2;
+l_h_cost_ratio = 0.2;
 var_data_acv = zeros(length(acv_ratios), num_estimator_samples);
 for i=1:length(acv_ratios)
   fprintf("\n*** ACV Ratio: %f ***\n", acv_ratios(i));
-  n_acv = round(n_mc / (1 + lf_hf_cost_ratio + acv_ratios(i)*lf_hf_cost_ratio));
+  n_acv = round(n_mc / (1 + l_h_cost_ratio + acv_ratios(i)*l_h_cost_ratio));
   m_acv = round(acv_ratios(i) * n_acv);
   for j=1:num_estimator_samples
     var_data_acv(i, j) = acv.est(x0_rv_ext(:, :, j), n_acv, m_acv, Uopt_h_num, false, '-1', 'stat');
@@ -333,8 +333,8 @@ for i=1:num_estimator_samples
 end
 
 n_mc = 500;
-lf_hf_cost_ratio = 0.2;
-n_cv = round(n_mc / (1 + lf_hf_cost_ratio));
+l_h_cost_ratio = 0.2;
+n_cv = round(n_mc / (1 + l_h_cost_ratio));
 n_acv = n_cv;
 var_data_cv = zeros(length(m_acvs), num_estimator_samples);
 var_data_acv = zeros(length(m_acvs), num_estimator_samples);
@@ -361,11 +361,11 @@ grid on;
 
 %% plot variance of CV/ACV vs analyitical
 num_estimator_samples = 100:100:2000;
-lf_hf_cost_ratio = 0.2;
+l_h_cost_ratio = 0.2;
 acv_ratio  = 1;
 n_mc = 500;
-n_cv = round(n_mc / (1 + lf_hf_cost_ratio));
-n_acv = round(n_mc / (1 + lf_hf_cost_ratio + acv_ratio*lf_hf_cost_ratio));
+n_cv = round(n_mc / (1 + l_h_cost_ratio));
+n_acv = round(n_mc / (1 + l_h_cost_ratio + acv_ratio*l_h_cost_ratio));
 m_acv = round(acv_ratio * n_acv);
 num_rv_samples = round(max(n_acv+m_acv, n_mc));
 x0_rv_ext = zeros(length(x0_ext), num_rv_samples, max(num_estimator_samples));
@@ -413,18 +413,18 @@ u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 max_iters = 30;
 tol = 1e-12;
 
-lf_hf_cost_ratio = 0.2; % TODO get this experimentally for each num_samples
+l_h_cost_ratio = 0.2; % TODO get this experimentally for each num_samples
 acv_exp_sample_factor = 1; % factor to increase samples for ACV Expectation, m
 
 mc = Mc(x0_ext_mean, x0_ext_cov, data.lqrsol{1});
 cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
 acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
 
-data.hf_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
-data.hf_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
-data.cv_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
+data.h_obj = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
+data.h_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
+data.cv_obj = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
 data.cv_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
-data.acv_cost = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
+data.acv_obj = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
 data.acv_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 
 %%
@@ -432,8 +432,8 @@ for num_samples=num_rv_samples
   fprintf("\n*** RV Samples: %d ***\n", num_samples);
   wait_bar = waitbar(0, "Running estimators with " + num_samples + " samples");
   n_mc = num_samples;
-  n_cv = int32(n_mc / (1 + lf_hf_cost_ratio));
-  n_acv = round(num_samples / (1 + lf_hf_cost_ratio + acv_exp_sample_factor*lf_hf_cost_ratio));
+  n_cv = int32(n_mc / (1 + l_h_cost_ratio));
+  n_acv = round(num_samples / (1 + l_h_cost_ratio + acv_exp_sample_factor*l_h_cost_ratio));
   m_acv = round(acv_exp_sample_factor * n_acv);
   num_rv_samples_actual(num_rv_samples == num_samples, :) = [n_mc, n_cv, n_acv, m_acv];
   
@@ -446,18 +446,18 @@ for num_samples=num_rv_samples
     x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
     
     % MC with HF
-    [costs, Us, ~] = mc.opt(u0_num, max_iters, tol, x0_rv_ext, n_mc);
-    data.hf_cost(:, i, num_rv_samples == num_samples) = costs;
-    data.hf_u(:, :, i, num_rv_samples == num_samples) = Us;
+    [objs, Us, ~] = mc.opt(u0_num, max_iters, tol, x0_rv_ext, n_mc);
+    data.h_obj(:, i, num_rv_samples == num_samples) = objs;
+    data.h_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % CV (true = lf at max corr)
-    [costs, Us, ~] = cv.opt(u0_num, max_iters, tol, x0_rv_ext, n_cv, true);
-    data.cv_cost(:, i, num_rv_samples == num_samples) = costs;
+    [objs, Us, ~] = cv.opt(u0_num, max_iters, tol, x0_rv_ext, n_cv, true);
+    data.cv_obj(:, i, num_rv_samples == num_samples) = objs;
     data.cv_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % ACV (true = lf at max corr)
-    [costs, Us, ~] = acv.opt(u0_num, max_iters, tol, x0_rv_ext, n_acv, m_acv, true, '-1', 'stat');
-    data.acv_cost(:, i, num_rv_samples == num_samples) = costs;
+    [objs, Us, ~] = acv.opt(u0_num, max_iters, tol, x0_rv_ext, n_acv, m_acv, true, '-1', 'stat');
+    data.acv_obj(:, i, num_rv_samples == num_samples) = objs;
     data.acv_u(:, :, i, num_rv_samples == num_samples) = Us;
   end
   close(wait_bar);
@@ -467,24 +467,24 @@ end
 %% plot percentiles
 percentiles = [25 75];
 markers = ["-", "--"];
-data.hf_prct = prctile(data.hf_cost, percentiles, 2);
-data.cv_prct = prctile(data.cv_cost, percentiles, 2);
-data.acv_prct = prctile(data.acv_cost, percentiles, 2);
+data.h_prct = prctile(data.h_obj, percentiles, 2);
+data.cv_prct = prctile(data.cv_obj, percentiles, 2);
+data.acv_prct = prctile(data.acv_obj, percentiles, 2);
 fig = figure;
 fig.Position(3:4) = [1500 500];
-sgtitle("Cost Percentiles vs iterations");
+sgtitle("Objective Percentiles vs iterations");
 for i=1:length(num_rv_samples)
   subplot(1, length(num_rv_samples), i);
   hold on;
   for j=1:length(percentiles)
-    semilogy(5:max_iters, data.hf_prct(5:end, j, i), 'r', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "MC HF "+percentiles(j)+"%");
+    semilogy(5:max_iters, data.h_prct(5:end, j, i), 'r', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "MC HF "+percentiles(j)+"%");
     semilogy(5:max_iters, data.cv_prct(5:end, j, i), 'g', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "CV "+percentiles(j)+"%");
     semilogy(5:max_iters, data.acv_prct(5:end, j, i), 'b', 'LineWidth', 1, 'LineStyle', markers(j), 'DisplayName', "ACV "+percentiles(j)+"%");
   end
   
   title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV n="+num_rv_samples_actual(i, 2)+", ACV n="+num_rv_samples_actual(i, 3)+", m="+num_rv_samples_actual(i, 4));
   xlabel("Iteration");
-  ylabel("Cost");
+  ylabel("Objective");
   legend show;
   % ylim([1e2 2e2]);
   grid on;
@@ -492,27 +492,27 @@ end
 
 %% plot variance and box plots
 % 2nd dimension is estimator samples, squeeze to get rid of extra dimension
-data.hf_var_st = squeeze(var(data.hf_cost, 0, 2));
-data.cv_var_st = squeeze(var(data.cv_cost, 0, 2));
-data.acv_var_st = squeeze(var(data.acv_cost, 0, 2));
+data.h_var_st = squeeze(var(data.h_obj, 0, 2));
+data.cv_var_st = squeeze(var(data.cv_obj, 0, 2));
+data.acv_var_st = squeeze(var(data.acv_obj, 0, 2));
 fig = figure;
 fig.Position(3:4) = [1500 500];
-sgtitle("Variance of cost vs iterations");
+sgtitle("Variance of objective vs iterations");
 for i=1:length(num_rv_samples)
   subplot(1, length(num_rv_samples), i);
   hold on;
   
   % yyaxis left;
-  semilogy(1:max_iters, data.hf_var_st(:, i), 'r', 'LineWidth', 1, 'DisplayName', 'MC HF');
+  semilogy(1:max_iters, data.h_var_st(:, i), 'r', 'LineWidth', 1, 'DisplayName', 'MC HF');
   semilogy(1:max_iters, data.cv_var_st(:, i), 'g', 'LineWidth', 1, 'DisplayName', 'CV');
   semilogy(1:max_iters, data.acv_var_st(:, i), 'b', 'LineWidth', 1, 'DisplayName', 'ACV');
   ylabel("Variance");
   
   % yyaxis right;
-  % boxplot(data.hf_cost(5:max_iters, :, i)', 'Positions', 5:max_iters, 'Colors', 'r', 'Widths', 0.5, 'Whisker', 1);
-  % boxplot(data.cv_fix_cost(5:max_iters, :, i)', 'Positions', 5:max_iters, 'Colors', 'g', 'Widths', 1, 'Whisker', 1);
-  % boxplot(data.acv_fix_cost(5:max_iters, :, i)', 'Positions', 5:max_iters, 'Colors', 'b', 'Widths', 0.5, 'Whisker', 1);
-  % ylabel("Cost/Objective");
+  % boxplot(data.h_obj(5:max_iters, :, i)', 'Positions', 5:max_iters, 'Colors', 'r', 'Widths', 0.5, 'Whisker', 1);
+  % boxplot(data.cv_fix_obj(5:max_iters, :, i)', 'Positions', 5:max_iters, 'Colors', 'g', 'Widths', 1, 'Whisker', 1);
+  % boxplot(data.acv_fix_obj(5:max_iters, :, i)', 'Positions', 5:max_iters, 'Colors', 'b', 'Widths', 0.5, 'Whisker', 1);
+  % ylabel("Objective");
   
   ax = gca;
   ax.YAxis(1).Scale ="log";
@@ -527,7 +527,7 @@ end
 
 %% plot convergence in solution
 for i=1:length(num_rv_samples)
-  plotConvergence(data.lqrsol{1}.Uopt, squeeze(data.hf_u(:, :, :, i)), squeeze(data.cv_u(:, :, :, i)), squeeze(data.acv_u(:, :, :, i)), ...
+  plotConvergence(data.lqrsol{1}.Uopt, squeeze(data.h_u(:, :, :, i)), squeeze(data.cv_u(:, :, :, i)), squeeze(data.acv_u(:, :, :, i)), ...
     ["MC HF", "CV", "ACV"], "Convergence distance comparison with " + num_rv_samples(i) + " HF samples");
 end
 
@@ -595,11 +595,11 @@ perturbation = perturb_dir_max * perturb_range;
 end
 
 function analyzeUs(Uh, Ul, lqrsol_h, lqrsol_l, x0_rv, x0_mean, x0_cov, xaxis, title_str, obj_str, xaxis_str, save_str, is_2d)
-cost_h = St.LQRCostMulti(x0_rv, lqrsol_h, Uh);
-cost_l = St.LQRCostMulti(x0_rv, lqrsol_l, Ul);
-corr_st = St.CorrMulti(cost_h, cost_l);
+obj_h = St.LQRObjMulti(x0_rv, lqrsol_h, Uh);
+obj_l = St.LQRObjMulti(x0_rv, lqrsol_l, Ul);
+corr_st = St.CorrMulti(obj_h, obj_l);
 corr_an = St.LQRCorrMulti(x0_mean, x0_cov, lqrsol_h, lqrsol_l, Uh, Ul);
-plotMultifidCost(xaxis, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, title_str, obj_str, xaxis_str, save_str);
+plotMultifidObj(xaxis, mean(obj_h,2), mean(obj_l,2), corr_st, corr_an, title_str, obj_str, xaxis_str, save_str);
 
 if is_2d
   corr_2d = St.LQRCorrMulti2D(x0_mean, x0_cov, lqrsol_h, lqrsol_l, Uh, Ul);
@@ -607,7 +607,7 @@ if is_2d
 end
 end
 
-function plotMultifidCost(range, cost_h, cost_l, corr_st, corr_an, title_str, obj_str, xaxis_str, save_str)
+function plotMultifidObj(range, obj_h, obj_l, corr_st, corr_an, title_str, obj_str, xaxis_str, save_str)
 fig = figure;
 sgtitle("Mean objective "+join(obj_str,' vs ')+' '+title_str, 'Interpreter', 'latex')
 
@@ -616,11 +616,11 @@ title("Mean objective");
 xlabel(xaxis_str);
 ax = gca;
 yyaxis left % have to do this to be able to specify colors on both axes
-semilogy(range, cost_h, 'b', 'LineWidth', 2, 'DisplayName', obj_str(1));
+semilogy(range, obj_h, 'b', 'LineWidth', 2, 'DisplayName', obj_str(1));
 ylabel(obj_str(1), "Interpreter", "latex", "FontSize", 14);
 ax.YColor = 'b';
 yyaxis right;
-semilogy(range, cost_l, 'r', 'LineWidth', 2, 'DisplayName', obj_str(2));
+semilogy(range, obj_l, 'r', 'LineWidth', 2, 'DisplayName', obj_str(2));
 ylabel(obj_str(2), "Interpreter", "latex", "FontSize", 14);
 ax.YColor = 'r';
 legend('Interpreter', 'latex', 'Location', 'best', "FontSize", 12);
@@ -667,7 +667,7 @@ fig.Position(3:4) = [1500, 600];
 saveas(fig, "figs/" + save_str + ".svg");
 end
 
-function visSols(uopt_hf, uopt_lf, times, title_str, zaxis, zaxis_str)
+function visSols(uopt_h, uopt_l, times, title_str, zaxis, zaxis_str)
 fig = uifigure("Name", title_str);
 fig.Position(3:4) = [500, 800];
 grd = uigridlayout(fig, [6, 1], "RowHeight", {'1x', '10x', '1x', '10x', '1x', 50});
@@ -681,8 +681,8 @@ ax = uiaxes(grd);
 ax.Layout.Row = 2;
 hold(ax, 'on');
 % TODO: we are assuming u0 to be 0, might not be true in general so might need to add u0 to cumsum
-plot_hf = stairs(ax, times(1:end-1), cumsum(uopt_hf(:, 1)), 'b', 'LineWidth', 2, 'DisplayName', 'HF solution');
-plot_lf = stairs(ax, times(1:end-1), cumsum(uopt_lf(:, 1)), 'r', 'LineWidth', 2, 'DisplayName', 'LF solution');
+plot_h = stairs(ax, times(1:end-1), cumsum(uopt_h(:, 1)), 'b', 'LineWidth', 2, 'DisplayName', 'HF solution');
+plot_l = stairs(ax, times(1:end-1), cumsum(uopt_l(:, 1)), 'r', 'LineWidth', 2, 'DisplayName', 'LF solution');
 xlabel(ax, 'Time [s]');
 ylabel(ax, 'Control Effort [N]');
 grid(ax, 'on')
@@ -697,8 +697,8 @@ title.FontSize = 16;
 ax = uiaxes(grd);
 ax.Layout.Row = 4;
 hold(ax, 'on');
-plot_hf_raw = stairs(ax, times(1:end-1), uopt_hf(:, 1), 'b', 'LineWidth', 2, 'DisplayName', 'HF solution');
-plot_lf_raw = stairs(ax, times(1:end-1), uopt_lf(:, 1), 'r', 'LineWidth', 2, 'DisplayName', 'LF solution');
+plot_h_raw = stairs(ax, times(1:end-1), uopt_h(:, 1), 'b', 'LineWidth', 2, 'DisplayName', 'HF solution');
+plot_l_raw = stairs(ax, times(1:end-1), uopt_l(:, 1), 'r', 'LineWidth', 2, 'DisplayName', 'LF solution');
 xlabel(ax, 'Time [s]');
 ylabel(ax, 'Control Effort [N]');
 grid(ax, 'on')
@@ -712,47 +712,47 @@ title.FontSize = 16;
 
 sld = uislider(grd, 'slider', 'limits', [zaxis(1), zaxis(end)]);
 sld.Layout.Row = 6;
-sld.ValueChangedFcn = @(sld, event) updVisSol(sld, plot_hf, plot_lf, plot_hf_raw, plot_lf_raw, uopt_hf, uopt_lf);
+sld.ValueChangedFcn = @(sld, event) updVisSol(sld, plot_h, plot_l, plot_h_raw, plot_l_raw, uopt_h, uopt_l);
 end
 
-function updVisSol(sld, plot_hf, plot_lf, plot_hf_raw, plot_lf_raw, uopt_hf, uopt_lf)
+function updVisSol(sld, plot_h, plot_l, plot_h_raw, plot_l_raw, uopt_h, uopt_l)
 % handle floats in the zaxis and map them back to the data range
-idx = round(interp1(sld.Limits, [1, size(uopt_hf, 2)], sld.Value));
+idx = round(interp1(sld.Limits, [1, size(uopt_h, 2)], sld.Value));
 
-hold(plot_hf.Parent, 'on');
-plot_hf.YData = cumsum(uopt_hf(:, idx));
-plot_lf.YData = cumsum(uopt_lf(:, idx));
-hold(plot_hf.Parent, 'off');
+hold(plot_h.Parent, 'on');
+plot_h.YData = cumsum(uopt_h(:, idx));
+plot_l.YData = cumsum(uopt_l(:, idx));
+hold(plot_h.Parent, 'off');
 
-hold(plot_hf_raw.Parent, 'on');
-plot_hf_raw.YData = uopt_hf(:, idx);
-plot_lf_raw.YData = uopt_lf(:, idx);
-hold(plot_hf_raw.Parent, 'off');
+hold(plot_h_raw.Parent, 'on');
+plot_h_raw.YData = uopt_h(:, idx);
+plot_l_raw.YData = uopt_l(:, idx);
+hold(plot_h_raw.Parent, 'off');
 end
 
-function plotConvergence(an_sol, U_num_hf, U_num_cv, U_num_cv_fix, labels, title_str)
-dist_hf = squeeze(vecnorm(an_sol - U_num_hf, 2, 1));
-dist_cv = squeeze(vecnorm(an_sol - U_num_cv, 2, 1));
-dist_cv_fix = squeeze(vecnorm(an_sol - U_num_cv_fix, 2, 1));
-if size(dist_hf, 1) == 1
-  dist_hf_mean = dist_hf;
+function plotConvergence(an_sol, Uopt_num, Uopt_cv, Uopt_cv_max, labels, title_str)
+dist_h = squeeze(vecnorm(an_sol - Uopt_num, 2, 1));
+dist_cv = squeeze(vecnorm(an_sol - Uopt_cv, 2, 1));
+dist_cv_max = squeeze(vecnorm(an_sol - Uopt_cv_max, 2, 1));
+if size(dist_h, 1) == 1
+  dist_h_mean = dist_h;
   dist_cv_mean = dist_cv;
-  dist_cv_fix_mean = dist_cv_fix;
+  dist_cv_max_mean = dist_cv_max;
 else
-  dist_hf_mean = mean(dist_hf, 2);
+  dist_h_mean = mean(dist_h, 2);
   dist_cv_mean = mean(dist_cv, 2);
-  dist_cv_fix_mean = mean(dist_cv_fix, 2);
+  dist_cv_max_mean = mean(dist_cv_max, 2);
 end
 figure;
 % handle alpha to be min 0.1 and max 1 based on how many lines there are
-semilogy(dist_hf, 'LineWidth', 1, 'Color', [1 0 0, max(0.1, 1/size(dist_hf, 1))]);
+semilogy(dist_h, 'LineWidth', 1, 'Color', [1 0 0, max(0.1, 1/size(dist_h, 1))]);
 hold on;
 % plot means with thicker lines
 semilogy(dist_cv, 'LineWidth', 1, 'Color', [0 1 0, max(0.1, 1/size(dist_cv, 1))]);
-semilogy(dist_cv_fix, 'LineWidth', 1, 'Color', [0 0 1, max(0.1, 1/size(dist_cv_fix, 1))]);
-l{1} = semilogy(dist_hf_mean, 'r', "Marker", "o", 'LineWidth', 1.5);
+semilogy(dist_cv_max, 'LineWidth', 1, 'Color', [0 0 1, max(0.1, 1/size(dist_cv_max, 1))]);
+l{1} = semilogy(dist_h_mean, 'r', "Marker", "o", 'LineWidth', 1.5);
 l{2} = semilogy(dist_cv_mean, 'g', "Marker", "o", 'LineWidth', 1.5);
-l{3} = semilogy(dist_cv_fix_mean, 'b', "Marker", "o", 'LineWidth', 1.5);
+l{3} = semilogy(dist_cv_max_mean, 'b', "Marker", "o", 'LineWidth', 1.5);
 title(title_str);
 xlabel("Iteration");
 ylabel("Distance to analytical solution");

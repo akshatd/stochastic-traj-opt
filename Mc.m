@@ -16,7 +16,7 @@ classdef Mc < handle
 		end
 		
 		function cost = est(obj, x0_rv_ext, n, u)
-			cost = mean(St.LQRCost(x0_rv_ext(:, 1:n), obj.lqrsol, u));
+			cost = mean(St.LQRObj(x0_rv_ext(:, 1:n), obj.lqrsol, u));
 		end
 		
 		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n)

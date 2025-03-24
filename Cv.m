@@ -20,9 +20,9 @@ classdef Cv < handle
 		
 		function cost = est(obj, x0_rv_ext, n, u, use_best_U_lf)
 			% ONLY set use_best_U_lf if insider optimizer and idx is set outside
-			cost_hf_all = St.LQRCost(x0_rv_ext(:, 1:n), obj.lqrsol_hf, u);
+			cost_hf_all = St.LQRObj(x0_rv_ext(:, 1:n), obj.lqrsol_hf, u);
 			u_hla = St.DownsampleAvg(u, 10);
-			cost_lf_all = St.LQRCost(x0_rv_ext(:, 1:n), obj.lqrsol_lf, u_hla);
+			cost_lf_all = St.LQRObj(x0_rv_ext(:, 1:n), obj.lqrsol_lf, u_hla);
 			if use_best_U_lf
 				obj.Us(:, obj.idx) = u;
 				obj.costs_lf(:, obj.idx) = cost_lf_all;

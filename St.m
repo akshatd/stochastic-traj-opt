@@ -4,17 +4,17 @@ classdef St
 	methods(Static) % so that we don't need to create an object to use these functions
 		
 		% handles x0 having multiple samples with diag
-		function cost = LQRCost(x0, lqrsol, U)
+		function cost = LQRObj(x0, lqrsol, U)
 			Q = lqrsol.Q; S = lqrsol.S; M = lqrsol.M; Qbar = lqrsol.Qbar; Rbar = lqrsol.Rbar;
 			cost = U'*(S'*Qbar*S + Rbar)*U + 2*x0'*M'*Qbar*S*U + diag(x0'*(M'*Qbar*M + Q)*x0);
 		end
 		
 		% cost for multiple x0 samples with multiple Us
-		function cost = LQRCostMulti(x0_rv, lqrsol, U) % TODO: U should be in rows
+		function cost = LQRObjMulti(x0_rv, lqrsol, U) % TODO: U should be in rows
 			items = size(U, 2);
 			cost = zeros(items, size(x0_rv, 2)); % rows are items, cols are samples
 			for i = 1:items
-				cost(i, :) = St.LQRCost(x0_rv, lqrsol, U(:, i));
+				cost(i, :) = St.LQRObj(x0_rv, lqrsol, U(:, i));
 			end
 		end
 		
@@ -26,8 +26,8 @@ classdef St
 			grad = 2 * H * U + 2 * q';
 		end
 		
-		function [f, g] = LQRCostwGrad(x0, lqrsol, U)
-			f = St.LQRCost(x0, lqrsol, U);
+		function [f, g] = LQRObjwGrad(x0, lqrsol, U)
+			f = St.LQRObj(x0, lqrsol, U);
 			g = St.LQRGrad(x0, lqrsol, U);
 		end
 		

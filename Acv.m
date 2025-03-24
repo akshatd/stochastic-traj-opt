@@ -20,9 +20,9 @@ classdef Acv < handle
 		
 		function cost = est(obj, x0_rv_ext, n, m, u, use_best_U_lf, a_type, e_type)
 			% ONLY set use_best_U_lf if insider optimizer and idx is set outside
-			cost_hf_all = St.LQRCost(x0_rv_ext(:, 1:n), obj.lqrsol_hf, u);
+			cost_hf_all = St.LQRObj(x0_rv_ext(:, 1:n), obj.lqrsol_hf, u);
 			u_hla = St.DownsampleAvg(u, 10);
-			cost_lf_all = St.LQRCost(x0_rv_ext(:, 1:n), obj.lqrsol_lf, u_hla);
+			cost_lf_all = St.LQRObj(x0_rv_ext(:, 1:n), obj.lqrsol_lf, u_hla);
 			if use_best_U_lf
 				obj.Us(:, obj.idx) = u;
 				obj.costs_lf(:, obj.idx) = cost_lf_all;
@@ -50,7 +50,7 @@ classdef Acv < handle
 			if strcmp(e_type, 'anly')
 				exp_l = St.LQRExp(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla);
 			elseif strcmp(e_type, 'stat')
-				exp_l = mean(St.LQRCost(x0_rv_ext(:, n+1:n+m), obj.lqrsol_lf, u_hla));
+				exp_l = mean(St.LQRObj(x0_rv_ext(:, n+1:n+m), obj.lqrsol_lf, u_hla));
 			end
 			cost = cost_hf + alpha * (cost_lf - exp_l);
 		end
