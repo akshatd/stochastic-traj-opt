@@ -1,7 +1,6 @@
 % TODOS:
 % - we are assuming u0 to be 0, might not be true in general so might need to add u0 to cumsum
 % - make indices consistent when storing U in row vs column (make everything row based)
-% - calculate cost of CV estimators to determine equal cost split
 
 clc; clear; close all force;
 %% A. state space model
@@ -258,8 +257,8 @@ analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_e
   title_str, obj_str, "Iteration", "num_opt_avg", true);
 
 %% F num opt with estimators
+%% F.1.1 normal CV
 cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
-%% F.1 normal CV
 n_cv = rv_samples/2;
 [~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, false);
 Uopt_cv = U_h; % save for plotting later
@@ -271,7 +270,7 @@ obj_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, 1:cv.idx, ...
   title_str, obj_str, "Iteration", "cv_opt", true);
 
-%% F.2 CV with LF solution at max corr
+%% F.1.2 CV with LF solution at max corr
 [~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, true);
 Uopt_cv_max = U_h; % save for plotting later
 % U_lf = repelem(U_hla, 10, cv.idx);
@@ -285,10 +284,22 @@ analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_e
 %% plot convergence distance comparison
 plotConvergence(data.lqrsol{1}.Uopt, Uopt_num, Uopt_cv, Uopt_cv_max, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
 
-%% G verify ACV estimator
-cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
-acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
+%% F.2.1 normal ACV
+% get low:high cost ratio, just do once per machine
+% hf = @() St.LQRObj(x0_rv_ext(:, 1:500), data.lqrsol{1}, u0_num);
+% lf = @() St.LQRObj(x0_rv_ext(:, 1:500), data.lqrsol{2}, u0_num(1:10:end));
+% repeat = 500;
+% ratios = zeros(repeat,1);
+% for i=1:repeat
+%     ratios(i) = timeit(lf)/timeit(hf);
+% end
+% l_h_cost_ratio = median(ratios);
+% fprintf("Low:High cost ratio: %f\n", l_h_cost_ratio);
 
+acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
+l_h_cost_ratio = 0.046809; % experimental value
+
+%% G verify ACV estimator
 %% check variance of ACV across different ratios of HF/LF evaluations
 acv_ratios = 0.1:0.1:2;
 num_rv_samples = 2000; % large enough to give samples to acv
@@ -300,7 +311,6 @@ for i=1:num_estimator_samples
 end
 
 n_mc = 500;
-l_h_cost_ratio = 0.2;
 var_data_acv = zeros(length(acv_ratios), num_estimator_samples);
 for i=1:length(acv_ratios)
   fprintf("\n*** ACV Ratio: %f ***\n", acv_ratios(i));
@@ -333,7 +343,6 @@ for i=1:num_estimator_samples
 end
 
 n_mc = 500;
-l_h_cost_ratio = 0.2;
 n_cv = round(n_mc / (1 + l_h_cost_ratio));
 n_acv = n_cv;
 var_data_cv = zeros(length(m_acvs), num_estimator_samples);
@@ -361,7 +370,6 @@ grid on;
 
 %% plot variance of CV/ACV vs analyitical
 num_estimator_samples = 100:100:2000;
-l_h_cost_ratio = 0.2;
 acv_ratio  = 1;
 n_mc = 500;
 n_cv = round(n_mc / (1 + l_h_cost_ratio));
@@ -413,7 +421,6 @@ u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 max_iters = 30;
 tol = 1e-12;
 
-l_h_cost_ratio = 0.2; % TODO get this experimentally for each num_samples
 acv_exp_sample_factor = 1; % factor to increase samples for ACV Expectation, m
 
 mc = Mc(x0_ext_mean, x0_ext_cov, data.lqrsol{1});

@@ -5,7 +5,6 @@ bin
 logs
 build
 artefacts
-figs
 
 ########################
 # Vim swp files
