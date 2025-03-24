@@ -107,5 +107,24 @@ classdef St
 			end
 		end
 		
+		function U_lf = DownsampleAvg(U_hf, avg_window, repeat)
+			arguments
+				U_hf (:, :) double
+				avg_window int32
+				repeat logical = false
+			end
+			U_hf_len = size(U_hf, 1);
+			U_lf = zeros(U_hf_len/avg_window, size(U_hf, 2));
+			skips = U_hf_len/avg_window;
+			for i = 1:skips
+				row_start = (i-1) * avg_window + 1;
+				row_end = i*avg_window;
+				U_lf(i, :) = mean(U_hf(row_start:row_end, :), 1);
+			end
+			if repeat
+				U_lf = repelem(U_lf, avg_window, 1);
+			end
+		end
+		
 	end
 end

@@ -21,7 +21,7 @@ classdef Acv < handle
 		function cost = est(obj, x0_rv_ext, n, m, u, use_best_U_lf, a_type, e_type)
 			% ONLY set use_best_U_lf if insider optimizer and idx is set outside
 			cost_hf_all = St.LQRCost(x0_rv_ext(:, 1:n), obj.lqrsol_hf, u);
-			u_hla = Est.DownsampleAvg(u, 10);
+			u_hla = St.DownsampleAvg(u, 10);
 			cost_lf_all = St.LQRCost(x0_rv_ext(:, 1:n), obj.lqrsol_lf, u_hla);
 			if use_best_U_lf
 				obj.Us(:, obj.idx) = u;
@@ -29,7 +29,7 @@ classdef Acv < handle
 				% TODO: Us should be in rows to prevent transpose
 				corrs = St.CorrMulti2D(cost_hf_all', obj.costs_lf(:, 1:obj.idx)');
 				[~, best_idx] = max(corrs);
-				u_hla = Est.DownsampleAvg(obj.Us(:, best_idx), 10);
+				u_hla = St.DownsampleAvg(obj.Us(:, best_idx), 10);
 				cost_lf_all = obj.costs_lf(:, best_idx);
 			end
 			obj.U_hlas(:, obj.idx) = u_hla; % save bc used for plotting
@@ -93,9 +93,9 @@ classdef Acv < handle
 			U_hlas = obj.U_hlas;
 		end
 		
-        function var = variance(obj, n, m, u)
+		function var = variance(obj, n, m, u)
 			var_h = St.LQRVar(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, u);
-			u_lf = Est.DownsampleAvg(u, 10);
+			u_lf = St.DownsampleAvg(u, 10);
 			corr_hl = St.LQRCorr(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, obj.lqrsol_lf, u, u_lf);
 			var = var_h/n * (1 - m/(m+n) * corr_hl^2);
 		end

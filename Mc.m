@@ -41,7 +41,7 @@ classdef Mc < handle
 			end
 			costs = costs(1:iters);
 			obj.Us = obj.Us(:, 1:iters);
-			obj.U_hlas = Est.DownsampleAvg(obj.Us, 10);
+			obj.U_hlas = St.DownsampleAvg(obj.Us, 10);
 			
 			function stop = OutFn(x, optimValues, state)
 				stop = false;

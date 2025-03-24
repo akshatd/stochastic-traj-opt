@@ -224,8 +224,8 @@ costs_str = ["$J_h(u_h)$", "$J_l(u_{hlr})$"];
 plotMultifidCost(perturb_range, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, title_str, costs_str, "Perturbation");
 
 %% E.1.1.2 averaging
-U_l = Est.DownsampleAvg(U_h, 10); % get HF in LF by avg every 10 values of HF
-% Uopt_lf = Est.DownsampleAvg(Uopt_hf, 10, true); % uncomment to visualize
+U_l = St.DownsampleAvg(U_h, 10); % get HF in LF by avg every 10 values of HF
+% Uopt_lf = St.DownsampleAvg(Uopt_hf, 10, true); % uncomment to visualize
 % visSols(Uopt_hf, Uopt_lf, data.lqrsol{1}.times, "HF obj", perturb_range, "Perturbation");
 % calculate costs and correlation for HF/LF sols for each perturbation
 cost_h = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_h);
@@ -282,8 +282,8 @@ plotMultifidCost(1:iters, mean(cost_h,2), mean(cost_l,2), corr_st, corr_an, titl
 plotCorr2d(corr_2d, "Correlation between costs in $J_h(u_h)$ and $J_l(u_{hlr})$", costs_str, "num_iters_res");
 
 %% E.2.1.2 correlation with averaging
-U_l = Est.DownsampleAvg(U_h, 10); % get LF by avg every 10 values of HF
-% U_lf = Est.DownsampleAvg(U_hf, 10, true); % uncomment to visualize
+U_l = St.DownsampleAvg(U_h, 10); % get LF by avg every 10 values of HF
+% U_lf = St.DownsampleAvg(U_hf, 10, true); % uncomment to visualize
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
 cost_h = St.LQRCostMulti(x0_rv_ext, data.lqrsol{1}, U_h);
 cost_l = St.LQRCostMulti(x0_rv_ext, data.lqrsol{2}, U_l);
