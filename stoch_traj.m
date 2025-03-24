@@ -257,9 +257,23 @@ analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_e
   title_str, obj_str, "Iteration", "num_opt_avg", true);
 
 %% F num opt with estimators
+% get low:high cost ratio, just do once per machine
+% hf = @() St.LQRObj(x0_rv_ext(:, 1:500), data.lqrsol{1}, u0_num);
+% lf = @() St.LQRObj(x0_rv_ext(:, 1:500), data.lqrsol{2}, u0_num(1:10:end));
+% repeat = 500;
+% ratios = zeros(repeat,1);
+% for i=1:repeat
+%     ratios(i) = timeit(lf)/timeit(hf);
+% end
+% l_h_cost_ratio = median(ratios);
+% fprintf("Low:High cost ratio: %f\n", l_h_cost_ratio);
+l_h_cost_ratio = 0.046809; % experimental value
+n_mc = 500; % set this to the max no of samples used later
+
 %% F.1.1 normal CV
-cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
-n_cv = rv_samples/2;
+cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_ratio);
+n_cv = cv.getEqCostSamples(n_mc);
+
 [~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, false);
 Uopt_cv = U_h; % save for plotting later
 % U_lf = repelem(U_hla, 10, cv.idx); % uncomment to visualize
@@ -285,52 +299,39 @@ analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_e
 plotConvergence(data.lqrsol{1}.Uopt, Uopt_num, Uopt_cv, Uopt_cv_max, ["HF", "CV", "CV with max corr"], "Convergence distance comparison");
 
 %% F.2.1 normal ACV
-% get low:high cost ratio, just do once per machine
-% hf = @() St.LQRObj(x0_rv_ext(:, 1:500), data.lqrsol{1}, u0_num);
-% lf = @() St.LQRObj(x0_rv_ext(:, 1:500), data.lqrsol{2}, u0_num(1:10:end));
-% repeat = 500;
-% ratios = zeros(repeat,1);
-% for i=1:repeat
-%     ratios(i) = timeit(lf)/timeit(hf);
-% end
-% l_h_cost_ratio = median(ratios);
-% fprintf("Low:High cost ratio: %f\n", l_h_cost_ratio);
-
-acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
-l_h_cost_ratio = 0.046809; % experimental value
-
-%% G verify ACV estimator
+acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_ratio);
 %% check variance of ACV across different ratios of HF/LF evaluations
-acv_ratios = 0.1:0.1:2;
-num_rv_samples = 2000; % large enough to give samples to acv
-num_estimator_samples = 500;
-x0_rv_ext = zeros(length(x0_ext), num_rv_samples, num_estimator_samples);
-for i=1:num_estimator_samples
-  x0_rv = mvnrnd(x0_mean, x0_cov, num_rv_samples)';
-  x0_rv_ext(:, :, i) = [x0_rv; repmat(u0, 1, num_rv_samples); repmat(ref, 1, num_rv_samples)];
-end
+% acv_mn_ratios = 0.5:0.1:2;
+% num_rv_samples = 2000; % large enough to give samples to acv
+% num_estimator_samples = 1000;
+% x0_rv_ext = zeros(length(x0_ext), num_rv_samples, num_estimator_samples);
+% for i=1:num_estimator_samples
+%   x0_rv = mvnrnd(x0_mean, x0_cov, num_rv_samples)';
+%   x0_rv_ext(:, :, i) = [x0_rv; repmat(u0, 1, num_rv_samples); repmat(ref, 1, num_rv_samples)];
+% end
 
-n_mc = 500;
-var_data_acv = zeros(length(acv_ratios), num_estimator_samples);
-for i=1:length(acv_ratios)
-  fprintf("\n*** ACV Ratio: %f ***\n", acv_ratios(i));
-  n_acv = round(n_mc / (1 + l_h_cost_ratio + acv_ratios(i)*l_h_cost_ratio));
-  m_acv = round(acv_ratios(i) * n_acv);
-  for j=1:num_estimator_samples
-    var_data_acv(i, j) = acv.est(x0_rv_ext(:, :, j), n_acv, m_acv, Uopt_h_num, false, '-1', 'stat');
-  end
-end
+% var_data_acv = zeros(length(acv_mn_ratios), num_estimator_samples);
+% for i=1:length(acv_mn_ratios)
+%   [n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_mn_ratios(i));
+%   fprintf("\n*** ACV Ratio: %f, m: %d, n: %d ***\n", acv_mn_ratios(i), m_acv, n_acv);
+%   for j=1:num_estimator_samples
+%     var_data_acv(i, j) = acv.est(x0_rv_ext(:, :, j), n_acv, m_acv, Uopt_h_num, false, '-1', 'stat');
+%   end
+% end
+% var_acv = var(var_data_acv, 0, 2);
+% acv_mn_ratio_opt = acv_mn_ratios(var_acv == min(var_acv));
 
-var_acv = var(var_data_acv, 0, 2);
+% figure;
+% plot(acv_mn_ratios, var_acv, 'b', 'LineWidth', 2, 'DisplayName', 'ACV');
+% xlabel("ACV Ratio (m:n)");
+% ylabel("Variance");
+% title("ACV estimator Variance across m:n ratios (eq cost, $\alpha=-1$)", "Interpreter", "latex");
+% legend show;
+% grid on;
 
-%%
-figure;
-plot(acv_ratios, var_acv, 'b', 'LineWidth', 2, 'DisplayName', 'ACV');
-xlabel("ACV Ratio (m:n)");
-ylabel("Variance");
-title("ACV estimator Variance across m:n ratios (eq cost, $\alpha=-1$)", "Interpreter", "latex");
-legend show;
-grid on;
+acv_mn_ratio_opt = 1.5; % set this to the optimal ratio from above
+[n_acv, m_acv] = acv.getEqCostSamples(rv_samples, acv_mn_ratio_opt);
+%% G verify estimators
 
 %% plot variance of CV vs ACV with n_acv fixed and increasing m_acv
 m_acvs = 100:100:2000;
@@ -343,7 +344,7 @@ for i=1:num_estimator_samples
 end
 
 n_mc = 500;
-n_cv = round(n_mc / (1 + l_h_cost_ratio));
+n_cv = cv.getEqCostSamples(n_mc);
 n_acv = n_cv;
 var_data_cv = zeros(length(m_acvs), num_estimator_samples);
 var_data_acv = zeros(length(m_acvs), num_estimator_samples);
@@ -372,9 +373,8 @@ grid on;
 num_estimator_samples = 100:100:2000;
 acv_ratio  = 1;
 n_mc = 500;
-n_cv = round(n_mc / (1 + l_h_cost_ratio));
-n_acv = round(n_mc / (1 + l_h_cost_ratio + acv_ratio*l_h_cost_ratio));
-m_acv = round(acv_ratio * n_acv);
+n_cv = cv.getEqCostSamples(n_mc);
+[n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_ratio);
 num_rv_samples = round(max(n_acv+m_acv, n_mc));
 x0_rv_ext = zeros(length(x0_ext), num_rv_samples, max(num_estimator_samples));
 for i=1:max(num_estimator_samples)
@@ -439,9 +439,8 @@ for num_samples=num_rv_samples
   fprintf("\n*** RV Samples: %d ***\n", num_samples);
   wait_bar = waitbar(0, "Running estimators with " + num_samples + " samples");
   n_mc = num_samples;
-  n_cv = int32(n_mc / (1 + l_h_cost_ratio));
-  n_acv = round(num_samples / (1 + l_h_cost_ratio + acv_exp_sample_factor*l_h_cost_ratio));
-  m_acv = round(acv_exp_sample_factor * n_acv);
+  n_cv = cv.getEqCostSamples(n_mc);
+  [n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_ratio);
   num_rv_samples_actual(num_rv_samples == num_samples, :) = [n_mc, n_cv, n_acv, m_acv];
   
   n_total = round(max(n_cv+n_acv+m_acv, num_samples)); % account for weird splits like 0.999

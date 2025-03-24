@@ -8,14 +8,16 @@ classdef Acv < handle
 		x0_cov = [];
 		lqrsol_hf = {};
 		lqrsol_lf = {};
+		l_h_cost_ratio = 0.045;
 	end
 	
 	methods
-		function obj = Acv(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf)
+		function obj = Acv(x0_mean, x0_cov, lqrsol_hf, lqrsol_lf, l_h_cost_ratio)
 			obj.x0_mean = x0_mean;
 			obj.x0_cov = x0_cov;
 			obj.lqrsol_hf = lqrsol_hf;
 			obj.lqrsol_lf = lqrsol_lf;
+			obj.l_h_cost_ratio = l_h_cost_ratio;
 		end
 		
 		function cost = est(obj, x0_rv_ext, n, m, u, use_best_U_lf, a_type, e_type)
@@ -100,6 +102,10 @@ classdef Acv < handle
 			var = var_h/n * (1 - m/(m+n) * corr_hl^2);
 		end
 		
+		function [n_acv, m_acv] = getEqCostSamples(obj, n_mc, mn_ratio)
+			n_acv = round(n_mc / (1 + obj.l_h_cost_ratio + mn_ratio*obj.l_h_cost_ratio));
+			m_acv = round(mn_ratio * n_acv);
+		end
+		
 	end
-	
 end
