@@ -437,18 +437,14 @@ grid on;
 %% G Convergence and variance with various optimizers and sample sizes
 num_rv_samples = [10 100 500];
 num_rv_samples_actual = zeros(length(num_rv_samples), 4); % 4 bc we have [MC, CV, n_ACV ,m_ACV]
-num_estimator_samples = 100;
+num_estimator_samples = 200;
 
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 max_iters = 30;
 tol = 1e-12;
 
-acv_exp_sample_factor = 1; % factor to increase samples for ACV Expectation, m
-
 mc = Mc(x0_ext_mean, x0_ext_cov, data.lqrsol{1});
-cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
-acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2});
-
+acv_mn_ratio_opt = 2;
 data.h_obj = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
 data.h_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.cv_obj = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
