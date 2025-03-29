@@ -39,17 +39,32 @@ class LQRMSD:
         self.N = int(t_horiz / t_step)  # Prediction horizon
         self.Kopt, self.S, self.M, self.Qbar, self.Rbar = self.solveLQR()
 
-    def LQRObj(self, x0, U):
+    def obj(self, x0, U):
         """
         Compute the cost for the LQR problem given the multiple x0 and the control input U.
         """
+        x0 = x0.reshape(self.nx, -1)  # fix shape
+        U = U.reshape(self.N*self.nu, -1)  # fix shape
         Q, S, M, Qbar, Rbar = self.Q, self.S, self.M, self.Qbar, self.Rbar
         # Compute the cost
         cost = U.T @ (S.T @ Qbar @ S + Rbar) @ U + 2 * x0.T @ M.T @ Qbar @ S @ U + \
             np.diag(x0.T @ (M.T @ Qbar @ M + Q) @ x0).reshape(-1, 1)
         return cost
 
-    def LQRExp(self, x0_mean, x0_cov, U):
+    def grad(self, x0, U):
+        """
+        Compute the gradient of the cost for the LQR problem given the multiple x0 and the control input U.
+        """
+        x0 = x0.reshape(self.nx, -1)  # fix shape
+        U = U.reshape(self.N*self.nu, -1)  # fix shape
+        S, M, Qbar, Rbar = self.S, self.M, self.Qbar, self.Rbar
+        # Compute the gradient
+        H = S.T @ Qbar @ S + Rbar
+        q = x0.T @ M.T @ Qbar @ S
+        grad = 2 * H @ U + 2 * q.T
+        return grad
+
+    def exp(self, x0_mean, x0_cov, U):
         """
         Compute the expected cost for the LQR problem given the mean and covariance of x0 and the control input U.
         """
@@ -61,7 +76,7 @@ class LQRMSD:
         exp = K + x0_mean.T @ L + x0_mean.T @ N @ x0_mean + np.trace(N @ x0_cov)
         return exp
 
-    def LQRVar(self, x0_mean, x0_cov, U):
+    def var(self, x0_mean, x0_cov, U):
         """
         Compute the variance of the LQR problem given the mean and covariance of x0 and the control input U.
         """
