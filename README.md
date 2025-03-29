@@ -60,7 +60,7 @@ $$
   \end{bmatrix} &=
   \begin{bmatrix}
     0 & 1 \\
-    -\frac{k}{m}  -\frac{c}{m}
+    -\frac{k}{m} &  -\frac{c}{m}
   \end{bmatrix}
   \begin{bmatrix}
     x \\
