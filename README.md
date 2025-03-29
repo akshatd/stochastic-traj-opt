@@ -49,7 +49,7 @@ $$
 \end{aligned}
 $$
 
-We have the state as $[x \dot{x}]^T$ containing the position and velocity of the mass, both of which are observed.
+We have the state as $[x \quad \dot{x}]^T$ containing the position and velocity of the mass, both of which are observed.
 The control input $u=F$ is applied to the mass, yielding the following state space model:
 
 $$
@@ -227,7 +227,7 @@ For simplicity, from now on we refer to $x_k^{ext}$ as $x_k$, $A^{ext}$ as $A$ a
 The cost function can now be written as
 
 $$
-J = \sum_{k=0}^{N-1} x_k^T Q x_k + \Delta u_k^T R \Delta u_k
+J = \sum_{k=0}^{N-1} x_k^{extT} Q x^{ext}_k + \Delta u_k^T R \Delta u_k
 $$
 
 Using the state transition formula

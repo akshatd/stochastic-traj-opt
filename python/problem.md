@@ -158,7 +158,7 @@ The cost function in terms of the new matrices $X$, $U$, $S$, $M$, $\bar{Q}$ and
 
 $$
 \begin{aligned}
-   J &= \sum_{k=0}^{N-1} x_k^T Q x_k + \Delta u_k^T R \Delta u_k \\
+   J &= \sum_{k=0}^{N-1} x_k^{extT} Q x^{ext}_k + \Delta u_k^T R \Delta u_k \\
    % \text{ (extra $x_0$ term because it is not in $X$)} \\
    &= X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0 \\
    &= (S U + M x_0)^T \bar{Q} (S U + M x_0) + U^T \bar{R} U + x_0^T Q x_0 \\

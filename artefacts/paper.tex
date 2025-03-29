@@ -35,7 +35,7 @@ This section describes how the dynamics for the mass-spring-damper is set up, al
 \subsection{Mass-Spring-Damper System}
 The mass-spring-damper system is a second order system that can be modelled using Newton's second law of motion.
 The system in consideration has a mass $m=5$ g, spring constant $k=2$ N/m and damping coefficient $c=0.5$ Ns/m.
-Given an external force $F$ and the acceleration of the system $\ddot{x}$, we have the state $[x \dot{x}]^T$
+Given an external force $F$ and the acceleration of the system $\ddot{x}$, we have the state $[x \quad \dot{x}]^T$
 that contains the position and velocity of the mass, both of which are observed.
 The control input $u=F$ is applied to the mass, yielding the following state-space model:
 
@@ -131,7 +131,7 @@ For simplicity, from now on we refer to $x_k^{ext}$ as $x_k$, $A^{ext}$ as $A$ a
 The objective function can now be written as
 
 $$
-J = \sum_{k=0}^{N-1} x_k^T Q x_k + \Delta u_k^T R \Delta u_k
+J = \sum_{k=0}^{N-1} x_k^{extT} Q x^{ext}_k + \Delta u_k^T R \Delta u_k
 $$
 
 Using the state transition formula, we can write the stacked state vector $X$ as $X = SU + Mx_0$.
@@ -142,20 +142,10 @@ are constructed using the penalty matrices $Q$ and $R$. The objective function t
 
 \begin{equation}
   \begin{aligned}
-    J &= \sum_{k=0}^{N-1} x_k^T Q x_k + \Delta u_k^T R \Delta u_k \\
+    J &= \sum_{k=0}^{N-1} x_k^{extT} Q x^{ext}_k + \Delta u_k^T R \Delta u_k \\
     % \text{ (extra $x_0$ term because it is not in $X$)} \\
     &= X^T \bar{Q} X + U^T \bar{R} U + x_0^T Q x_0 \\
     &= (S U + M x_0)^T \bar{Q} (S U + M x_0) + U^T \bar{R} U + x_0^T Q x_0 \\
-    % & \text{note } (A + B)^T = A^T + B^T \text{ and } (AB)^T = B^T A^T \\
-    &= (U^T S^T + x_0^T M^T) \bar{Q} (S U + M x_0) + U^T \bar{R} U + x_0^T Q x_0 \\
-    % & \text{note } A(B + C) = AB + AC \\
-    &= (U^T S^T + x_0^T M^T) (\bar{Q} S U + \bar{Q} M x_0) + U^T \bar{R} U + x_0^T Q x_0 \\
-    &= U^T S^T \bar{Q} S U + U^T S^T \bar{Q} M x_0 + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0 + U^T \bar{R} U + x_0^T Q x_0 \\
-    % & \text{note } \bar{Q} \text{ is symmetric so it doesnt need to be transposed} \\
-    &= U^T S^T \bar{Q} S U + (x_0^T M^T \bar{Q} S U)^T + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0 + U^T \bar{R} U + x_0^T Q x_0 \\
-    % & \text{note } x_0^T M^T \bar{Q} S U \text{ is a scalar(check its dimensions), so its transpose is itself} \\
-    &= U^T S^T \bar{Q} S U + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} S U + x_0^T M^T \bar{Q} M x_0 + U^T \bar{R} U + x_0^T Q x_0 \\
-    % & \text{combining all quadratic and repeated terms} \\
     &= U^T (S^T \bar{Q} S + \bar{R}) U + 2 x_0^T M^T \bar{Q} S U + x_0^T(M^T \bar{Q} M + Q) x_0\\
   \end{aligned}
 \end{equation}
