@@ -114,7 +114,6 @@ for idx = 1:length(TsList)
   assert(mod(Ts, Tfid) == 0, "Ts=" + Ts + " is not a multiple of Tfid=" + Tfid);
   
   %% D.1 deterministic LQR
-  Tmult = Ts / Tfid;
   times = 0:Ts:Tsim;
   N = Tsim/Ts; % prediction horizon, excluding initial state
   % create the extended state system [x_k, u_k-1, r_k]
@@ -313,27 +312,31 @@ acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_rati
 %   x0_rv = mvnrnd(x0_mean, x0_cov, num_rv_samples)';
 %   x0_rv_ext(:, :, i) = [x0_rv; repmat(u0, 1, num_rv_samples); repmat(ref, 1, num_rv_samples)];
 % end
-%
+
 % var_data_acv = zeros(length(acv_mn_ratios), num_estimator_samples);
+% var_acv_an = zeros(length(acv_mn_ratios), 1);
 % for i=1:length(acv_mn_ratios)
 %   [n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_mn_ratios(i));
 %   fprintf("\n*** ACV Ratio: %f, m: %d, n: %d ***\n", acv_mn_ratios(i), m_acv, n_acv);
 %   for j=1:num_estimator_samples
 %     var_data_acv(i, j) = acv.est(x0_rv_ext(:, :, j), n_acv, m_acv, Uopt_h_num, false, '-1', 'share');
 %   end
+%   var_acv_an(i) = acv.variance(n_acv, m_acv, Uopt_h_num);
 % end
 % var_acv = var(var_data_acv, 0, 2);
 % acv_mn_ratio_opt = acv_mn_ratios(var_acv == min(var_acv));
-%
+
 % figure;
-% plot(acv_mn_ratios, var_acv, 'b', 'LineWidth', 2, 'DisplayName', 'ACV');
+% plot(acv_mn_ratios, var_acv, 'b', 'LineWidth', 2, 'DisplayName', 'Statistical');
+% hold on;
+% plot(acv_mn_ratios, var_acv_an, 'r', 'LineWidth', 2, 'DisplayName', 'Analytical');
 % xlabel("ACV Ratio (m:n)");
 % ylabel("Variance");
 % title("ACV estimator Variance across m:n ratios (eq cost, $\alpha=-1$)", "Interpreter", "latex");
 % legend show;
 % grid on;
 
-acv_mn_ratio_opt = 1.5; % set this to the optimal ratio from above
+acv_mn_ratio_opt = 2; % set this to the optimal ratio from above (1.5)
 [n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_mn_ratio_opt);
 
 [~, U_h, U_l] = acv.opt(u0_num, -1, -1, x0_rv_ext, n_acv, m_acv, false, '-1', 'share');
@@ -444,7 +447,6 @@ max_iters = 30;
 tol = 1e-12;
 
 mc = Mc(x0_ext_mean, x0_ext_cov, data.lqrsol{1});
-acv_mn_ratio_opt = 2;
 data.h_obj = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
 data.h_u = zeros(length(u0_num), max_iters, num_estimator_samples, length(num_rv_samples));
 data.cv_obj = zeros(max_iters, num_estimator_samples, length(num_rv_samples));
@@ -564,6 +566,12 @@ end
 
 function x_history = fminuncWHistory(fun, x0)
 % this is a wrapper around fminunc that returns the history of the optimization
+% check gradient
+grad_opts = optimoptions("fminunc", FiniteDifferenceType="central");
+valid = checkGradients(fun, x0, grad_opts, Display="on");
+if ~valid
+  error("Gradient check failed");
+end
 x_history = [];
 options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
 fminunc(fun, x0, options);
