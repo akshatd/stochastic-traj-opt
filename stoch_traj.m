@@ -280,7 +280,7 @@ x0_rv_ext = [
 cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_ratio);
 n_cv = cv.getEqCostSamples(n_mc);
 
-[~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, false);
+[~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, false, false);
 Uopt_cv = U_h; % save for plotting later
 % U_lf = repelem(U_hla, 10, cv.idx); % uncomment to visualize
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
@@ -291,7 +291,7 @@ analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_e
   title_str, obj_str, "Iteration", "cv_opt", true);
 
 %% F.1.2 CV with LF solution at max corr
-[~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, true);
+[~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, true, false);
 Uopt_cv_max = U_h; % save for plotting later
 % U_lf = repelem(U_hla, 10, cv.idx);
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
@@ -339,7 +339,7 @@ acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_rati
 acv_mn_ratio_opt = 2; % set this to the optimal ratio from above (1.5)
 [n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_mn_ratio_opt);
 
-[~, U_h, U_l] = acv.opt(u0_num, -1, -1, x0_rv_ext, n_acv, m_acv, false, '-1', 'share');
+[~, U_h, U_l] = acv.opt(u0_num, -1, -1, x0_rv_ext, n_acv, m_acv, false, '-1', 'share', false);
 Uopt_acv = U_h; % save for plotting later
 
 title_str = "$S_{"+n_acv+","+m_acv+"}^{ACV}$";
@@ -348,7 +348,7 @@ analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_e
   title_str, obj_str, "Iteration", "acv_opt", true);
 
 %% F.2.2 ACV with LF solution at max corr
-[~, U_h, U_l] = acv.opt(u0_num, -1, -1, x0_rv_ext, n_acv, m_acv, true, '-1', 'share');
+[~, U_h, U_l] = acv.opt(u0_num, -1, -1, x0_rv_ext, n_acv, m_acv, true, '-1', 'share', false);
 Uopt_acv_max = U_h; % save for plotting later
 
 title_str = "$S_{"+n_acv+","+m_acv+"}^{ACV}$";
@@ -461,6 +461,9 @@ for num_samples=num_rv_samples
   n_mc = num_samples;
   n_cv = cv.getEqCostSamples(n_mc);
   [n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_mn_ratio_opt);
+  % n_cv = n_mc;
+  % n_acv = n_cv;
+  % m_acv = 1;
   num_rv_samples_actual(num_rv_samples == num_samples, :) = [n_mc, n_cv, n_acv, m_acv];
   
   n_total = round(max(n_cv+n_acv+m_acv, num_samples)); % account for weird splits like 0.999
@@ -472,17 +475,17 @@ for num_samples=num_rv_samples
     x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
     
     % MC with HF
-    [objs, Us, ~] = mc.opt(u0_num, max_iters, tol, x0_rv_ext, n_mc);
+    [objs, Us, ~] = mc.opt(u0_num, max_iters, tol, x0_rv_ext, n_mc, true);
     data.h_obj(:, i, num_rv_samples == num_samples) = objs;
     data.h_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % CV (true = lf at max corr)
-    [objs, Us, ~] = cv.opt(u0_num, max_iters, tol, x0_rv_ext, n_cv, true);
+    [objs, Us, ~] = cv.opt(u0_num, max_iters, tol, x0_rv_ext, n_cv, true, true);
     data.cv_obj(:, i, num_rv_samples == num_samples) = objs;
     data.cv_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % ACV (true = lf at max corr)
-    [objs, Us, ~] = acv.opt(u0_num, max_iters, tol, x0_rv_ext, n_acv, m_acv, true, '-1', 'share');
+    [objs, Us, ~] = acv.opt(u0_num, max_iters, tol, x0_rv_ext, n_acv, m_acv, true, '-1', 'share', true);
     data.acv_obj(:, i, num_rv_samples == num_samples) = objs;
     data.acv_u(:, :, i, num_rv_samples == num_samples) = Us;
   end

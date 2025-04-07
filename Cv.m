@@ -44,7 +44,7 @@ classdef Cv < handle
 			cost = cost_hf + alpha * (cost_lf - exp_l);
 		end
 		
-		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, use_best_U_lf)
+		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, use_best_U_lf, use_sgd)
 			costs = zeros(max_iters, 1);
 			obj.Us = zeros(size(u0, 1), max_iters);
 			obj.U_hlas = zeros(size(u0, 1)/10, max_iters);
@@ -52,11 +52,51 @@ classdef Cv < handle
 			obj.idx = 1;
 			
 			if max_iters <  0 || tol < 0
-				options = optimoptions('fminunc', 'OutputFcn', @OutFn);
+				options = optimoptions('fminunc', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn);
+				% options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @OutFn);
 			else
-				options = optimoptions('fminunc', 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol);
+				options = optimoptions('fminunc', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol);
+				% options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol, 'Display', 'iter-detailed');
 			end
-			fminunc(@(u) obj.est(x0_rv_ext, n, u, use_best_U_lf), u0, options);
+			f = @(u) obj.est(x0_rv_ext, n, u, use_best_U_lf);
+			
+			% SGD algorithm
+			if use_sgd
+				% alpha_start = 7e-9; % learning rate
+				alpha_start = 2e-4; % normie learning rate
+				u = u0; % initial control input
+				for i=1:max_iters
+					% Store the cost
+					costs(i) = f(u);
+					obj.Us(:, obj.idx) = u;
+					obj.U_hlas(:, obj.idx) = St.DownsampleAvg(u, 10);
+					% Compute the gradient
+					x0_idxs = randperm(n);
+					x0_samples = x0_rv_ext(:, x0_idxs(1:round(n/2)));
+					grad = mean(St.LQRGrad(x0_samples, obj.lqrsol_hf, u), 2);
+					% disp(norm(grad));
+					% Update the control input
+					% alpha = alpha_start*norm(grad);
+					alpha = alpha_start;
+					u = u - alpha * grad;
+					obj.idx = obj.idx + 1;
+					% Check for convergence
+					if i > 1 && abs(costs(i) - costs(i-1)) < tol
+						break;
+					end
+				end
+			else
+				% function [f, g] = fwGrad(x0_rv_ext, n, u, use_best_U_lf)
+				% 	f = obj.est(x0_rv_ext, n, u, use_best_U_lf);
+				% 	g = mean(St.LQRGrad(x0_rv_ext(:, 1:n), obj.lqrsol_hf, u), 2);
+				% 	% fprintf('grad: ');
+				% 	% disp(g);
+				% end
+				% f = @(u) fwGrad(x0_rv_ext, n, u, use_best_U_lf);
+				% grad_opts = optimoptions("fminunc", FiniteDifferenceType="central");
+				% checkGradients(f, u0, grad_opts, Display="on");
+				fminunc(f, u0, options);
+			end
 			
 			% trim to match iters
 			obj.idx = obj.idx-1; % remove last iteration that stopped it
