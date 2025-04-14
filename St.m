@@ -9,6 +9,18 @@ classdef St
 			cost = U'*(S'*Qbar*S + Rbar)*U + 2*x0'*M'*Qbar*S*U + diag(x0'*(M'*Qbar*M + Q)*x0);
 		end
 		
+		% Precalculates the quadratic x0 term for the LQR cost function
+		function precalc = LQRObj_x0term(x0, lqrsol)
+			Q = lqrsol.Q; M = lqrsol.M; Qbar = lqrsol.Qbar;
+			precalc = diag(x0'*(M'*Qbar*M + Q)*x0);
+		end
+		
+		% Uses the precalculated x0 term to calculate the LQR cost
+		function cost = LQRObj_precalc(x0, lqrsol, U, x0_term)
+			S = lqrsol.S; M = lqrsol.M; Qbar = lqrsol.Qbar; Rbar = lqrsol.Rbar;
+			cost = U'*(S'*Qbar*S + Rbar)*U + 2*x0'*M'*Qbar*S*U + x0_term;
+		end
+		
 		% cost for multiple x0 samples with multiple Us
 		function cost = LQRObjMulti(x0_rv, lqrsol, U) % TODO: U should be in rows
 			items = size(U, 2);

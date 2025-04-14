@@ -60,6 +60,51 @@ classdef Acv < handle
 			cost = cost_hf + alpha * (cost_lf - exp_l);
 		end
 		
+		function cost = estPrecalc(obj, x0_rv_ext, n, m, u, use_best_U_lf, a_type, e_type, x0_term_hf, x0_term_lf, x0_term_exp)
+			% ONLY set use_best_U_lf if insider optimizer and idx is set outside
+			% cost_hf_all = St.LQRObj(x0_rv_ext(:, 1:n), obj.lqrsol_hf, u);
+			cost_hf_all = St.LQRObj_precalc(x0_rv_ext(:, 1:n), obj.lqrsol_hf, u, x0_term_hf);
+			u_hla = St.DownsampleAvg(u, 10);
+			% cost_lf_all = St.LQRObj(x0_rv_ext(:, 1:n), obj.lqrsol_lf, u_hla);
+			cost_lf_all = St.LQRObj_precalc(x0_rv_ext(:, 1:n), obj.lqrsol_lf, u_hla, x0_term_lf);
+			if use_best_U_lf
+				obj.Us(:, obj.idx) = u;
+				obj.costs_lf(:, obj.idx) = cost_lf_all;
+				% TODO: Us should be in rows to prevent transpose
+				corrs = St.CorrMulti2D(cost_hf_all', obj.costs_lf(:, 1:obj.idx)');
+				[~, best_idx] = max(corrs);
+				u_hla = St.DownsampleAvg(obj.Us(:, best_idx), 10);
+				cost_lf_all = obj.costs_lf(:, best_idx);
+			end
+			obj.U_hlas(:, obj.idx) = u_hla; % save bc used for plotting
+			cost_hf = mean(cost_hf_all);
+			cost_lf = mean(cost_lf_all);
+			if strcmp(a_type, 'anly')
+				var_l = St.LQRVar(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla); % analytical
+				cov_hl = St.LQRCov(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, obj.lqrsol_lf, u, u_hla); % analytical
+				alpha = -m/(m+n) * cov_hl / var_l;
+			elseif strcmp(a_type, 'stat')
+				var_l = var(cost_lf_all);
+				cov_hl = cov(cost_hf_all, cost_lf_all);
+				cov_hl = cov_hl(1, 2); % only off diagonal element
+				alpha = -m/(m+n) * cov_hl / var_l;
+			elseif strcmp(a_type, '-1')
+				alpha = -1;
+			end
+			if strcmp(e_type, 'anly')
+				exp_l = St.LQRExp(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla);
+			elseif strcmp(e_type, 'stat')
+				% exp_l = mean(St.LQRObj(x0_rv_ext(:, n+1:n+m), obj.lqrsol_lf, u_hla));
+				exp_l = mean(St.LQRObj_precalc(x0_rv_ext(:, n+1:n+m), obj.lqrsol_lf, u_hla, x0_term_exp));
+			elseif strcmp(e_type, 'share')
+				% exp_l = St.LQRObj(x0_rv_ext(:, n+1:n+m), obj.lqrsol_lf, u_hla);
+				exp_l = St.LQRObj_precalc(x0_rv_ext(:, n+1:n+m), obj.lqrsol_lf, u_hla, x0_term_exp);
+				exp_l = mean([exp_l; cost_lf_all]);
+			end
+			cost = cost_hf + alpha * (cost_lf - exp_l);
+		end
+		
+		
 		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, m, use_best_U_lf, a_type, e_type, use_sgd)
 			costs = zeros(max_iters, 1);
 			obj.Us = zeros(size(u0, 1), max_iters);
@@ -74,8 +119,14 @@ classdef Acv < handle
 				options = optimoptions('fminunc', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol);
 				% options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol, 'Display', 'iter-detailed');
 			end
-			f = @(u) obj.est(x0_rv_ext, n, m, u, use_best_U_lf, a_type, e_type);
+			% normal f
+			% f = @(u) obj.est(x0_rv_ext, n, m, u, use_best_U_lf, a_type, e_type);
 			
+			% f with precalculated x0 term
+			x0_term_hf = St.LQRObj_x0term(x0_rv_ext(:, 1:n), obj.lqrsol_hf);
+			x0_term_lf = St.LQRObj_x0term(x0_rv_ext(:, 1:n), obj.lqrsol_lf);
+			x0_term_exp = St.LQRObj_x0term(x0_rv_ext(:, n+1:n+m), obj.lqrsol_lf);
+			f = @(u) obj.estPrecalc(x0_rv_ext, n, m, u, use_best_U_lf, a_type, e_type, x0_term_hf, x0_term_lf, x0_term_exp);
 			% SGD algorithm
 			if use_sgd
 				% alpha_start = 7e-9; % learning rate

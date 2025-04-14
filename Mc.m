@@ -19,6 +19,10 @@ classdef Mc < handle
 			cost = mean(St.LQRObj(x0_rv_ext(:, 1:n), obj.lqrsol, u));
 		end
 		
+		function cost = estPrecalc(obj, x0_rv_ext, n, u, x0_term)
+			cost = mean(St.LQRObj_precalc(x0_rv_ext(:, 1:n), obj.lqrsol, u, x0_term));
+		end
+		
 		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, use_sgd)
 			costs = zeros(max_iters, 1);
 			obj.Us = zeros(size(u0, 1), max_iters);
@@ -32,7 +36,13 @@ classdef Mc < handle
 				options = optimoptions('fminunc', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol);
 				% options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol, 'Display', 'iter-detailed');
 			end
-			f = @(u) obj.est(x0_rv_ext, n, u);
+			
+			% normal f
+			% f = @(u) obj.est(x0_rv_ext, n, u);
+			
+			% f with precalculated x0 term
+			x0_term = St.LQRObj_x0term(x0_rv_ext(:, 1:n), obj.lqrsol);
+			f = @(u) obj.estPrecalc(x0_rv_ext, n, u, x0_term);
 			
 			% SGD algorithm
 			if use_sgd
