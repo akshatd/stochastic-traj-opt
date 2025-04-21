@@ -12,7 +12,19 @@ classdef St
 		% Precalculates the quadratic x0 term for the LQR cost function
 		function precalc = LQRObj_x0term(x0, lqrsol)
 			Q = lqrsol.Q; M = lqrsol.M; Qbar = lqrsol.Qbar;
-			precalc = diag(x0'*(M'*Qbar*M + Q)*x0);
+			% precalc = diag(x0'*(M'*Qbar*M + Q)*x0);
+			step = 10000;
+			precalc = zeros(size(x0, 2), 1);
+			i=0;
+			while true
+				idx_start = i+1;
+				idx_end = min(i+step, size(x0, 2));
+				precalc(idx_start:idx_end) = diag(x0(:, idx_start:idx_end)'*(M'*Qbar*M + Q)*x0(:, idx_start:idx_end));
+				if idx_end == size(x0, 2)
+					break;
+				end
+				i = i + step;
+			end
 		end
 		
 		% Uses the precalculated x0 term to calculate the LQR cost
@@ -87,10 +99,11 @@ classdef St
 		% correlation for multiple Us across all pairs given the mean and cov of x0
 		function corr = LQRCorrMulti2D(x0_mean, x0_cov, lqrsol_1, lqrsol_2, U_1, U_2)
 			% TODO: Us should be in rows
-			items = size(U_1, 2);
-			corr = zeros(items, items);
-			for i = 1:items
-				for j = 1:items
+			items_1 = size(U_1, 2);
+			items_2 = size(U_2, 2);
+			corr = zeros(items_1, items_2);
+			for i = 1:items_1
+				for j = 1:items_2
 					corr(i, j) = St.LQRCorr(x0_mean, x0_cov, lqrsol_1, lqrsol_2, U_1(:, i), U_2(:, j));
 				end
 			end
@@ -108,10 +121,11 @@ classdef St
 		
 		% correlation between all pairs of rows of two matrices
 		function corr = CorrMulti2D(cost_1, cost_2)
-			items = size(cost_1, 1);
-			corr = zeros(items, items);
-			for i = 1:items % iterations in 1
-				for j = 1:items % iterations in 2
+			items_1 = size(cost_1, 1);
+			items_2 = size(cost_2, 1);
+			corr = zeros(items_1, items_2);
+			for i = 1:items_1 % iterations in 1
+				for j = 1:items_2 % iterations in 2
 					corr_mat = corrcoef(cost_1(i, :), cost_2(j, :));
 					% rows are from 1, cols are from 2
 					corr(i, j) = corr_mat(1, 2); % we only need the cross correlation, diagnonal will be 1
