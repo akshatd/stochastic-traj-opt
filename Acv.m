@@ -45,9 +45,12 @@ classdef Acv < handle
 				var_l = var(cost_lf_all);
 				cov_hl = cov(cost_hf_all, cost_lf_all);
 				cov_hl = cov_hl(1, 2); % only off diagonal element
-				alpha = -m/(m+n) * cov_hl / var_l;
+				% alpha = -m/(m+n) * cov_hl / var_l; % based off notes
+				alpha = -cov_hl / var_l; % based off paper
 			elseif strcmp(a_type, '-1')
 				alpha = -1;
+				% alpha = -5.8;
+				% alpha = -5.2;
 			end
 			if strcmp(e_type, 'anly')
 				exp_l = St.LQRExp(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla);
@@ -87,9 +90,12 @@ classdef Acv < handle
 				var_l = var(cost_lf_all);
 				cov_hl = cov(cost_hf_all, cost_lf_all);
 				cov_hl = cov_hl(1, 2); % only off diagonal element
-				alpha = -m/(m+n) * cov_hl / var_l;
+				% alpha = -m/(m+n) * cov_hl / var_l; % based off notes
+				alpha = -cov_hl / var_l; % based off paper
 			elseif strcmp(a_type, '-1')
 				alpha = -1;
+				% alpha = -5.8;
+				% alpha = -5.2;
 			end
 			if strcmp(e_type, 'anly')
 				exp_l = St.LQRExp(obj.x0_mean, obj.x0_cov, obj.lqrsol_lf, u_hla);
@@ -105,7 +111,7 @@ classdef Acv < handle
 		end
 		
 		
-		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, m, use_best_U_lf, a_type, e_type, use_sgd)
+		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, m, use_best_U_lf, a_type, e_type, use_sgd, U_bounds_A, U_bounds_b)
 			costs = zeros(max_iters, 1);
 			obj.Us = zeros(size(u0, 1), max_iters);
 			obj.U_hlas = zeros(size(u0, 1)/10, max_iters);
@@ -113,10 +119,10 @@ classdef Acv < handle
 			obj.idx = 1;
 			
 			if max_iters <  0 || tol < 0
-				options = optimoptions('fminunc', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn);
+				options = optimoptions('fmincon', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn);
 				% options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @OutFn);
 			else
-				options = optimoptions('fminunc', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol);
+				options = optimoptions('fmincon', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol);
 				% options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol, 'Display', 'iter-detailed');
 			end
 			% normal f
@@ -162,7 +168,8 @@ classdef Acv < handle
 				% f = @(u) fwGrad(x0_rv_ext, n, m, u, use_best_U_lf, a_type, e_type);
 				% grad_opts = optimoptions("fminunc", FiniteDifferenceType="central");
 				% checkGradients(f, u0, grad_opts, Display="on");
-				fminunc(f, u0, options);
+				% fminunc(f, u0, options);
+				fmincon(f, u0, U_bounds_A, U_bounds_b, [], [], [], [], [], options);
 			end
 			
 			% trim to match iters
@@ -193,12 +200,25 @@ classdef Acv < handle
 			var_h = St.LQRVar(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, u);
 			u_lf = St.DownsampleAvg(u, 10);
 			corr_hl = St.LQRCorr(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, obj.lqrsol_lf, u, u_lf);
-			var = var_h/n * (1 - m/(m+n) * corr_hl^2);
+			% var = var_h/n * (1 - m/(m+n) * corr_hl^2); % for MLMC ACV, notes
+			r1 = m/n;
+			var = var_h/n * (1 - (r1-1)/r1 * corr_hl^2); % for MFMC ACV, paper
 		end
 		
 		function [n_acv, m_acv] = getEqCostSamples(obj, n_mc, mn_ratio)
 			n_acv = round(n_mc / (1 + obj.l_h_cost_ratio + mn_ratio*obj.l_h_cost_ratio));
 			m_acv = round(mn_ratio * n_acv);
+		end
+		
+		% following functions are only for optimization
+		function var = varianceEqCost(obj, n_cv, mn_ratio, u)
+			[n, m] = obj.getEqCostSamplesRaw(n_cv, mn_ratio);
+			var = obj.variance(n, m, u);
+		end
+		
+		function [n_acv, m_acv] = getEqCostSamplesRaw(obj, n_mc, mn_ratio)
+			n_acv = n_mc / (1 + obj.l_h_cost_ratio + mn_ratio*obj.l_h_cost_ratio);
+			m_acv = mn_ratio * n_acv;
 		end
 		
 	end

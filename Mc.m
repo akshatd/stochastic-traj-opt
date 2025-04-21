@@ -23,17 +23,17 @@ classdef Mc < handle
 			cost = mean(St.LQRObj_precalc(x0_rv_ext(:, 1:n), obj.lqrsol, u, x0_term));
 		end
 		
-		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, use_sgd)
+		function [costs, Us, U_hlas] = opt(obj, u0, max_iters, tol, x0_rv_ext, n, use_sgd, U_bounds_A, U_bounds_b)
 			costs = zeros(max_iters, 1);
 			obj.Us = zeros(size(u0, 1), max_iters);
 			obj.U_hlas = zeros(size(u0, 1)/10, max_iters);
 			obj.idx = 1;
 			
 			if max_iters <  0 || tol < 0
-				options = optimoptions('fminunc', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn);
+				options = optimoptions('fmincon', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn);
 				% options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @OutFn);
 			else
-				options = optimoptions('fminunc', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol);
+				options = optimoptions('fmincon', 'SpecifyObjectiveGradient', false, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol);
 				% options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @OutFn, 'MaxIter', max_iters, 'OptimalityTolerance', tol, 'StepTolerance', tol, 'Display', 'iter-detailed');
 			end
 			
@@ -80,7 +80,8 @@ classdef Mc < handle
 				% grad_opts = optimoptions("fminunc", FiniteDifferenceType="central");
 				% checkGradients(f, u0, grad_opts, Display="on");
 				
-				fminunc(f, u0, options);
+				% fminunc(f, u0, options);
+				fmincon(f, u0, U_bounds_A, U_bounds_b, [], [], [], [], [], options);
 			end
 			
 			% trim to match iters

@@ -227,7 +227,9 @@ analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_e
 %% E.2 correlation at different points in a numerical optimizer
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 fun = @(u) St.LQRObjwGrad(data.lqrsol{1}.x0_ext, data.lqrsol{1}, u);
-Uopt_num = fminuncWHistory(fun, u0_num);
+U_bounds_A = eye(length(u0_num));
+U_bounds_b = 1.5*ones(length(u0_num), 1);
+Uopt_num = fminuncWHistory(fun, u0_num, U_bounds_A, U_bounds_b);
 Uopt_h_num = Uopt_num(:, end);
 iters = size(Uopt_num, 2);
 
@@ -280,7 +282,7 @@ x0_rv_ext = [
 cv = Cv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_ratio);
 n_cv = cv.getEqCostSamples(n_mc);
 
-[~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, false, false);
+[~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, false, false, U_bounds_A, U_bounds_b);
 Uopt_cv = U_h; % save for plotting later
 % U_lf = repelem(U_hla, 10, cv.idx); % uncomment to visualize
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
@@ -291,7 +293,7 @@ analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_e
   title_str, obj_str, "Iteration", "cv_opt", true);
 
 %% F.1.2 CV with LF solution at max corr
-[~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, true, false);
+[~, U_h, U_l] = cv.opt(u0_num, -1, -1, x0_rv_ext, n_cv, true, false, U_bounds_A, U_bounds_b);
 Uopt_cv_max = U_h; % save for plotting later
 % U_lf = repelem(U_hla, 10, cv.idx);
 % visSols(U_hf, U_lf, data.lqrsol{1}.times, "Solutions along optimizer path", 1:iters, "Iteration");
@@ -304,8 +306,8 @@ analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_e
 %% F.2.1 normal ACV
 acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_ratio);
 %% check variance of ACV across different ratios of HF/LF evaluations
-% acv_mn_ratios = 0.1:0.1:2;
-% num_rv_samples = 2000; % large enough to give samples to acv
+% acv_mn_ratios = 0.1:0.2:7;
+% num_rv_samples = 5000; % large enough to give samples to acv
 % num_estimator_samples = 1000;
 % x0_rv_ext = zeros(length(x0_ext), num_rv_samples, num_estimator_samples);
 % for i=1:num_estimator_samples
@@ -319,12 +321,17 @@ acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_rati
 %   [n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_mn_ratios(i));
 %   fprintf("\n*** ACV Ratio: %f, m: %d, n: %d ***\n", acv_mn_ratios(i), m_acv, n_acv);
 %   for j=1:num_estimator_samples
-%     var_data_acv(i, j) = acv.est(x0_rv_ext(:, :, j), n_acv, m_acv, Uopt_h_num, false, '-1', 'share');
+%     var_data_acv(i, j) = acv.est(x0_rv_ext(:, :, j), n_acv, m_acv, Uopt_h_num, false, 'stat', 'share');
 %   end
 %   var_acv_an(i) = acv.variance(n_acv, m_acv, Uopt_h_num);
 % end
+
+% %%
 % var_acv = var(var_data_acv, 0, 2);
 % acv_mn_ratio_opt = acv_mn_ratios(var_acv == min(var_acv));
+% acv_mn_ratio_opt_an = fminunc(@(x) acv.varianceEqCost(n_mc, x, Uopt_h_num), 1); % analytical opt
+% fprintf("ACV ratio with min variance: %f\n", acv_mn_ratio_opt);
+% fprintf("ACV ratio with min variance (anly): %f\n", acv_mn_ratio_opt_an);
 
 % figure;
 % plot(acv_mn_ratios, var_acv, 'b', 'LineWidth', 2, 'DisplayName', 'Statistical');
@@ -332,13 +339,13 @@ acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_rati
 % plot(acv_mn_ratios, var_acv_an, 'r', 'LineWidth', 2, 'DisplayName', 'Analytical');
 % xlabel("ACV Ratio (m:n)");
 % ylabel("Variance");
-% title("ACV estimator Variance across m:n ratios (eq cost, $\alpha=-1$)", "Interpreter", "latex");
+% title("ACV estimator Variance across m:n ratios (eq cost, $\alpha=stat$)", "Interpreter", "latex");
 % legend show;
 % grid on;
 
+%% ACV optimizer
 acv_mn_ratio_opt = 2; % set this to the optimal ratio from above (1.5)
 [n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_mn_ratio_opt);
-
 [~, U_h, U_l] = acv.opt(u0_num, -1, -1, x0_rv_ext, n_acv, m_acv, false, '-1', 'share', false);
 Uopt_acv = U_h; % save for plotting later
 
@@ -463,7 +470,7 @@ for num_samples=num_rv_samples
   [n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_mn_ratio_opt);
   % n_cv = n_mc;
   % n_acv = n_cv;
-  % m_acv = 1;
+  % m_acv = 10000;
   num_rv_samples_actual(num_rv_samples == num_samples, :) = [n_mc, n_cv, n_acv, m_acv];
   
   n_total = round(max(n_cv+n_acv+m_acv, num_samples)); % account for weird splits like 0.999
@@ -475,17 +482,17 @@ for num_samples=num_rv_samples
     x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
     
     % MC with HF
-    [objs, Us, ~] = mc.opt(u0_num, max_iters, tol, x0_rv_ext, n_mc, true);
+    [objs, Us, ~] = mc.opt(u0_num, max_iters, tol, x0_rv_ext, n_mc, false);
     data.h_obj(:, i, num_rv_samples == num_samples) = objs;
     data.h_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % CV (true = lf at max corr)
-    [objs, Us, ~] = cv.opt(u0_num, max_iters, tol, x0_rv_ext, n_cv, true, true);
+    [objs, Us, ~] = cv.opt(u0_num, max_iters, tol, x0_rv_ext, n_cv, true, false);
     data.cv_obj(:, i, num_rv_samples == num_samples) = objs;
     data.cv_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % ACV (true = lf at max corr)
-    [objs, Us, ~] = acv.opt(u0_num, max_iters, tol, x0_rv_ext, n_acv, m_acv, true, '-1', 'share', true);
+    [objs, Us, ~] = acv.opt(u0_num, max_iters, tol, x0_rv_ext, n_acv, m_acv, true, 'stat', 'share', false);
     data.acv_obj(:, i, num_rv_samples == num_samples) = objs;
     data.acv_u(:, :, i, num_rv_samples == num_samples) = Us;
   end
@@ -545,6 +552,7 @@ for i=1:length(num_rv_samples)
   
   ax = gca;
   ax.YAxis(1).Scale ="log";
+  ax.YAxis(1).Limits = [1e0 1e5];
   % ax.YAxis(2).Scale ="log";
   % ax.XAxis.TickValues = 1:max_iters;
   title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV n="+num_rv_samples_actual(i, 2)+", ACV n="+num_rv_samples_actual(i, 3)+", m="+num_rv_samples_actual(i, 4));
@@ -567,7 +575,7 @@ function xdot = msd(~, x, u, A, B)
 xdot = A * x + B * u;
 end
 
-function x_history = fminuncWHistory(fun, x0)
+function x_history = fminuncWHistory(fun, x0, U_bounds_A, U_bounds_b)
 % this is a wrapper around fminunc that returns the history of the optimization
 % check gradient
 grad_opts = optimoptions("fminunc", FiniteDifferenceType="central");
@@ -576,8 +584,11 @@ if ~valid
   error("Gradient check failed");
 end
 x_history = [];
-options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
-fminunc(fun, x0, options);
+% options = optimoptions('fminunc', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
+% fminunc(fun, x0, options);
+
+options = optimoptions('fmincon', 'SpecifyObjectiveGradient', true, 'OutputFcn', @outfun);
+fmincon(fun, x0, U_bounds_A, U_bounds_b, [], [], [], [], [], options);
 
   function stop = outfun(x, ~, state)
     % this is for capturing intermediate values of the optimization
