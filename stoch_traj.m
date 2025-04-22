@@ -314,7 +314,7 @@ acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_rati
 %   x0_rv = mvnrnd(x0_mean, x0_cov, num_rv_samples)';
 %   x0_rv_ext(:, :, i) = [x0_rv; repmat(u0, 1, num_rv_samples); repmat(ref, 1, num_rv_samples)];
 % end
-
+% 
 % var_data_acv = zeros(length(acv_mn_ratios), num_estimator_samples);
 % var_acv_an = zeros(length(acv_mn_ratios), 1);
 % for i=1:length(acv_mn_ratios)
@@ -326,17 +326,23 @@ acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_rati
 %   var_acv_an(i) = acv.variance(n_acv, m_acv, Uopt_h_num);
 % end
 
-% %%
+%%
 % var_acv = var(var_data_acv, 0, 2);
 % acv_mn_ratio_opt = acv_mn_ratios(var_acv == min(var_acv));
-% acv_mn_ratio_opt_an = fminunc(@(x) acv.varianceEqCost(n_mc, x, Uopt_h_num), 1); % analytical opt
 % fprintf("ACV ratio with min variance: %f\n", acv_mn_ratio_opt);
-% fprintf("ACV ratio with min variance (anly): %f\n", acv_mn_ratio_opt_an);
-
+% ratios_raw = 0.01:0.1:7;
+% var_acv_raw = zeros(length(ratios_raw), 1);
+% for i=1:length(ratios_raw)
+%   m_acv = round(ratios_raw(i) * n_mc);
+%   var_acv_raw(i) = acv.variance(n_mc, m_acv, Uopt_h_num);
+% end
+% 
 % figure;
 % plot(acv_mn_ratios, var_acv, 'b', 'LineWidth', 2, 'DisplayName', 'Statistical');
 % hold on;
 % plot(acv_mn_ratios, var_acv_an, 'r', 'LineWidth', 2, 'DisplayName', 'Analytical');
+% plot(ratios_raw, var_acv_raw, 'g--', 'LineWidth', 2, 'DisplayName', 'Analytical (not equal cost)');
+% yline(mc.var(n_mc, Uopt_h_num), 'k--', 'LineWidth', 2, 'DisplayName', 'MC var');
 % xlabel("ACV Ratio (m:n)");
 % ylabel("Variance");
 % title("ACV estimator Variance across m:n ratios (eq cost, $\alpha=stat$)", "Interpreter", "latex");
@@ -344,18 +350,19 @@ acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_rati
 % grid on;
 
 %% ACV optimizer
-acv_mn_ratio_opt = 2; % set this to the optimal ratio from above (1.5)
+acv_mn_ratio_opt = fminunc(@(x) acv.varianceEqCost(n_mc, x, Uopt_h_num), 1); % analytical opt
+fprintf("ACV ratio with min variance (anly): %f\n", acv_mn_ratio_opt);
 [n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_mn_ratio_opt);
-[~, U_h, U_l] = acv.opt(u0_num, -1, -1, x0_rv_ext, n_acv, m_acv, false, '-1', 'share', false);
+[~, U_h, U_l] = acv.opt(u0_num, -1, -1, x0_rv_ext, n_acv, m_acv, false, 'stat', 'share', false, U_bounds_A, U_bounds_b);
 Uopt_acv = U_h; % save for plotting later
 
 title_str = "$S_{"+n_acv+","+m_acv+"}^{ACV}$";
-obj_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
+obj_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];bf
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, 1:acv.idx, ...
   title_str, obj_str, "Iteration", "acv_opt", true);
 
 %% F.2.2 ACV with LF solution at max corr
-[~, U_h, U_l] = acv.opt(u0_num, -1, -1, x0_rv_ext, n_acv, m_acv, true, '-1', 'share', false);
+[~, U_h, U_l] = acv.opt(u0_num, -1, -1, x0_rv_ext, n_acv, m_acv, true, 'stat', 'share', false, U_bounds_A, U_bounds_b);
 Uopt_acv_max = U_h; % save for plotting later
 
 title_str = "$S_{"+n_acv+","+m_acv+"}^{ACV}$";
@@ -445,12 +452,12 @@ legend show;
 grid on;
 
 %% G Convergence and variance with various optimizers and sample sizes
-num_rv_samples = [10 100 500];
+num_rv_samples = [10 100];
 num_rv_samples_actual = zeros(length(num_rv_samples), 4); % 4 bc we have [MC, CV, n_ACV ,m_ACV]
-num_estimator_samples = 200;
+num_estimator_samples = 50;
 
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
-max_iters = 30;
+max_iters = 15;
 tol = 1e-12;
 
 mc = Mc(x0_ext_mean, x0_ext_cov, data.lqrsol{1});
@@ -468,12 +475,11 @@ for num_samples=num_rv_samples
   n_mc = num_samples;
   n_cv = cv.getEqCostSamples(n_mc);
   [n_acv, m_acv] = acv.getEqCostSamples(n_mc, acv_mn_ratio_opt);
-  % n_cv = n_mc;
   % n_acv = n_cv;
   % m_acv = 10000;
   num_rv_samples_actual(num_rv_samples == num_samples, :) = [n_mc, n_cv, n_acv, m_acv];
   
-  n_total = round(max(n_cv+n_acv+m_acv, num_samples)); % account for weird splits like 0.999
+  n_total = round(max(n_cv+n_acv+m_acv, num_samples));
   
   for i=1:num_estimator_samples
     waitbar(i/num_estimator_samples, wait_bar);
@@ -482,17 +488,17 @@ for num_samples=num_rv_samples
     x0_rv_ext = [x0_rv; repmat(u0, 1, n_total); repmat(ref, 1, n_total)];
     
     % MC with HF
-    [objs, Us, ~] = mc.opt(u0_num, max_iters, tol, x0_rv_ext, n_mc, false);
+    [objs, Us, ~] = mc.opt(u0_num, max_iters, tol, x0_rv_ext, n_mc, false, U_bounds_A, U_bounds_b);
     data.h_obj(:, i, num_rv_samples == num_samples) = objs;
     data.h_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % CV (true = lf at max corr)
-    [objs, Us, ~] = cv.opt(u0_num, max_iters, tol, x0_rv_ext, n_cv, true, false);
+    [objs, Us, ~] = cv.opt(u0_num, max_iters, tol, x0_rv_ext, n_cv, true, false, U_bounds_A, U_bounds_b);
     data.cv_obj(:, i, num_rv_samples == num_samples) = objs;
     data.cv_u(:, :, i, num_rv_samples == num_samples) = Us;
     
     % ACV (true = lf at max corr)
-    [objs, Us, ~] = acv.opt(u0_num, max_iters, tol, x0_rv_ext, n_acv, m_acv, true, 'stat', 'share', false);
+    [objs, Us, ~] = acv.opt(u0_num, max_iters, tol, x0_rv_ext, n_acv, m_acv, true, 'stat', 'share', false, U_bounds_A, U_bounds_b);
     data.acv_obj(:, i, num_rv_samples == num_samples) = objs;
     data.acv_u(:, :, i, num_rv_samples == num_samples) = Us;
   end

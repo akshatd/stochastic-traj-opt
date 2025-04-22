@@ -108,7 +108,7 @@ classdef Mc < handle
 			U_hlas = obj.U_hlas;
 		end
 		
-		function var = var(n, u)
+		function var = var(obj, n, u)
 			var_h = St.LQRVar(obj.x0_mean, obj.x0_cov, obj.lqrsol, u);
 			var = var_h/n;
 		end

@@ -201,7 +201,7 @@ classdef Acv < handle
 			u_lf = St.DownsampleAvg(u, 10);
 			corr_hl = St.LQRCorr(obj.x0_mean, obj.x0_cov, obj.lqrsol_hf, obj.lqrsol_lf, u, u_lf);
 			% var = var_h/n * (1 - m/(m+n) * corr_hl^2); % for MLMC ACV, notes
-			r1 = m/n;
+			r1 = (m+n)/n;
 			var = var_h/n * (1 - (r1-1)/r1 * corr_hl^2); % for MFMC ACV, paper
 		end
 		
