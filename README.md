@@ -764,22 +764,6 @@ Comparing $J_h(u_h, x_0)$ and $J_l(u_{hlr}, x_0)$
 
 Comparing $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$
 
-#### Perturbation in the low fidelity model/objective function
-
-When perturbing in the low fidelity model/objective function, the perturbed high fidelity solution was determined
-by converting the low fidelity perturbation to high fidelity dimensions as described in section \ref{comp_opt}.
-
-Hence, we have the following important variables:
-
-- $J_h$: High fidelity model/objective function
-- $J_l$: Low fidelity model/objective function
-- $u_l^*$: Low fidelity optimum
-- $p_l$: Low fidelity perturbation
-- $u_l = u_l^* + p_l$: Perturbed low fidelity solution
-- $u_{lh} = T_{lh} u_l$: Perturbed high fidelity solution upsampled
-
-Comparing $J_h(u_{lh}, x_0)$ and $J_l(u_l, x_0)$
-
 #### Along the path of a numerical optimizer
 
 Since in a realistic scenario, one would be optimizing using a numerical optimizer, and desire to reach the high fidelity optimum,
@@ -825,18 +809,67 @@ The important variables for constructing the control variate are:
 The control variate coefficient $\alpha$ can be calculated as
 
 $$
-\alpha = -\frac{\text{Cov}(J*h(u_h, x_0), J_l(u*{hla}, x*0))}{\text{Var}[J_l(u*{hla}, x_0)]}
+\alpha = -\frac{\text{Cov}(J_h(u_h, x_0), J_l(u_{hla}, x_0))}{\text{Var}[J_l(u_{hla}, x_0)]}
 $$
 
 Hence, the control variate is
 
 $$
-S*n^{CV}(J_h, J_l) = S_n^{MC}(J_h(u_h, x_0)) + \alpha (S_n^{MC}(J_l(u*{hla}, x*0)) - \mathbb{E}[J_l(u*{hla}, x_0)])
+S_n^{CV}(J_h, J_l) = S_n^{MC}(J_h(u_h, x_0)) + \alpha (S_n^{MC}(J_l(u_{hla}, x_0)) - \mathbb{E}[J_l(u_{hla}, x_0)])
 $$
 
 Where the samples of $x_0$ used in $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$ are the same.
 
 Note that $\text{Cov}(J_h(u_h, x_0), J_l(u_{hla}, x_0))$, $\text{Var}[J_l(u_{hla}, x_0)]$ and $\mathbb{E}[J_l(u_{hla}, x_0)]$ are calculated analytically using the equations in section \ref{stochastic_lqr}.
+
+The variance of the CV estimator is given by
+
+$$
+Var[S_n^{CV}(J_h, J_l)] = \frac{Var[J_h(u_h, x_0)]}{n} (1 - \rho^2)
+$$
+
+Where $\rho$ is the correlation coefficient between $J_h(u_h, x_0)$ and $J_l(u_{hla}, x_0)$.
+
+For equal computation cost, we can select $n$ samples of $x_0$ from the $N_{mc}$ total samples used in the MC estimator by using the following formula
+
+$$
+n = \frac{N_{mc}} {1 + \text{cost ratio}_{lh}}
+$$
+
+Where $\text{cost ratio}_{hl}$ is the ratio of the computation cost of the low fidelity model to the high fidelity model.
+
+### Approximate Control Variate Construction
+
+For the Approximate Control Variate(ACV), we contruct a Multi Fidelity Monte Carlo(MFMC) Estimator, which is one of the many types of ACV Estimators. We use the same terms as in the CV estimator, but now we calculate the expectation of the low fidelity term differently since this is meant to emulate a real-life scenario where it the low fidelity expectation might not be available to us. Hence, the MFMC estimator is as follows
+
+$$
+S_{n,m}^{ACV}(J_h, J_l) = S_n^{MC}(J_h(u_h, x_0)) + \alpha (S_n^{MC}(J_l(u_{hla}, x_0)) - S_{m+n}^{MC}(J_l(u_{hla}, x_0)))
+$$
+
+Where the expectation term uses the $n$ samples from the low fidelity term and an additional $m$ samples to get a better estimate of the expectation. Since this will not be the exact expectation, the variance of the ACV estimator is now given by
+
+$$
+Var[S_{n,m}^{ACV}(J_h, J_l)] = \frac{Var[J_h(u_h, x_0)]}{n} (1 - \frac{r_1 - 1}{r_1}\rho^2)
+$$
+
+Where $r_1 = \frac{m+n}{n}$ is the ratio of the number of samples used in the expectatio term to the number of samples used in the estimators.
+
+Here, to calculate $n$ and $m$, we need to know the ratio $m:n$ that we require. Given this ratio $\text{ratio}_{m:n}$, we can calculate $n$ and $m$ such that the computational cost of the ACV estimator is equal to the computational cost of the MC estimator with $N_{mc}$ samples.
+
+$$
+\begin{aligned}
+n &= \frac{N_{mc}} {1 + \text{cost ratio}_{lh} + \text{ratio}_{m:n} \text{cost ratio}_{lh}} \\
+m &= \text{ratio}_{m:n} n
+\end{aligned}
+$$
+
+In practise, different $m:n$ ratios can be tried for a given solution $u$, and the ratio which gives us the minimum variance is the one selected. For this project, that was done by using the control input $u_h$ at the deterministic optimum, and then the optimal $m:n$ ratio was determined by
+
+$$
+\text{ratio}_{m:n} = \underset{m:n}{argmin} \{Var[S_{n,m}^{ACV}(J_h, J_l)]\}
+$$
+
+Where the actual $m$ and $n$ values are calculated by making sure that the computational cost of the ACV estimator is equal to the computational cost of the MC estimator with $N_{mc}$ samples.
 
 ### Numerical optimizer using Control Variate
 
@@ -845,6 +878,10 @@ The numerical optimizer was run in 3 different scenarios
 - $S_n^{MC}(J_h(U_h, x_0))$: MC estimate of the high fidelity objective function
 - $S_n^{CV}(J_h(U_h, x_0), J_l(U_{hla}, x_0))$: CV estimate with $u_{hla}$ at the current iteration
 - $S_n^{CV_{max}}(J_h(U_h, x_0), J_l(U_{hla}^{max}, x_0))$:CV estimate where $u_{hla}^{max}$ is at the iteration with the highest correlation.
+- $S_{n,m}^{ACV}(J_h(U_h, x_0), J_l(U_{hla}, x_0))$: ACV estimate with $u_{hla}$ at the current iteration
+- $S_{n,m}^{ACV_{max}}(J_h(U_h, x_0), J_l(U_{hla}^{max}, x_0))$: ACV estimate where $u_{hla}^{max}$ is at the iteration with the highest correlation.
+
+The estimators that use the low fidelity solution at the iteration with maximum correlation have been constructed to make sure that we get the best possible variance reduction, since the variance reduction increases as the correlation of the cost between the high and low fidelity solutions increases.
 
 This is how the whole routine works, step-by-step:
 
@@ -853,66 +890,60 @@ Initialization:
 - $U_l^* \gets$ Analytical solution of low fidelity model
 - $U_{h_0} \gets T_{lh} U_l^*$
 
-% For $S_n^{CV}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
-% $$
-% S*n^{CV}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U*{hla}, x*0)) - \mathbb{E}[J_l(U*{hla}, x_0)])
-% $$
-
-% Where
-%
-% \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
-% \item $U_{hla} = T_{hla} U$
-% \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0), J_l(U_{hla}, x_0))}{\text{Var}[J_l(U_{hla}, x_0)]}$ is calculated analytically
-% \item $\mathbb{E}[J_l(U_{hla}, x_0)]$ is calculated analytically
-%
-
-% For $S_n^{CV_{max}}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
-% $$
-% S*n^{CV*{max}}(J*h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U*{hla}^{max}, x*0)) - \mathbb{E}[J_l(U*{hla}^{max}, x_0)])
-% $$
-
-% Where
-%
-% \item $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
-% \item $U_{hla} = T_{hla} U$
-% \item $U_{hla}^{max} = \underset{U_{hla}(j)}{max} \{\rho(J_h(U(i), x_0^n), J_l(U_{hla}(j), x_0^n))\}_{j=1}^i$
-% \item $\alpha = -\frac{\text{Cov}(J_h(U, x_0), J_l(U_{hla}^{max}, x_0))}{\text{Var}[J_l(U_{hla}^{max}, x_0)]}$ is calculated analytically
-% \item $\mathbb{E}[J_l(U_{hla}^{max}, x_0)]$ is calculated analytically
-%
-
-For $S_{nm}^{ACV}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+For $S_n^{CV}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
 
 $$
-S*{nm}^{ACV}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U*{hla}, x*0)) - S_m^{MC}(J_l(U*{hla}, x_0)))
+S_n^{CV}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}, x_0)) - \mathbb{E}[J_l(U_{hla}, x_0)])
 $$
 
 Where
 
-- $m$: Total number of samples of $x_0$
-- $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S_m^{MC}(J_h(U, x_0))$ (without considering the cost of $S_m^{MC}(J_l(U_{hla}, x_0))$)
+- $n$: Number of samples of $x_0$ used in the CV estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
+- $U_{hla} = T_{hla} U$
+- $\alpha = -\frac{\text{Cov}(J_h(U, x_0), J_l(U_{hla}, x_0))}{\text{Var}[J_l(U_{hla}, x_0)]}$ is calculated analytically
+- $\mathbb{E}[J_l(U_{hla}, x_0)]$ is calculated analytically
+
+For $S_n^{CV_{max}}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+
+$$
+S_n^{CV*{max}}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}^{max}, x_0)) - \mathbb{E}[J_l(U_{hla}^{max}, x_0)])
+$$
+
+Where
+
+- $n$: Number of samples of $x_0$ used in the CV estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
+- $U_{hla} = T_{hla} U$
+- $U_{hla}^{max} = \underset{U_{hla}(j)}{max} \{\rho(J_h(U(i), x_0^n), J_l(U_{hla}(j), x_0^n))\}_{j=1}^i$
+- $\alpha = -\frac{\text{Cov}(J_h(U, x_0), J_l(U_{hla}^{max}, x_0))}{\text{Var}[J_l(U_{hla}^{max}, x_0)]}$ is calculated analytically
+- $\mathbb{E}[J_l(U_{hla}^{max}, x_0)]$ is calculated analytically
+
+For $S_{n,m}^{ACV}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+
+$$
+S_{n,m}^{ACV}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}, x_0)) - S_{m+n}^{MC}(J_l(U_{hla}, x_0)))
+$$
+
+Where
+
+- $n+m$: Total number of samples of $x_0$ used n ACV estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
 - $U_{hla} = T_{hla} U$
 - $\alpha = -\frac{\text{Cov}(J_h(U, x_0^n), J_l(U_{hla}, x_0^n))}{\text{Var}[J_l(U_{hla}, x_0^n)]}$ is calculated statistically with $n$ samples
 
-For $S_{nm}^{ACV_{max}}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
+For $S_{n,m}^{ACV_{max}}$ the numerical optimizer is run for $i^{max}$ iterations, where in each iteration $i$, the objective is calculated:
 
 $$
-S*{nm}^{ACV*{max}}(J*h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U*{hla}^{max}, x*0)) - S_m^{MC}(J_l(U*{hla}^{max}, x_0)))
+S_{n,m}^{ACV_{max}}(J_h, J_l) = S_n^{MC}(J_h(U, x_0)) + \alpha (S_n^{MC}(J_l(U_{hla}^{max}, x_0)) - S_{m+n}^{MC}(J_l(U_{hla}^{max}, x_0)))
 $$
 
 Where
 
-- $m$: Total number of samples of $x_0$
-- $n$: Number of samples of $x_0$ used in the MC estimate to equal the cost of $S_m^{MC}(J_h(U, x_0))$ (without considering the cost of $S_m^{MC}(J_l(U_{hla}, x_0))$)
+- $n+m$: Total number of samples of $x_0$ used n ACV estimate to equal the cost of $S^{MC}(J_h(U, x_0))$ with all samples
 - $U_{hla} = T_{hla} U$
 - $U_{hla}^{max} = \underset{U_{hla}(j)}{max} \{\rho(J_h(U(i), x_0^n), J_l(U_{hla}(j), x_0^n))\}_{j=1}^i$
 - $\alpha = -\frac{\text{Cov}(J_h(U, x_0^n), J_l(U_{hla}^{max}, x_0^n))}{\text{Var}[J_l(U_{hla}^{max}, x_0^n)]}$ is calculated statistically with $n$ samples
 
-For these experiments, $n$, the number of samples of $x_0$ used in the MC estimate, was compared between 10, 100, 500 and 1000.
-The comparison is done between $S_n^{MC}(J_h(u_h, x_0))$ vs $S_{\frac{n}{2}}^{CV}(J_h, J_l)$ and $S_{\frac{n}{2}}^{CV_{max}}(J_h, J_l)$
-to keep the number of objective function evaluations the same with the control variate estimators having a lower computational cost
-due to half the sammples being used in the low fidelity objective function.
-
-To compare the variance, we ran a numerical optimizer with n random samples of $x_0$ and calculated the variance for each iteration.
+For these experiments, $N_{mc}$, the number of samples of $x_0$ used in the MC estimate, was compared between 10, 100, 500 and the CV and ACV estimates were allocated samples that were equal to the cost of the MC estimate with all samples.
+To compare the variance, we ran a numerical optimizer with n random samples of $x_0$ and calculated the variance for each iteration. We also added a constraint on the control input $u$ to always be $\leq 1.5$ so that the solution represents a realistic scenario.
 
 The variance was also calculated analytically for each control variate
 
