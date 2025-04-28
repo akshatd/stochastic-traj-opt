@@ -211,8 +211,8 @@ classdef Acv < handle
 		end
 		
 		% following functions are only for optimization
-		function var = varianceEqCost(obj, n_cv, mn_ratio, u)
-			[n, m] = obj.getEqCostSamplesRaw(n_cv, mn_ratio);
+		function var = varianceEqCost(obj, n_mc, mn_ratio, u)
+			[n, m] = obj.getEqCostSamplesRaw(n_mc, mn_ratio);
 			var = obj.variance(n, m, u);
 		end
 		

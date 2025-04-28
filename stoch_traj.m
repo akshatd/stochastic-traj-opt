@@ -314,7 +314,7 @@ acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_rati
 %   x0_rv = mvnrnd(x0_mean, x0_cov, num_rv_samples)';
 %   x0_rv_ext(:, :, i) = [x0_rv; repmat(u0, 1, num_rv_samples); repmat(ref, 1, num_rv_samples)];
 % end
-% 
+%
 % var_data_acv = zeros(length(acv_mn_ratios), num_estimator_samples);
 % var_acv_an = zeros(length(acv_mn_ratios), 1);
 % for i=1:length(acv_mn_ratios)
@@ -336,7 +336,7 @@ acv = Acv(x0_ext_mean, x0_ext_cov, data.lqrsol{1}, data.lqrsol{2}, l_h_cost_rati
 %   m_acv = round(ratios_raw(i) * n_mc);
 %   var_acv_raw(i) = acv.variance(n_mc, m_acv, Uopt_h_num);
 % end
-% 
+%
 % figure;
 % plot(acv_mn_ratios, var_acv, 'b', 'LineWidth', 2, 'DisplayName', 'Statistical');
 % hold on;
@@ -357,7 +357,7 @@ fprintf("ACV ratio with min variance (anly): %f\n", acv_mn_ratio_opt);
 Uopt_acv = U_h; % save for plotting later
 
 title_str = "$S_{"+n_acv+","+m_acv+"}^{ACV}$";
-obj_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];bf
+obj_str = ["$J_h(u_h)$", "$J_l(u_{hla})$"];
 analyzeUs(U_h, U_l, data.lqrsol{1}, data.lqrsol{2}, x0_rv_ext, x0_ext_mean, x0_ext_cov, 1:acv.idx, ...
   title_str, obj_str, "Iteration", "acv_opt", true);
 
@@ -452,9 +452,9 @@ legend show;
 grid on;
 
 %% G Convergence and variance with various optimizers and sample sizes
-num_rv_samples = [10 100];
+num_rv_samples = [10 100 500];
 num_rv_samples_actual = zeros(length(num_rv_samples), 4); % 4 bc we have [MC, CV, n_ACV ,m_ACV]
-num_estimator_samples = 50;
+num_estimator_samples = 200;
 
 u0_num = repelem(data.lqrsol{2}.Uopt, 10, 1); % warm start
 max_iters = 15;
@@ -505,6 +505,21 @@ for num_samples=num_rv_samples
   close(wait_bar);
 end
 
+%% check optimum sample allocation for 500 sample case for 1 estimator
+n_mc = 10;
+opt_mn = zeros(max_iters, num_estimator_samples);
+for i=1:max_iters
+  for j=1:num_estimator_samples
+    opt_mn(i, j) = max(fminunc(@(x) acv.varianceEqCost(n_mc, x, data.acv_u(:, i, j, num_rv_samples == n_mc)), acv_mn_ratio_opt), 0);
+  end
+end
+
+%%
+fig = figure;
+plot(1:max_iters, opt_mn, 'r', 'LineWidth', 1, 'Color', [0.5 0.5 0.5, 0.2]);
+xlabel("Iteration");
+ylabel("m:n ratio");
+title("Optimum m:n ratio for ACV with 10 x0 samples over all 200 estimators");
 
 %% plot percentiles
 percentiles = [25 75];
@@ -534,12 +549,15 @@ end
 
 %% plot variance and box plots
 % 2nd dimension is estimator samples, squeeze to get rid of extra dimension
-data.h_var_st = squeeze(var(data.h_obj, 0, 2));
-data.cv_var_st = squeeze(var(data.cv_obj, 0, 2));
-data.acv_var_st = squeeze(var(data.acv_obj, 0, 2));
+% data.h_var_st = squeeze(var(data.h_obj, 0, 2));
+% data.cv_var_st = squeeze(var(data.cv_obj, 0, 2));
+% data.acv_var_st = squeeze(var(data.acv_obj, 0, 2));
+data.h_var_st = squeeze(vecnorm(squeeze(var(data.h_u, 0, 3)), 2, 1));
+data.cv_var_st = squeeze(vecnorm(squeeze(var(data.cv_u, 0, 3)), 2, 1));
+data.acv_var_st = squeeze(vecnorm(squeeze(var(data.acv_u, 0, 3)), 2, 1));
 fig = figure;
 fig.Position(3:4) = [1500 500];
-sgtitle("Variance of objective vs iterations");
+sgtitle("Norm of Variance of Solution vs iterations");
 for i=1:length(num_rv_samples)
   subplot(1, length(num_rv_samples), i);
   hold on;
@@ -558,7 +576,7 @@ for i=1:length(num_rv_samples)
   
   ax = gca;
   ax.YAxis(1).Scale ="log";
-  ax.YAxis(1).Limits = [1e0 1e5];
+  ax.YAxis(1).Limits = [1e-5 1e0];
   % ax.YAxis(2).Scale ="log";
   % ax.XAxis.TickValues = 1:max_iters;
   title("Samples: MC="+num_rv_samples_actual(i, 1)+", CV n="+num_rv_samples_actual(i, 2)+", ACV n="+num_rv_samples_actual(i, 3)+", m="+num_rv_samples_actual(i, 4));
@@ -570,7 +588,7 @@ end
 
 %% plot convergence in solution
 for i=1:length(num_rv_samples)
-  plotConvergence(data.lqrsol{1}.Uopt, squeeze(data.h_u(:, :, :, i)), squeeze(data.cv_u(:, :, :, i)), squeeze(data.acv_u(:, :, :, i)), ...
+  plotConvergence(Uopt_h_num, squeeze(data.h_u(:, :, :, i)), squeeze(data.cv_u(:, :, :, i)), squeeze(data.acv_u(:, :, :, i)), ...
     ["MC HF", "CV", "ACV"], "Convergence distance comparison with " + num_rv_samples(i) + " HF samples");
 end
 
